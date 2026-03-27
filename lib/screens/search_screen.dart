@@ -140,7 +140,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 24),
                           child: Text(
-                            'Search failed.\n$error',
+                            error is SearchFailure
+                                ? error.message
+                                : 'Search failed. Please try again.',
                             style: Theme.of(context)
                                 .textTheme
                                 .labelSmall

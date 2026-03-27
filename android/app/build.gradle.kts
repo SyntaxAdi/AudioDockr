@@ -44,6 +44,4 @@ flutter {
 }
 
 dependencies {
-    implementation("com.github.teamnewpipe:NewPipeExtractor:v0.24.8")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
 }

@@ -1,10 +1,20 @@
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../api/backend_api_client.dart';
 import '../database_helper.dart';
+
+class PlaybackFailure implements Exception {
+  const PlaybackFailure(this.code, this.message);
+
+  final String code;
+  final String message;
+
+  @override
+  String toString() => message;
+}
 
 final audioPlayerProvider = Provider<AudioPlayer>((ref) {
   return AudioPlayer();
@@ -12,7 +22,8 @@ final audioPlayerProvider = Provider<AudioPlayer>((ref) {
 
 final playbackNotifierProvider = StateNotifierProvider<PlaybackNotifier, PlaybackState>((ref) {
   final player = ref.read(audioPlayerProvider);
-  return PlaybackNotifier(player);
+  final apiClient = ref.read(backendApiClientProvider);
+  return PlaybackNotifier(player, apiClient);
 });
 
 class PlaybackState {
@@ -34,10 +45,10 @@ class PlaybackState {
 }
 
 class PlaybackNotifier extends StateNotifier<PlaybackState> {
-  static const MethodChannel _extractChannel = MethodChannel('audiodockr/extract');
   final AudioPlayer _player;
+  final BackendApiClient _apiClient;
 
-  PlaybackNotifier(this._player) : super(PlaybackState()) {
+  PlaybackNotifier(this._player, this._apiClient) : super(PlaybackState()) {
     _player.playingStream.listen((playing) {
       state = state.copyWith(isPlaying: playing);
     });
@@ -62,15 +73,12 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     if (res.isNotEmpty && (res.first['expires_at'] as int) > now) {
       audioUrl = res.first['audio_url'] as String;
     } else {
-      final extractedUrl = await _extractChannel.invokeMethod<String>(
-        'extract',
-        {'video_id': videoId, 'video_url': videoUrl},
-      );
+      final extractedUrl = await _extractTrackUrl(videoId, videoUrl);
 
       if (extractedUrl == null || extractedUrl.isEmpty) {
-        throw PlatformException(
-          code: 'EXTRACT_EMPTY',
-          message: 'Android extractor returned an empty audio URL.',
+        throw const PlaybackFailure(
+          'extract_empty',
+          'Audio playback could not be prepared for this track.',
         );
       }
 
@@ -104,6 +112,57 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     } catch (e) {
       // Handle error, invalid url?
       print(e);
+    }
+  }
+
+  Future<String?> _extractTrackUrl(String videoId, String videoUrl) async {
+    try {
+      return await _apiClient.extractAudioUrl(
+        videoId: videoId,
+        videoUrl: videoUrl,
+      );
+    } on BackendApiException catch (error) {
+      throw _mapExtractError(error);
+    }
+  }
+
+  PlaybackFailure _mapExtractError(BackendApiException error) {
+    switch (error.code) {
+      case 'backend_not_configured':
+        return const PlaybackFailure(
+          'backend_not_configured',
+          'Backend URL is not configured. Start the yt-dlp server and launch the app with AUDIODOCKR_API_BASE_URL.',
+        );
+      case 'temporary_unavailable':
+        return const PlaybackFailure(
+          'temporary_unavailable',
+          'The yt-dlp backend is temporarily unavailable. Please try playing this track again.',
+        );
+      case 'rate_limited':
+        return const PlaybackFailure(
+          'rate_limited',
+          'The backend is being rate limited by YouTube right now. Try again soon.',
+        );
+      case 'integrity_check_required':
+        return const PlaybackFailure(
+          'integrity_check_required',
+          'The backend needs extra YouTube verification for this request.',
+        );
+      case 'unsupported_response':
+        return const PlaybackFailure(
+          'unsupported_response',
+          'yt-dlp could not parse the playback response from YouTube.',
+        );
+      case 'extract_failed':
+        return const PlaybackFailure(
+          'extract_failed',
+          'Unable to prepare audio playback for this track.',
+        );
+      default:
+        return PlaybackFailure(
+          error.code,
+          error.message,
+        );
     }
   }
 

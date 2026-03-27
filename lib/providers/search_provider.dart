@@ -1,13 +1,26 @@
-import 'dart:convert';
-
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../api/backend_api_client.dart';
+
+final backendApiClientProvider = Provider<BackendApiClient>((ref) {
+  return BackendApiClient();
+});
 
 final searchProvider =
     StateNotifierProvider<SearchNotifier, AsyncValue<List<SearchResult>>>((ref) {
-  return SearchNotifier();
+  final apiClient = ref.read(backendApiClientProvider);
+  return SearchNotifier(apiClient);
 });
+
+class SearchFailure implements Exception {
+  const SearchFailure(this.code, this.message);
+
+  final String code;
+  final String message;
+
+  @override
+  String toString() => message;
+}
 
 class SearchResult {
   const SearchResult({
@@ -54,9 +67,9 @@ class SearchResult {
 }
 
 class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
-  SearchNotifier() : super(const AsyncValue.data([]));
+  SearchNotifier(this._apiClient) : super(const AsyncValue.data([]));
 
-  static const MethodChannel _channel = MethodChannel('audiodockr/search');
+  final BackendApiClient _apiClient;
 
   String _latestQuery = '';
 
@@ -69,23 +82,10 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
       return;
     }
 
-    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
-      state = AsyncValue.error(
-        UnsupportedError(
-          'YouTube search is only wired for Android right now. Run the app on an Android device or emulator.',
-        ),
-        StackTrace.current,
-      );
-      return;
-    }
-
     state = const AsyncValue.loading();
 
     try {
-      final lines = await _channel.invokeListMethod<String>(
-        'search',
-        {'query': trimmedQuery},
-      );
+      final response = await _apiClient.search(trimmedQuery);
 
       if (_latestQuery != trimmedQuery) {
         return;
@@ -93,34 +93,10 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
 
       final results = <SearchResult>[];
 
-      for (final line in lines ?? <String>[]) {
-        if (line.trim().isEmpty) {
-          continue;
-        }
-
-        if (line.startsWith('ERROR:')) {
-          throw PlatformException(
-            code: 'SEARCH_FAILED',
-            message: line,
-          );
-        }
-
-        try {
-          final decoded = jsonDecode(line);
-          if (decoded is Map<String, dynamic>) {
-            final result = SearchResult.fromJson(decoded);
-            if (result.videoId.isNotEmpty) {
-              results.add(result);
-            }
-          } else if (decoded is Map) {
-            final result =
-                SearchResult.fromJson(Map<String, dynamic>.from(decoded));
-            if (result.videoId.isNotEmpty) {
-              results.add(result);
-            }
-          }
-        } on FormatException {
-          // Ignore non-JSON noise from the native process and keep parsing.
+      for (final item in response.items) {
+        final result = SearchResult.fromJson(item);
+        if (result.videoId.isNotEmpty) {
+          results.add(result);
         }
       }
 
@@ -129,12 +105,68 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
       if (_latestQuery != trimmedQuery) {
         return;
       }
-      state = AsyncValue.error(error, stackTrace);
+      final mappedError = _mapSearchError(error);
+      if (mappedError.code == 'no_results') {
+        state = const AsyncValue.data([]);
+        return;
+      }
+      state = AsyncValue.error(mappedError, stackTrace);
     }
   }
 
   void clear() {
     _latestQuery = '';
     state = const AsyncValue.data([]);
+  }
+
+  SearchFailure _mapSearchError(Object error) {
+    if (error is SearchFailure) {
+      return error;
+    }
+
+    if (error is BackendApiException) {
+      switch (error.code) {
+        case 'backend_not_configured':
+          return const SearchFailure(
+            'backend_not_configured',
+            'Backend URL is not configured. Start the yt-dlp server and launch the app with AUDIODOCKR_API_BASE_URL.',
+          );
+        case 'temporary_unavailable':
+          return const SearchFailure(
+            'temporary_unavailable',
+            'The yt-dlp backend is temporarily unavailable. Please try again in a moment.',
+          );
+        case 'rate_limited':
+          return const SearchFailure(
+            'rate_limited',
+            'The backend is being rate limited by YouTube right now. Please wait a bit and retry.',
+          );
+        case 'integrity_check_required':
+          return const SearchFailure(
+            'integrity_check_required',
+            'The backend needs extra YouTube verification right now. Please try again later.',
+          );
+        case 'unsupported_response':
+          return const SearchFailure(
+            'unsupported_response',
+            'yt-dlp could not parse YouTube\'s latest response format.',
+          );
+        case 'no_results':
+          return const SearchFailure(
+            'no_results',
+            'No matching songs were found on YouTube.',
+          );
+        default:
+          return SearchFailure(
+            error.code,
+            error.message ?? 'Search failed. Please try again.',
+          );
+      }
+    }
+
+    return const SearchFailure(
+      'search_failed',
+      'Search failed. Please try again.',
+    );
   }
 }
