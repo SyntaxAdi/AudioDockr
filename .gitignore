@@ -1,0 +1,111 @@
+# ──────────────────────────────────────────────
+# AudioDockr — Flutter Project .gitignore
+# ──────────────────────────────────────────────
+
+# ── Miscellaneous ─────────────────────────────
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# ── Editors & IDEs ────────────────────────────
+# IntelliJ / Android Studio
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code (uncomment if you don't want to share launch configs)
+#.vscode/
+
+# Xcode
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+xcuserdata/
+
+# ── Flutter / Dart / Pub ──────────────────────
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Generated files
+*.g.dart
+*.freezed.dart
+*.gr.dart
+
+# Flutter web
+/web/flutter_service_worker.js
+/web/flutter.js
+
+# ── Android ───────────────────────────────────
+# Gradle build outputs
+/android/.gradle/
+/android/app/debug/
+/android/app/profile/
+/android/app/release/
+/android/build/
+/android/local.properties
+/android/key.properties       # ← Keystore signing config (NEVER commit!)
+*.jks
+*.keystore
+
+# ── iOS / macOS ───────────────────────────────
+**/ios/Pods/
+**/macos/Pods/
+**/ios/.symlinks/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+macos/Flutter/GeneratedPluginRegistrant.swift
+macos/Flutter/Flutter-Debug.plist
+macos/Flutter/Flutter-Release.plist
+
+# ── Linux ─────────────────────────────────────
+/linux/flutter/generated_plugin_registrant.cc
+/linux/flutter/generated_plugin_registrant.h
+/linux/flutter/generated_plugins.cmake
+/linux/build/
+
+# ── Windows ───────────────────────────────────
+/windows/flutter/generated_plugin_registrant.cc
+/windows/flutter/generated_plugin_registrant.h
+/windows/flutter/generated_plugins.cmake
+/windows/build/
+
+# ── Web ───────────────────────────────────────
+/web/build/
+
+# ── Symbolication & Obfuscation ───────────────
+app.*.symbols
+app.*.map.json
+
+# ── Secrets & Environment ─────────────────────
+.env
+.env.*
+!.env.example
+secrets.dart
+**/google-services.json
+**/GoogleService-Info.plist
+
+# ── Local Cache / AudioDockr-specific ─────────
+# Local audio cache and downloads directory
+local_cache/
+downloads/
+*.opus
+*.m4a
+*.mp3.cache
+
+# ── Pub lock (keep for apps, remove for packages) ─
+# pubspec.lock   ← Keep committed for apps (it is committed here)
