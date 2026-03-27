@@ -1,15 +1,11 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../api/backend_api_client.dart';
-
-final backendApiClientProvider = Provider<BackendApiClient>((ref) {
-  return BackendApiClient();
-});
+import '../api/youtube_service.dart';
 
 final searchProvider =
     StateNotifierProvider<SearchNotifier, AsyncValue<List<SearchResult>>>((ref) {
-  final apiClient = ref.read(backendApiClientProvider);
-  return SearchNotifier(apiClient);
+  final youtubeService = ref.read(youtubeServiceProvider);
+  return SearchNotifier(youtubeService);
 });
 
 class SearchFailure implements Exception {
@@ -67,9 +63,9 @@ class SearchResult {
 }
 
 class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
-  SearchNotifier(this._apiClient) : super(const AsyncValue.data([]));
+  SearchNotifier(this._youtubeService) : super(const AsyncValue.data([]));
 
-  final BackendApiClient _apiClient;
+  final YoutubeService _youtubeService;
 
   String _latestQuery = '';
 
@@ -85,22 +81,26 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
     state = const AsyncValue.loading();
 
     try {
-      final response = await _apiClient.search(trimmedQuery);
+      final items = await _youtubeService.search(trimmedQuery);
 
       if (_latestQuery != trimmedQuery) {
         return;
       }
 
-      final results = <SearchResult>[];
-
-      for (final item in response.items) {
-        final result = SearchResult.fromJson(item);
-        if (result.videoId.isNotEmpty) {
-          results.add(result);
-        }
-      }
-
-      state = AsyncValue.data(results);
+      state = AsyncValue.data(
+        items
+            .map(
+              (item) => SearchResult(
+                videoId: item.id,
+                videoUrl: item.url,
+                title: item.title,
+                artist: item.uploader,
+                duration: item.duration,
+                thumbnailUrl: item.thumbnailUrl,
+              ),
+            )
+            .toList(),
+      );
     } catch (error, stackTrace) {
       if (_latestQuery != trimmedQuery) {
         return;
@@ -124,32 +124,22 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
       return error;
     }
 
-    if (error is BackendApiException) {
+    if (error is YoutubeServiceException) {
       switch (error.code) {
-        case 'backend_not_configured':
-          return const SearchFailure(
-            'backend_not_configured',
-            'Backend URL is not configured. Start the yt-dlp server and launch the app with AUDIODOCKR_API_BASE_URL.',
-          );
         case 'temporary_unavailable':
           return const SearchFailure(
             'temporary_unavailable',
-            'The yt-dlp backend is temporarily unavailable. Please try again in a moment.',
+            'YouTube is temporarily unavailable. Please try again in a moment.',
           );
         case 'rate_limited':
           return const SearchFailure(
             'rate_limited',
-            'The backend is being rate limited by YouTube right now. Please wait a bit and retry.',
-          );
-        case 'integrity_check_required':
-          return const SearchFailure(
-            'integrity_check_required',
-            'The backend needs extra YouTube verification right now. Please try again later.',
+            'YouTube is rate limiting requests right now. Please wait a bit and retry.',
           );
         case 'unsupported_response':
           return const SearchFailure(
             'unsupported_response',
-            'yt-dlp could not parse YouTube\'s latest response format.',
+            'YouTube returned a response this app could not parse.',
           );
         case 'no_results':
           return const SearchFailure(

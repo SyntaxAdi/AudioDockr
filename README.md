@@ -1,39 +1,15 @@
 # audiodockr
 
-Flutter music player UI backed by a `yt-dlp` API.
+Flutter music player with built-in YouTube search and stream lookup.
 
-## Start the yt-dlp backend
-
-Create a Python environment, then install the backend requirements:
+## Run the app
 
 ```bash
-pip install -r backend/requirements.txt
+flutter run
 ```
 
-Start the API server:
+## Build an APK
 
 ```bash
-uvicorn backend.app:app --host 0.0.0.0 --port 8000
+flutter build apk --debug
 ```
-
-## Run the Flutter app
-
-Launch Flutter with your backend URL:
-
-```bash
-flutter run --dart-define=AUDIODOCKR_API_BASE_URL=http://YOUR_COMPUTER_IP:8000
-```
-
-For Android emulators, `10.0.2.2` usually points back to the host machine:
-
-```bash
-flutter run --dart-define=AUDIODOCKR_API_BASE_URL=http://10.0.2.2:8000
-```
-
-For a physical Android phone, use your computer's LAN IP and make sure both devices are on the same network.
-
-## API endpoints
-
-- `GET /health`
-- `POST /search`
-- `POST /extract`
