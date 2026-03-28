@@ -8,9 +8,18 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Rect
+import android.graphics.Shader
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.util.LruCache
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -38,6 +47,7 @@ class PlaybackService : MediaSessionService() {
     private var mediaSession: MediaSession? = null
     private lateinit var notificationManager: PlayerNotificationManager
     private val artworkExecutor = Executors.newSingleThreadExecutor()
+    private val artworkCache = object : LruCache<String, Bitmap>(24) {}
     private val mainHandler = Handler(Looper.getMainLooper())
     private val progressRunnable = object : Runnable {
         override fun run() {
@@ -72,9 +82,12 @@ class PlaybackService : MediaSessionService() {
                 )
             }
 
-        mediaSession = MediaSession.Builder(this, player).build()
+        mediaSession = MediaSession.Builder(this, player).build().also { session ->
+            createSessionActivity()?.let(session::setSessionActivity)
+        }
         ensureNotificationChannel()
         notificationManager = buildNotificationManager().also {
+            mediaSession?.platformToken?.let(it::setMediaSessionToken)
             it.setPlayer(player)
         }
         mainHandler.post(progressRunnable)
@@ -99,6 +112,12 @@ class PlaybackService : MediaSessionService() {
                 publishState()
             }
             ACTION_RESUME -> {
+                if (player.playbackState == Player.STATE_ENDED) {
+                    player.seekToDefaultPosition()
+                    if (player.mediaItemCount > 0) {
+                        player.prepare()
+                    }
+                }
                 player.play()
                 publishState()
             }
@@ -140,6 +159,8 @@ class PlaybackService : MediaSessionService() {
             )
             .build()
 
+        player.stop()
+        player.clearMediaItems()
         player.setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
         player.prepare()
         player.play()
@@ -279,6 +300,16 @@ class PlaybackService : MediaSessionService() {
         manager.createNotificationChannel(channel)
     }
 
+    private fun createSessionActivity(): PendingIntent? {
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return null
+        return PendingIntent.getActivity(
+            this,
+            0,
+            launchIntent,
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+        )
+    }
+
     private fun buildNotificationManager(): PlayerNotificationManager {
         return PlayerNotificationManager.Builder(
             this,
@@ -289,14 +320,7 @@ class PlaybackService : MediaSessionService() {
             .setMediaDescriptionAdapter(
                 object : PlayerNotificationManager.MediaDescriptionAdapter {
                     override fun createCurrentContentIntent(player: Player): PendingIntent? {
-                        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
-                            ?: return null
-                        return PendingIntent.getActivity(
-                            this@PlaybackService,
-                            0,
-                            launchIntent,
-                            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-                        )
+                        return createSessionActivity()
                     }
 
                     override fun getCurrentContentText(player: Player): CharSequence {
@@ -312,10 +336,18 @@ class PlaybackService : MediaSessionService() {
                         callback: PlayerNotificationManager.BitmapCallback,
                     ): Bitmap? {
                         val artworkUri = player.mediaMetadata.artworkUri ?: return null
+                        artworkCache.get(artworkUri.toString())?.let { cachedBitmap ->
+                            return cachedBitmap
+                        }
+
                         artworkExecutor.execute {
                             runCatching {
                                 URL(artworkUri.toString()).openStream().use(BitmapFactory::decodeStream)
-                            }.getOrNull()?.let(callback::onBitmap)
+                            }.getOrNull()?.let { rawBitmap ->
+                                val processedBitmap = processNotificationArtwork(rawBitmap)
+                                artworkCache.put(artworkUri.toString(), processedBitmap)
+                                callback.onBitmap(processedBitmap)
+                            }
                         }
                         return null
                     }
@@ -342,9 +374,82 @@ class PlaybackService : MediaSessionService() {
             )
             .build()
             .apply {
+                setColorized(true)
                 setUseNextAction(false)
                 setUsePreviousAction(false)
+                setUsePlayPauseActions(true)
                 setPriority(NotificationCompat.PRIORITY_LOW)
             }
+    }
+
+    private fun processNotificationArtwork(source: Bitmap): Bitmap {
+        val targetSize = source.width.coerceAtMost(source.height).coerceAtLeast(256)
+        val croppedBitmap = centerCropSquare(source, targetSize)
+        val output = Bitmap.createBitmap(
+            croppedBitmap.width,
+            croppedBitmap.height,
+            Bitmap.Config.ARGB_8888,
+        )
+        val canvas = Canvas(output)
+
+        val basePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            colorFilter = ColorMatrixColorFilter(
+                ColorMatrix().apply {
+                    set(
+                        floatArrayOf(
+                            1.08f, 0f, 0f, 0f, -6f,
+                            0f, 1.08f, 0f, 0f, -6f,
+                            0f, 0f, 1.08f, 0f, -6f,
+                            0f, 0f, 0f, 1f, 0f,
+                        ),
+                    )
+                    postConcat(
+                        ColorMatrix().apply {
+                            setSaturation(1.08f)
+                        },
+                    )
+                },
+            )
+        }
+        canvas.drawBitmap(croppedBitmap, 0f, 0f, basePaint)
+
+        canvas.drawColor(Color.argb(118, 0, 0, 0))
+
+        val vignettePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = LinearGradient(
+                0f,
+                output.height * 0.35f,
+                0f,
+                output.height.toFloat(),
+                intArrayOf(
+                    Color.argb(0, 0, 0, 0),
+                    Color.argb(70, 0, 0, 0),
+                    Color.argb(150, 0, 0, 0),
+                ),
+                floatArrayOf(0f, 0.68f, 1f),
+                Shader.TileMode.CLAMP,
+            )
+        }
+        canvas.drawRect(
+            0f,
+            0f,
+            output.width.toFloat(),
+            output.height.toFloat(),
+            vignettePaint,
+        )
+
+        return output
+    }
+
+    private fun centerCropSquare(source: Bitmap, targetSize: Int): Bitmap {
+        val squareSize = source.width.coerceAtMost(source.height)
+        val left = (source.width - squareSize) / 2
+        val top = (source.height - squareSize) / 2
+        val sourceRect = Rect(left, top, left + squareSize, top + squareSize)
+        val output = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        val destinationRect = Rect(0, 0, targetSize, targetSize)
+        canvas.drawBitmap(source, sourceRect, destinationRect, Paint(Paint.ANTI_ALIAS_FLAG))
+        return output
     }
 }

@@ -1,14 +1,23 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../theme.dart';
-import '../providers/playback_provider.dart';
 
-class NowPlayingScreen extends ConsumerWidget {
+import '../providers/playback_provider.dart';
+import '../theme.dart';
+
+class NowPlayingScreen extends ConsumerStatefulWidget {
   const NowPlayingScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<NowPlayingScreen> createState() => _NowPlayingScreenState();
+}
+
+class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
+  bool _isSeeking = false;
+  double? _seekPreviewMs;
+
+  @override
+  Widget build(BuildContext context) {
     final playbackState = ref.watch(playbackNotifierProvider);
     final notifier = ref.read(playbackNotifierProvider.notifier);
 
@@ -19,35 +28,54 @@ class NowPlayingScreen extends ConsumerWidget {
           child: Center(
             child: Text(
               'NOTHING IS PLAYING',
-              style: TextStyle(color: textSecondary, fontSize: 13, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ),
         ),
       );
     }
 
+    final durationMs = playbackState.duration.inMilliseconds > 0
+        ? playbackState.duration.inMilliseconds.toDouble()
+        : 1.0;
+    final currentPositionMs = playbackState.position.inMilliseconds
+        .clamp(0, durationMs.toInt())
+        .toDouble();
+    final sliderValue = (_isSeeking ? _seekPreviewMs : currentPositionMs) ?? currentPositionMs;
+    final clampedSliderValue = sliderValue.clamp(0.0, durationMs);
+    final displayedPosition = Duration(milliseconds: clampedSliderValue.round());
+
     return Container(
       color: bgBase,
       child: SafeArea(
         child: Column(
           children: [
-            // Swipe down handle
             Center(
               child: Container(
                 width: 40,
                 height: 4,
                 margin: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(color: bgDivider, borderRadius: BorderRadius.circular(2)),
+                decoration: BoxDecoration(
+                  color: bgDivider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
             ),
-            // Thumbnail Hero
             AspectRatio(
               aspectRatio: 1,
               child: (playbackState.currentThumbnailUrl ?? '').isEmpty
                   ? Container(
                       color: bgCard,
                       child: const Center(
-                        child: Icon(Icons.music_video, size: 64, color: textSecondary),
+                        child: Icon(
+                          Icons.music_video,
+                          size: 64,
+                          color: textSecondary,
+                        ),
                       ),
                     )
                   : CachedNetworkImage(
@@ -56,13 +84,16 @@ class NowPlayingScreen extends ConsumerWidget {
                       errorWidget: (_, __, ___) => Container(
                         color: bgCard,
                         child: const Center(
-                          child: Icon(Icons.music_video, size: 64, color: textSecondary),
+                          child: Icon(
+                            Icons.music_video,
+                            size: 64,
+                            color: textSecondary,
+                          ),
                         ),
                       ),
                     ),
             ),
             const SizedBox(height: 24),
-            // Track Info
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Column(
@@ -77,73 +108,132 @@ class NowPlayingScreen extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Text(
                     (playbackState.currentArtist ?? 'Unknown artist').toUpperCase(),
-                    style: const TextStyle(fontSize: 13, color: textSecondary, fontWeight: FontWeight.bold, letterSpacing: 0.1),
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: textSecondary,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.1,
+                    ),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 32),
-            // Action Row
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                IconButton(icon: const Icon(Icons.favorite_border, color: accentPrimary), onPressed: () {}),
-                IconButton(icon: const Icon(Icons.file_download_outlined, color: textSecondary), onPressed: () {}),
-                IconButton(icon: const Icon(Icons.playlist_add, color: textSecondary), onPressed: () {}),
+                IconButton(
+                  icon: const Icon(Icons.favorite_border, color: accentPrimary),
+                  onPressed: () {},
+                ),
+                IconButton(
+                  icon: const Icon(Icons.file_download_outlined, color: textSecondary),
+                  onPressed: () {},
+                ),
+                IconButton(
+                  icon: const Icon(Icons.playlist_add, color: textSecondary),
+                  onPressed: () {},
+                ),
               ],
             ),
-            const SizedBox(height: 32),
-            // Seek Bar
+            const SizedBox(height: 28),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
                 children: [
-                  SliderTheme(
-                    data: SliderThemeData(
-                      trackHeight: 2,
-                      activeTrackColor: accentPrimary,
-                      inactiveTrackColor: bgDivider,
-                      thumbColor: accentPrimary,
-                      thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5, elevation: 0), // Square shape is custom drawn usually, using default here.
-                      overlayShape: SliderComponentShape.noOverlay,
-                    ),
-                    child: Slider(
-                      value: playbackState.position.inSeconds.toDouble(),
-                      max: playbackState.duration.inSeconds.toDouble() > 0 ? playbackState.duration.inSeconds.toDouble() : 1.0,
-                      onChanged: (val) {
-                        notifier.seek(Duration(seconds: val.toInt()));
-                      },
+                  SizedBox(
+                    height: 28,
+                    child: SliderTheme(
+                      data: SliderThemeData(
+                        trackHeight: 4,
+                        activeTrackColor: accentPrimary,
+                        inactiveTrackColor: bgDivider,
+                        thumbColor: accentPrimary,
+                        overlayColor: accentPrimary.withValues(alpha: 0.16),
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 7,
+                          elevation: 0,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 16,
+                        ),
+                      ),
+                      child: Slider(
+                        min: 0,
+                        max: durationMs,
+                        value: clampedSliderValue,
+                        onChangeStart: (value) {
+                          setState(() {
+                            _isSeeking = true;
+                            _seekPreviewMs = value;
+                          });
+                        },
+                        onChanged: (value) {
+                          setState(() {
+                            _seekPreviewMs = value;
+                          });
+                        },
+                        onChangeEnd: (value) {
+                          setState(() {
+                            _isSeeking = false;
+                            _seekPreviewMs = null;
+                          });
+                          notifier.seek(
+                            Duration(milliseconds: value.round()),
+                          );
+                        },
+                      ),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(_formatDuration(playbackState.position), style: const TextStyle(fontSize: 11, color: textSecondary)),
-                      Text(_formatDuration(playbackState.duration), style: const TextStyle(fontSize: 11, color: textSecondary)),
+                      Text(
+                        _formatDuration(displayedPosition),
+                        style: const TextStyle(fontSize: 11, color: textSecondary),
+                      ),
+                      Text(
+                        _formatDuration(playbackState.duration),
+                        style: const TextStyle(fontSize: 11, color: textSecondary),
+                      ),
                     ],
                   ),
                 ],
               ),
             ),
             const Spacer(),
-            // Playback Controls
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                IconButton(icon: const Icon(Icons.shuffle, color: textSecondary), onPressed: () {}),
-                IconButton(icon: const Icon(Icons.skip_previous, color: textPrimary), onPressed: () {}),
+                IconButton(
+                  icon: const Icon(Icons.shuffle, color: textSecondary),
+                  onPressed: () {},
+                ),
+                IconButton(
+                  icon: const Icon(Icons.skip_previous, color: textPrimary),
+                  onPressed: () {},
+                ),
                 GestureDetector(
                   onTap: () => notifier.togglePlayPause(),
                   child: Container(
                     width: 48,
                     height: 48,
                     color: accentPrimary,
-                    child: Icon(playbackState.isPlaying ? Icons.pause : Icons.play_arrow, color: bgBase),
+                    child: Icon(
+                      playbackState.isPlaying ? Icons.pause : Icons.play_arrow,
+                      color: bgBase,
+                    ),
                   ),
                 ),
-                IconButton(icon: const Icon(Icons.skip_next, color: textPrimary), onPressed: () {}),
-                IconButton(icon: const Icon(Icons.repeat, color: textSecondary), onPressed: () {}),
+                IconButton(
+                  icon: const Icon(Icons.skip_next, color: textPrimary),
+                  onPressed: () {},
+                ),
+                IconButton(
+                  icon: const Icon(Icons.repeat, color: textSecondary),
+                  onPressed: () {},
+                ),
               ],
             ),
             const SizedBox(height: 32),
