@@ -1,10 +1,11 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:just_audio/just_audio.dart';
-import 'package:flutter/services.dart';
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
-import 'package:just_audio_background/just_audio_background.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 
 import '../api/youtube_service.dart';
+import '../services/native_player_service.dart';
 
 class PlaybackFailure implements Exception {
   const PlaybackFailure(this.code, this.message);
@@ -16,14 +17,14 @@ class PlaybackFailure implements Exception {
   String toString() => message;
 }
 
-final audioPlayerProvider = Provider<AudioPlayer>((ref) {
-  return AudioPlayer();
+final nativePlayerServiceProvider = Provider<NativePlayerService>((ref) {
+  return NativePlayerService();
 });
 
 final playbackNotifierProvider = StateNotifierProvider<PlaybackNotifier, PlaybackState>((ref) {
-  final player = ref.read(audioPlayerProvider);
   final youtubeService = ref.read(youtubeServiceProvider);
-  return PlaybackNotifier(player, youtubeService);
+  final nativePlayerService = ref.read(nativePlayerServiceProvider);
+  return PlaybackNotifier(nativePlayerService, youtubeService);
 });
 
 class PlaybackState {
@@ -34,6 +35,7 @@ class PlaybackState {
   final bool isPlaying;
   final Duration position;
   final Duration duration;
+  final String? lastError;
 
   PlaybackState({
     this.currentTrackId,
@@ -43,6 +45,7 @@ class PlaybackState {
     this.isPlaying = false,
     this.position = Duration.zero,
     this.duration = Duration.zero,
+    this.lastError,
   });
   
   PlaybackState copyWith({
@@ -53,6 +56,7 @@ class PlaybackState {
     bool? isPlaying,
     Duration? position,
     Duration? duration,
+    Object? lastError = _playbackStateNoChange,
   }) {
     return PlaybackState(
       currentTrackId: currentTrackId ?? this.currentTrackId,
@@ -62,28 +66,27 @@ class PlaybackState {
       isPlaying: isPlaying ?? this.isPlaying,
       position: position ?? this.position,
       duration: duration ?? this.duration,
+      lastError: identical(lastError, _playbackStateNoChange)
+          ? this.lastError
+          : lastError as String?,
     );
   }
 }
 
+const Object _playbackStateNoChange = Object();
+
 class PlaybackNotifier extends StateNotifier<PlaybackState> {
   static const MethodChannel _extractChannel = MethodChannel('audiodockr/extract');
 
-  final AudioPlayer _player;
+  final NativePlayerService _nativePlayerService;
   final YoutubeService _youtubeService;
+  StreamSubscription<Map<String, dynamic>>? _playerEventsSubscription;
 
-  PlaybackNotifier(this._player, this._youtubeService) : super(PlaybackState()) {
-    _player.playingStream.listen((playing) {
-      state = state.copyWith(isPlaying: playing);
-    });
-    _player.positionStream.listen((pos) {
-      state = state.copyWith(position: pos);
-    });
-    _player.durationStream.listen((dur) {
-      if (dur != null) {
-        state = state.copyWith(duration: dur);
-      }
-    });
+  PlaybackNotifier(this._nativePlayerService, this._youtubeService)
+      : super(PlaybackState()) {
+    _playerEventsSubscription = _nativePlayerService.playerStateStream.listen(
+      _handleNativePlayerEvent,
+    );
   }
 
   Future<void> playTrack(String videoId, String videoUrl, String title, String artist, String thumbnailUrl) async {
@@ -97,23 +100,18 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     }
 
     try {
-      await _player.setAudioSource(
-        AudioSource.uri(
-          Uri.parse(audioUrl),
-          tag: MediaItem(
-            id: videoId,
-            title: title,
-            artist: artist,
-            artUri: thumbnailUrl.isNotEmpty ? Uri.parse(thumbnailUrl) : null,
-          ),
-        ),
+      await _nativePlayerService.playYoutubeStream(
+        audioUrl,
+        _buildPlaybackHeaders(),
       );
-      _player.play();
       state = state.copyWith(
         currentTrackId: videoId,
         currentTitle: title,
         currentArtist: artist,
         currentThumbnailUrl: thumbnailUrl,
+        position: Duration.zero,
+        duration: Duration.zero,
+        lastError: null,
       );
     } catch (e) {
       throw PlaybackFailure(
@@ -121,6 +119,25 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         e.toString(),
       );
     }
+  }
+
+  void _handleNativePlayerEvent(Map<String, dynamic> event) {
+    final error = event['error'] as String?;
+    state = state.copyWith(
+      isPlaying: event['isPlaying'] as bool? ?? state.isPlaying,
+      position: Duration(milliseconds: (event['position'] as num?)?.toInt() ?? state.position.inMilliseconds),
+      duration: Duration(milliseconds: (event['duration'] as num?)?.toInt() ?? state.duration.inMilliseconds),
+      lastError: error,
+    );
+  }
+
+  Map<String, String> _buildPlaybackHeaders() {
+    return const {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+      'Referer': 'https://music.youtube.com/',
+      'Origin': 'https://music.youtube.com',
+      'Accept-Language': 'en-US,en;q=0.9',
+    };
   }
 
   Future<String?> _extractTrackUrl(String videoId, String videoUrl) async {
@@ -180,15 +197,21 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     }
   }
 
-  void togglePlayPause() {
-    if (_player.playing) {
-      _player.pause();
+  Future<void> togglePlayPause() async {
+    if (state.isPlaying) {
+      await _nativePlayerService.pause();
     } else {
-      _player.play();
+      await _nativePlayerService.resume();
     }
   }
 
-  void seek(Duration pos) {
-    _player.seek(pos);
+  Future<void> seek(Duration pos) async {
+    await _nativePlayerService.seekTo(pos.inMilliseconds);
+  }
+
+  @override
+  void dispose() {
+    _playerEventsSubscription?.cancel();
+    super.dispose();
   }
 }
