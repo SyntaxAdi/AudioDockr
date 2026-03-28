@@ -13,6 +13,7 @@
 .history
 .svn/
 .swiftpm/
+.codex
 migrate_working_dir/
 
 # ── Editors & IDEs ────────────────────────────

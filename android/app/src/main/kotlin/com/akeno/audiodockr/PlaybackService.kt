@@ -1,10 +1,17 @@
 package com.akeno.audiodockr
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import androidx.core.net.toUri
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
@@ -16,7 +23,10 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
+import androidx.media3.ui.PlayerNotificationManager
+import java.net.URL
 import java.util.concurrent.CopyOnWriteArraySet
+import java.util.concurrent.Executors
 
 class PlaybackService : MediaSessionService() {
     private val audioAttributes = AudioAttributes.Builder()
@@ -26,6 +36,8 @@ class PlaybackService : MediaSessionService() {
 
     private lateinit var player: ExoPlayer
     private var mediaSession: MediaSession? = null
+    private lateinit var notificationManager: PlayerNotificationManager
+    private val artworkExecutor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
     private val progressRunnable = object : Runnable {
         override fun run() {
@@ -61,6 +73,10 @@ class PlaybackService : MediaSessionService() {
             }
 
         mediaSession = MediaSession.Builder(this, player).build()
+        ensureNotificationChannel()
+        notificationManager = buildNotificationManager().also {
+            it.setPlayer(player)
+        }
         mainHandler.post(progressRunnable)
     }
 
@@ -119,6 +135,7 @@ class PlaybackService : MediaSessionService() {
         player.setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
         player.prepare()
         player.play()
+        notificationManager.invalidate()
         publishState()
     }
 
@@ -142,6 +159,8 @@ class PlaybackService : MediaSessionService() {
 
     override fun onDestroy() {
         mainHandler.removeCallbacks(progressRunnable)
+        notificationManager.setPlayer(null)
+        artworkExecutor.shutdown()
         mediaSession?.release()
         mediaSession = null
         player.release()
@@ -151,6 +170,9 @@ class PlaybackService : MediaSessionService() {
 
     companion object {
         private const val TAG = "PlaybackService"
+        private const val NOTIFICATION_CHANNEL_ID = "audiodockr_playback"
+        private const val NOTIFICATION_CHANNEL_NAME = "AudioDockr Playback"
+        private const val NOTIFICATION_ID = 1001
         private const val ACTION_PLAY = "com.akeno.audiodockr.action.PLAY"
         private const val ACTION_PAUSE = "com.akeno.audiodockr.action.PAUSE"
         private const val ACTION_RESUME = "com.akeno.audiodockr.action.RESUME"
@@ -236,5 +258,85 @@ class PlaybackService : MediaSessionService() {
                 }
             }.toMap()
         }
+    }
+
+    private fun ensureNotificationChannel() {
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channel = NotificationChannel(
+            NOTIFICATION_CHANNEL_ID,
+            NOTIFICATION_CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_LOW,
+        )
+        manager.createNotificationChannel(channel)
+    }
+
+    private fun buildNotificationManager(): PlayerNotificationManager {
+        return PlayerNotificationManager.Builder(
+            this,
+            NOTIFICATION_ID,
+            NOTIFICATION_CHANNEL_ID,
+        )
+            .setSmallIconResourceId(android.R.drawable.ic_media_play)
+            .setMediaDescriptionAdapter(
+                object : PlayerNotificationManager.MediaDescriptionAdapter {
+                    override fun createCurrentContentIntent(player: Player) = packageManager
+                        .getLaunchIntentForPackage(packageName)
+                        ?.let { intent ->
+                            androidx.core.app.PendingIntentCompat.getActivity(
+                                this@PlaybackService,
+                                0,
+                                intent,
+                                0,
+                                false,
+                            )
+                        }
+
+                    override fun getCurrentContentText(player: Player): CharSequence {
+                        return player.mediaMetadata.artist ?: "AudioDockr"
+                    }
+
+                    override fun getCurrentContentTitle(player: Player): CharSequence {
+                        return player.mediaMetadata.title ?: "AudioDockr"
+                    }
+
+                    override fun getCurrentLargeIcon(
+                        player: Player,
+                        callback: PlayerNotificationManager.BitmapCallback,
+                    ): Bitmap? {
+                        val artworkUri = player.mediaMetadata.artworkUri ?: return null
+                        artworkExecutor.execute {
+                            runCatching {
+                                URL(artworkUri.toString()).openStream().use(BitmapFactory::decodeStream)
+                            }.getOrNull()?.let(callback::onBitmap)
+                        }
+                        return null
+                    }
+                },
+            )
+            .setNotificationListener(
+                object : PlayerNotificationManager.NotificationListener {
+                    override fun onNotificationPosted(
+                        notificationId: Int,
+                        notification: Notification,
+                        ongoing: Boolean,
+                    ) {
+                        if (ongoing) {
+                            startForeground(notificationId, notification)
+                        } else {
+                            stopForeground(STOP_FOREGROUND_DETACH)
+                        }
+                    }
+
+                    override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
+                        stopForeground(STOP_FOREGROUND_REMOVE)
+                    }
+                },
+            )
+            .build()
+            .apply {
+                setUseNextAction(false)
+                setUsePreviousAction(false)
+                setPriority(NotificationCompat.PRIORITY_LOW)
+            }
     }
 }
