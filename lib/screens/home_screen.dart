@@ -7,12 +7,17 @@ import '../providers/playback_provider.dart';
 import '../theme.dart';
 
 class HomeScreen extends ConsumerWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({
+    super.key,
+    required this.onViewMore,
+  });
+
+  final VoidCallback onViewMore;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final libraryState = ref.watch(libraryProvider);
-    final recentlyPlayed = libraryState.recentTracks;
+    final recentlyPlayed = libraryState.recentTracks.take(5).toList();
 
     return Scaffold(
       body: SafeArea(
@@ -48,13 +53,36 @@ class HomeScreen extends ConsumerWidget {
             else ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Text(
-                  'RECENTLY PLAYED',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: accentPrimary,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.1,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'RECENTLY PLAYED',
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: accentPrimary,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.1,
+                            ),
                       ),
+                    ),
+                    TextButton(
+                      onPressed: onViewMore,
+                      style: TextButton.styleFrom(
+                        minimumSize: Size.zero,
+                        padding: EdgeInsets.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: BorderSide.none,
+                      ),
+                      child: Text(
+                        'VIEW MORE ->',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: accentPrimary,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 0.8,
+                            ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               SizedBox(

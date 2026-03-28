@@ -20,14 +20,7 @@ class AppShell extends ConsumerStatefulWidget {
 
 class _AppShellState extends ConsumerState<AppShell> {
   int _currentIndex = 0;
-
-  final List<Widget> _pages = const [
-    HomeScreen(),
-    SearchScreen(),
-    LibraryScreen(),
-    DownloadsScreen(),
-    SettingsScreen(),
-  ];
+  int _libraryResetToken = 0;
 
   void _onTabTapped(int index) {
     setState(() {
@@ -35,12 +28,27 @@ class _AppShellState extends ConsumerState<AppShell> {
     });
   }
 
+  void _openLibraryTracks() {
+    setState(() {
+      _libraryResetToken++;
+      _currentIndex = 2;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final pages = [
+      HomeScreen(onViewMore: _openLibraryTracks),
+      const SearchScreen(),
+      LibraryScreen(key: ValueKey('library-$_libraryResetToken')),
+      const DownloadsScreen(),
+      const SettingsScreen(),
+    ];
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
-        children: _pages,
+        children: pages,
       ),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
