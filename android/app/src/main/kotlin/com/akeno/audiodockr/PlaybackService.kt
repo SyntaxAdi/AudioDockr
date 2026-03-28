@@ -57,9 +57,12 @@ class PlaybackService : MediaSessionService() {
         when (intent?.action) {
             ACTION_PLAY -> {
                 val url = intent.getStringExtra(EXTRA_URL).orEmpty()
+                val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
+                val artist = intent.getStringExtra(EXTRA_ARTIST).orEmpty()
+                val artworkUrl = intent.getStringExtra(EXTRA_ARTWORK_URL).orEmpty()
                 val headers = decodeHeaders(intent.getStringArrayListExtra(EXTRA_HEADERS))
                 if (url.isNotBlank()) {
-                    play(url, headers)
+                    play(url, headers, title, artist, artworkUrl)
                 } else {
                     publishState("Missing stream URL.")
                 }
@@ -81,7 +84,7 @@ class PlaybackService : MediaSessionService() {
         return START_STICKY
     }
 
-    private fun play(url: String, headers: Map<String, String>) {
+    private fun play(url: String, headers: Map<String, String>, title: String, artist: String, artworkUrl: String) {
         Log.d(TAG, "Starting playback for $url")
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setDefaultRequestProperties(headers)
@@ -95,6 +98,9 @@ class PlaybackService : MediaSessionService() {
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setIsPlayable(true)
+                    .setTitle(title)
+                    .setArtist(artist)
+                    .setArtworkUri(if (artworkUrl.isNotBlank()) android.net.Uri.parse(artworkUrl) else null)
                     .build(),
             )
             .build()
@@ -141,6 +147,9 @@ class PlaybackService : MediaSessionService() {
         private const val EXTRA_URL = "url"
         private const val EXTRA_HEADERS = "headers"
         private const val EXTRA_POSITION = "position"
+        private const val EXTRA_TITLE = "title"
+        private const val EXTRA_ARTIST = "artist"
+        private const val EXTRA_ARTWORK_URL = "artworkUrl"
 
         @Volatile
         private var instance: PlaybackService? = null
@@ -166,10 +175,16 @@ class PlaybackService : MediaSessionService() {
             context: Context,
             url: String,
             headers: Map<String, String>,
+            title: String,
+            artist: String,
+            artworkUrl: String,
         ): Intent {
             return Intent(context, PlaybackService::class.java).apply {
                 action = ACTION_PLAY
                 putExtra(EXTRA_URL, url)
+                putExtra(EXTRA_TITLE, title)
+                putExtra(EXTRA_ARTIST, artist)
+                putExtra(EXTRA_ARTWORK_URL, artworkUrl)
                 putStringArrayListExtra(
                     EXTRA_HEADERS,
                     ArrayList(headers.map { "${it.key}=${it.value}" }),
