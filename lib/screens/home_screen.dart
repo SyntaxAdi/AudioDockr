@@ -17,7 +17,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final libraryState = ref.watch(libraryProvider);
-    final recentlyPlayed = libraryState.recentTracks.take(5).toList();
+    final recentlyPlayed = libraryState.recentTracks.take(20).toList();
 
     return Scaffold(
       body: SafeArea(
@@ -57,11 +57,10 @@ class HomeScreen extends ConsumerWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        'RECENTLY PLAYED',
+                        'Recents',
                         style: Theme.of(context).textTheme.titleMedium?.copyWith(
                               color: accentPrimary,
                               fontWeight: FontWeight.bold,
-                              letterSpacing: 1.1,
                             ),
                       ),
                     ),
@@ -74,11 +73,10 @@ class HomeScreen extends ConsumerWidget {
                         side: BorderSide.none,
                       ),
                       child: Text(
-                        'VIEW MORE ->',
+                        'Show all',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
                               color: accentPrimary,
                               fontWeight: FontWeight.bold,
-                              letterSpacing: 0.8,
                             ),
                       ),
                     ),
