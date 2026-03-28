@@ -5,10 +5,12 @@ import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import androidx.media3.common.AudioAttributes
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.C
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -17,6 +19,11 @@ import androidx.media3.session.MediaSessionService
 import java.util.concurrent.CopyOnWriteArraySet
 
 class PlaybackService : MediaSessionService() {
+    private val audioAttributes = AudioAttributes.Builder()
+        .setUsage(C.USAGE_MEDIA)
+        .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+        .build()
+
     private lateinit var player: ExoPlayer
     private var mediaSession: MediaSession? = null
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -31,23 +38,27 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         instance = this
 
-        player = ExoPlayer.Builder(this).build().also { exoPlayer ->
-            exoPlayer.addListener(
-                object : Player.Listener {
-                    override fun onIsPlayingChanged(isPlaying: Boolean) {
-                        publishState()
-                    }
+        player = ExoPlayer.Builder(this)
+            .build()
+            .also { exoPlayer ->
+                exoPlayer.setAudioAttributes(audioAttributes, true)
+                exoPlayer.setHandleAudioBecomingNoisy(true)
+                exoPlayer.addListener(
+                    object : Player.Listener {
+                        override fun onIsPlayingChanged(isPlaying: Boolean) {
+                            publishState()
+                        }
 
-                    override fun onPlaybackStateChanged(playbackState: Int) {
-                        publishState()
-                    }
+                        override fun onPlaybackStateChanged(playbackState: Int) {
+                            publishState()
+                        }
 
-                    override fun onPlayerError(error: PlaybackException) {
-                        publishState(error.errorCodeName ?: error.localizedMessage)
-                    }
-                },
-            )
-        }
+                        override fun onPlayerError(error: PlaybackException) {
+                            publishState(error.errorCodeName ?: error.localizedMessage)
+                        }
+                    },
+                )
+            }
 
         mediaSession = MediaSession.Builder(this, player).build()
         mainHandler.post(progressRunnable)
