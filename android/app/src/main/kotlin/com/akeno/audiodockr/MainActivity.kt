@@ -1,7 +1,6 @@
 package com.akeno.audiodockr
 
 import android.content.Intent
-import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -53,7 +52,7 @@ class MainActivity : FlutterActivity() {
                         }
 
                         val intent = PlaybackService.buildPlayIntent(this, url, headers)
-                        ContextCompat.startForegroundService(this, intent)
+                        startService(intent)
                         result.success(null)
                     }
                     "pause" -> {

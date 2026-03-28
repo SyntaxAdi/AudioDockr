@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/services.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../api/youtube_service.dart';
 import '../services/native_player_service.dart';
@@ -90,6 +91,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }
 
   Future<void> playTrack(String videoId, String videoUrl, String title, String artist, String thumbnailUrl) async {
+    await _ensurePlaybackPermissions();
     final audioUrl = await _extractTrackUrl(videoId, videoUrl);
 
     if (audioUrl == null || audioUrl.isEmpty) {
@@ -138,6 +140,23 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       'Origin': 'https://music.youtube.com',
       'Accept-Language': 'en-US,en;q=0.9',
     };
+  }
+
+  Future<void> _ensurePlaybackPermissions() async {
+    if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+      return;
+    }
+
+    final status = await Permission.notification.status;
+    if (status.isDenied) {
+      final requested = await Permission.notification.request();
+      if (!requested.isGranted) {
+        throw const PlaybackFailure(
+          'notification_permission_denied',
+          'Notification permission is required for background playback on Android.',
+        );
+      }
+    }
   }
 
   Future<String?> _extractTrackUrl(String videoId, String videoUrl) async {
