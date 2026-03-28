@@ -103,11 +103,8 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
 
     try {
       await _nativePlayerService.playYoutubeStream(
-        url: audioUrl,
-        headers: _buildPlaybackHeaders(),
-        title: title,
-        artist: artist,
-        artworkUrl: thumbnailUrl,
+        audioUrl,
+        _buildPlaybackHeaders(),
       );
       state = state.copyWith(
         currentTrackId: videoId,
