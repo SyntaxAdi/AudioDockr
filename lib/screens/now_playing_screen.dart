@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../theme.dart';
 import '../providers/playback_provider.dart';
 
@@ -10,6 +11,20 @@ class NowPlayingScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final playbackState = ref.watch(playbackNotifierProvider);
     final notifier = ref.read(playbackNotifierProvider.notifier);
+
+    if (playbackState.currentTrackId == null) {
+      return Container(
+        color: bgBase,
+        child: const SafeArea(
+          child: Center(
+            child: Text(
+              'NOTHING IS PLAYING',
+              style: TextStyle(color: textSecondary, fontSize: 13, fontWeight: FontWeight.bold),
+            ),
+          ),
+        ),
+      );
+    }
 
     return Container(
       color: bgBase,
@@ -28,7 +43,23 @@ class NowPlayingScreen extends ConsumerWidget {
             // Thumbnail Hero
             AspectRatio(
               aspectRatio: 1,
-              child: Container(color: bgCard, child: const Center(child: Icon(Icons.music_video, size: 64, color: textSecondary))),
+              child: (playbackState.currentThumbnailUrl ?? '').isEmpty
+                  ? Container(
+                      color: bgCard,
+                      child: const Center(
+                        child: Icon(Icons.music_video, size: 64, color: textSecondary),
+                      ),
+                    )
+                  : CachedNetworkImage(
+                      imageUrl: playbackState.currentThumbnailUrl!,
+                      fit: BoxFit.cover,
+                      errorWidget: (_, __, ___) => Container(
+                        color: bgCard,
+                        child: const Center(
+                          child: Icon(Icons.music_video, size: 64, color: textSecondary),
+                        ),
+                      ),
+                    ),
             ),
             const SizedBox(height: 24),
             // Track Info
@@ -38,14 +69,14 @@ class NowPlayingScreen extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Track Title Example',
+                    playbackState.currentTitle ?? 'Unknown track',
                     style: Theme.of(context).textTheme.titleLarge,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'ARTIST NAME',
+                    (playbackState.currentArtist ?? 'Unknown artist').toUpperCase(),
                     style: const TextStyle(fontSize: 13, color: textSecondary, fontWeight: FontWeight.bold, letterSpacing: 0.1),
                   ),
                 ],
@@ -116,23 +147,6 @@ class NowPlayingScreen extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 32),
-            // Download Status
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                   Container(
-                     height: 2,
-                     color: bgDivider,
-                     alignment: Alignment.centerLeft,
-                     child: FractionallySizedBox(widthFactor: 0.47, child: Container(color: accentPrimary)),
-                   ),
-                   const SizedBox(height: 4),
-                   const Text('DOWNLOADING — 47%', style: TextStyle(color: accentPrimary, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.1)),
-                ],
-              ),
-            ),
             const SizedBox(height: 24),
           ],
         ),

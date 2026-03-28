@@ -17,7 +17,10 @@ class PlaybackFailure implements Exception {
 }
 
 final audioPlayerProvider = Provider<AudioPlayer>((ref) {
-  return AudioPlayer();
+  return AudioPlayer(
+    userAgent:
+        'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Mobile Safari/537.36',
+  );
 });
 
 final playbackNotifierProvider = StateNotifierProvider<PlaybackNotifier, PlaybackState>((ref) {
@@ -28,15 +31,37 @@ final playbackNotifierProvider = StateNotifierProvider<PlaybackNotifier, Playbac
 
 class PlaybackState {
   final String? currentTrackId;
+  final String? currentTitle;
+  final String? currentArtist;
+  final String? currentThumbnailUrl;
   final bool isPlaying;
   final Duration position;
   final Duration duration;
 
-  PlaybackState({this.currentTrackId, this.isPlaying = false, this.position = Duration.zero, this.duration = Duration.zero});
+  PlaybackState({
+    this.currentTrackId,
+    this.currentTitle,
+    this.currentArtist,
+    this.currentThumbnailUrl,
+    this.isPlaying = false,
+    this.position = Duration.zero,
+    this.duration = Duration.zero,
+  });
   
-  PlaybackState copyWith({String? currentTrackId, bool? isPlaying, Duration? position, Duration? duration}) {
+  PlaybackState copyWith({
+    String? currentTrackId,
+    String? currentTitle,
+    String? currentArtist,
+    String? currentThumbnailUrl,
+    bool? isPlaying,
+    Duration? position,
+    Duration? duration,
+  }) {
     return PlaybackState(
       currentTrackId: currentTrackId ?? this.currentTrackId,
+      currentTitle: currentTitle ?? this.currentTitle,
+      currentArtist: currentArtist ?? this.currentArtist,
+      currentThumbnailUrl: currentThumbnailUrl ?? this.currentThumbnailUrl,
       isPlaying: isPlaying ?? this.isPlaying,
       position: position ?? this.position,
       duration: duration ?? this.duration,
@@ -99,20 +124,40 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       await _player.setAudioSource(
         AudioSource.uri(
           Uri.parse(audioUrl),
+          headers: _buildStreamHeaders(videoUrl),
           tag: MediaItem(
             id: videoId,
             title: title,
             artist: artist,
-            artUri: Uri.parse(thumbnailUrl),
+            artUri: thumbnailUrl.isNotEmpty ? Uri.parse(thumbnailUrl) : null,
           ),
         ),
       );
       _player.play();
-      state = state.copyWith(currentTrackId: videoId);
+      state = state.copyWith(
+        currentTrackId: videoId,
+        currentTitle: title,
+        currentArtist: artist,
+        currentThumbnailUrl: thumbnailUrl,
+      );
     } catch (e) {
-      // Handle error, invalid url?
-      print(e);
+      throw PlaybackFailure(
+        'playback_failed',
+        e.toString(),
+      );
     }
+  }
+
+  Map<String, String> _buildStreamHeaders(String videoUrl) {
+    final referer = videoUrl.isNotEmpty ? videoUrl : 'https://www.youtube.com/';
+    return {
+      'User-Agent':
+          'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Mobile Safari/537.36',
+      'Referer': referer,
+      'Origin': 'https://www.youtube.com',
+      'Accept-Language': 'en-US,en;q=0.9',
+      'Accept-Encoding': 'identity',
+    };
   }
 
   Future<String?> _extractTrackUrl(String videoId, String videoUrl) async {

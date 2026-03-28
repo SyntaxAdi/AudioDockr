@@ -99,7 +99,20 @@ class YoutubeService {
   }) async {
     try {
       final target = videoUrl.isNotEmpty ? videoUrl : videoId;
-      final manifest = await _client.videos.streams.getManifest(target);
+      final manifest = await _client.videos.streams.getManifest(
+        target,
+        ytClients: [
+          YoutubeApiClient.ios,
+          YoutubeApiClient.safari,
+          YoutubeApiClient.tv,
+        ],
+      );
+
+      final hls = manifest.hls;
+      if (hls.isNotEmpty) {
+        return hls.first.url.toString();
+      }
+
       final audioOnly = manifest.audioOnly;
       if (audioOnly.isNotEmpty) {
         return audioOnly.withHighestBitrate().url.toString();

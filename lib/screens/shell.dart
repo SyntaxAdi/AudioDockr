@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 import '../theme.dart';
+import '../providers/playback_provider.dart';
 import 'search_screen.dart';
 import 'library_screen.dart';
 import 'downloads_screen.dart';
@@ -28,6 +30,10 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   void _onTabTapped(int index) {
     if (index == 2) {
+      final playbackState = ref.read(playbackNotifierProvider);
+      if (playbackState.currentTrackId == null) {
+        return;
+      }
       // Tap on player icon opens full screen player over the current tab
       showModalBottomSheet(
         context: context,
@@ -97,7 +103,15 @@ class MiniPlayer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Hidden if no track is playing. For now, showing mock data always.
+    final playbackState = ref.watch(playbackNotifierProvider);
+    if (playbackState.currentTrackId == null) {
+      return const SizedBox.shrink();
+    }
+
+    final progress = playbackState.duration.inMilliseconds > 0
+        ? playbackState.position.inMilliseconds / playbackState.duration.inMilliseconds
+        : 0.0;
+
     return GestureDetector(
       onTap: () {
         showModalBottomSheet(
@@ -122,22 +136,30 @@ class MiniPlayer extends ConsumerWidget {
                   height: 48,
                   margin: const EdgeInsets.only(left: 8),
                   color: bgDivider,
-                  child: const Center(child: Icon(Icons.music_note, color: textSecondary)),
+                  child: (playbackState.currentThumbnailUrl ?? '').isEmpty
+                      ? const Center(child: Icon(Icons.music_note, color: textSecondary))
+                      : CachedNetworkImage(
+                          imageUrl: playbackState.currentThumbnailUrl!,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => const Center(
+                            child: Icon(Icons.music_note, color: textSecondary),
+                          ),
+                        ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
+                  children: [
                       Text(
-                        'Cyberpunk 2077 - V',
+                        playbackState.currentTitle ?? 'Unknown track',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(fontSize: 13, color: textPrimary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       Text(
-                        'P.T. Adamczyk',
+                        playbackState.currentArtist ?? 'Unknown artist',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(fontSize: 11, color: textSecondary),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -146,8 +168,11 @@ class MiniPlayer extends ConsumerWidget {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.play_arrow, color: accentPrimary),
-                  onPressed: () {},
+                  icon: Icon(
+                    playbackState.isPlaying ? Icons.pause : Icons.play_arrow,
+                    color: accentPrimary,
+                  ),
+                  onPressed: () => ref.read(playbackNotifierProvider.notifier).togglePlayPause(),
                 ),
                 IconButton(
                   icon: const Icon(Icons.skip_next, color: textSecondary),
@@ -165,7 +190,7 @@ class MiniPlayer extends ConsumerWidget {
                 alignment: Alignment.centerLeft,
                 color: bgDivider,
                 child: FractionallySizedBox(
-                  widthFactor: 0.3, // 30% progress mock
+                  widthFactor: progress.clamp(0.0, 1.0),
                   child: Container(color: accentPrimary),
                 ),
               ),

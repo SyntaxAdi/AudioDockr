@@ -120,14 +120,23 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                             final track = results[index];
                             return TrackListItem(
                               track: track,
-                              onTap: () {
-                                ref.read(playbackNotifierProvider.notifier).playTrack(
+                              onTap: () async {
+                                try {
+                                  await ref.read(playbackNotifierProvider.notifier).playTrack(
                                       track.videoId,
                                       track.videoUrl,
                                       track.title,
                                       track.artist,
                                       track.thumbnailUrl,
                                     );
+                                } on PlaybackFailure catch (error) {
+                                  if (!context.mounted) {
+                                    return;
+                                  }
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(error.message)),
+                                  );
+                                }
                               },
                             );
                           },
