@@ -108,11 +108,6 @@ class YoutubeService {
         ],
       );
 
-      final hls = manifest.hls;
-      if (hls.isNotEmpty) {
-        return hls.first.url.toString();
-      }
-
       final audioOnly = manifest.audioOnly;
       if (audioOnly.isNotEmpty) {
         return audioOnly.withHighestBitrate().url.toString();

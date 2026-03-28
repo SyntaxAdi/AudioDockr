@@ -1,9 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:just_audio_background/just_audio_background.dart';
-import 'package:sqflite/sqflite.dart';
 
-import '../database_helper.dart';
 import '../api/youtube_service.dart';
 
 class PlaybackFailure implements Exception {
@@ -17,10 +17,7 @@ class PlaybackFailure implements Exception {
 }
 
 final audioPlayerProvider = Provider<AudioPlayer>((ref) {
-  return AudioPlayer(
-    userAgent:
-        'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Mobile Safari/537.36',
-  );
+  return AudioPlayer();
 });
 
 final playbackNotifierProvider = StateNotifierProvider<PlaybackNotifier, PlaybackState>((ref) {
@@ -70,6 +67,8 @@ class PlaybackState {
 }
 
 class PlaybackNotifier extends StateNotifier<PlaybackState> {
+  static const MethodChannel _extractChannel = MethodChannel('audiodockr/extract');
+
   final AudioPlayer _player;
   final YoutubeService _youtubeService;
 
@@ -88,35 +87,12 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }
 
   Future<void> playTrack(String videoId, String videoUrl, String title, String artist, String thumbnailUrl) async {
-    // Check cache
-    final db = await DatabaseHelper.instance.database;
-    final res = await db.query('url_cache', where: 'video_id = ?', whereArgs: [videoId]);
-    
-    String audioUrl = '';
-    int now = DateTime.now().millisecondsSinceEpoch;
-    
-    if (res.isNotEmpty && (res.first['expires_at'] as int) > now) {
-      audioUrl = res.first['audio_url'] as String;
-    } else {
-      final extractedUrl = await _extractTrackUrl(videoId, videoUrl);
+    final audioUrl = await _extractTrackUrl(videoId, videoUrl);
 
-      if (extractedUrl == null || extractedUrl.isEmpty) {
-        throw const PlaybackFailure(
-          'extract_empty',
-          'Audio playback could not be prepared for this track.',
-        );
-      }
-
-      audioUrl = extractedUrl;
-      await db.insert(
-        'url_cache',
-        {
-          'video_id': videoId,
-          'audio_url': audioUrl,
-          'expires_at': now + const Duration(hours: 1).inMilliseconds,
-          'last_verified': now,
-        },
-        conflictAlgorithm: ConflictAlgorithm.replace,
+    if (audioUrl == null || audioUrl.isEmpty) {
+      throw const PlaybackFailure(
+        'extract_empty',
+        'Audio playback could not be prepared.',
       );
     }
 
@@ -124,7 +100,6 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       await _player.setAudioSource(
         AudioSource.uri(
           Uri.parse(audioUrl),
-          headers: _buildStreamHeaders(videoUrl),
           tag: MediaItem(
             id: videoId,
             title: title,
@@ -148,23 +123,27 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     }
   }
 
-  Map<String, String> _buildStreamHeaders(String videoUrl) {
-    final referer = videoUrl.isNotEmpty ? videoUrl : 'https://www.youtube.com/';
-    return {
-      'User-Agent':
-          'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0 Mobile Safari/537.36',
-      'Referer': referer,
-      'Origin': 'https://www.youtube.com',
-      'Accept-Language': 'en-US,en;q=0.9',
-      'Accept-Encoding': 'identity',
-    };
-  }
-
   Future<String?> _extractTrackUrl(String videoId, String videoUrl) async {
     try {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        final nativeUrl = await _extractChannel.invokeMethod<String>(
+          'extract',
+          {
+            'videoId': videoId,
+            'videoUrl': videoUrl,
+          },
+        );
+        return nativeUrl;
+      }
+
       return await _youtubeService.extractAudioUrl(
         videoId: videoId,
         videoUrl: videoUrl,
+      );
+    } on PlatformException catch (error) {
+      throw PlaybackFailure(
+        error.code,
+        error.message ?? 'Unable to prepare audio playback for this track.',
       );
     } on YoutubeServiceException catch (error) {
       throw _mapExtractError(error);
