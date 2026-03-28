@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../theme.dart';
 import '../providers/playback_provider.dart';
+import 'home_screen.dart';
 import 'search_screen.dart';
 import 'library_screen.dart';
 import 'downloads_screen.dart';
@@ -21,31 +22,14 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _currentIndex = 0;
 
   final List<Widget> _pages = const [
+    HomeScreen(),
     SearchScreen(),
     LibraryScreen(),
-    SizedBox(), // Placeholder for Player tab
     DownloadsScreen(),
     SettingsScreen(),
   ];
 
   void _onTabTapped(int index) {
-    if (index == 2) {
-      final playbackState = ref.read(playbackNotifierProvider);
-      if (playbackState.currentTrackId == null) {
-        return;
-      }
-      // Tap on player icon opens full screen player over the current tab
-      showModalBottomSheet(
-        context: context,
-        isScrollControlled: true,
-        backgroundColor: Colors.transparent,
-        builder: (_) => DraggableScrollableSheet(
-          initialChildSize: 1.0,
-          builder: (_, controller) => const NowPlayingScreen(),
-        ),
-      );
-      return;
-    }
     setState(() {
       _currentIndex = index;
     });
@@ -70,6 +54,10 @@ class _AppShellState extends ConsumerState<AppShell> {
             currentIndex: _currentIndex,
             onTap: _onTabTapped,
             items: const [
+            BottomNavigationBarItem(
+              icon: Icon(Icons.home_rounded),
+              label: 'HOME',
+            ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.search),
                 label: 'SEARCH',
@@ -77,10 +65,6 @@ class _AppShellState extends ConsumerState<AppShell> {
               BottomNavigationBarItem(
                 icon: Icon(Icons.library_music),
                 label: 'LIBRARY',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.graphic_eq),
-                label: 'PLAYER',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.download_rounded),

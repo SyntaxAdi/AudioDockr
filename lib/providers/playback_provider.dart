@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../api/youtube_service.dart';
+import 'library_provider.dart';
 import '../services/native_player_service.dart';
 
 class PlaybackFailure implements Exception {
@@ -25,38 +26,63 @@ final nativePlayerServiceProvider = Provider<NativePlayerService>((ref) {
 final playbackNotifierProvider = StateNotifierProvider<PlaybackNotifier, PlaybackState>((ref) {
   final youtubeService = ref.read(youtubeServiceProvider);
   final nativePlayerService = ref.read(nativePlayerServiceProvider);
-  return PlaybackNotifier(nativePlayerService, youtubeService);
+  final libraryNotifier = ref.read(libraryProvider.notifier);
+  return PlaybackNotifier(nativePlayerService, youtubeService, libraryNotifier);
 });
+
+class RecentlyPlayedTrack {
+  const RecentlyPlayedTrack({
+    required this.videoId,
+    required this.videoUrl,
+    required this.title,
+    required this.artist,
+    required this.thumbnailUrl,
+  });
+
+  final String videoId;
+  final String videoUrl;
+  final String title;
+  final String artist;
+  final String thumbnailUrl;
+}
 
 class PlaybackState {
   final String? currentTrackId;
   final String? currentTitle;
   final String? currentArtist;
   final String? currentThumbnailUrl;
+  final String? currentVideoUrl;
   final bool isPlaying;
   final Duration position;
   final Duration duration;
   final String? lastError;
+  final List<RecentlyPlayedTrack>? _recentlyPlayed;
+
+  List<RecentlyPlayedTrack> get recentlyPlayed => _recentlyPlayed ?? const [];
 
   PlaybackState({
     this.currentTrackId,
     this.currentTitle,
     this.currentArtist,
     this.currentThumbnailUrl,
+    this.currentVideoUrl,
     this.isPlaying = false,
     this.position = Duration.zero,
     this.duration = Duration.zero,
     this.lastError,
-  });
+    List<RecentlyPlayedTrack>? recentlyPlayed,
+  }) : _recentlyPlayed = recentlyPlayed;
   
   PlaybackState copyWith({
     String? currentTrackId,
     String? currentTitle,
     String? currentArtist,
     String? currentThumbnailUrl,
+    String? currentVideoUrl,
     bool? isPlaying,
     Duration? position,
     Duration? duration,
+    List<RecentlyPlayedTrack>? recentlyPlayed,
     Object? lastError = _playbackStateNoChange,
   }) {
     return PlaybackState(
@@ -64,9 +90,11 @@ class PlaybackState {
       currentTitle: currentTitle ?? this.currentTitle,
       currentArtist: currentArtist ?? this.currentArtist,
       currentThumbnailUrl: currentThumbnailUrl ?? this.currentThumbnailUrl,
+      currentVideoUrl: currentVideoUrl ?? this.currentVideoUrl,
       isPlaying: isPlaying ?? this.isPlaying,
       position: position ?? this.position,
       duration: duration ?? this.duration,
+      recentlyPlayed: recentlyPlayed ?? this.recentlyPlayed,
       lastError: identical(lastError, _playbackStateNoChange)
           ? this.lastError
           : lastError as String?,
@@ -81,9 +109,10 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
 
   final NativePlayerService _nativePlayerService;
   final YoutubeService _youtubeService;
+  final LibraryNotifier _libraryNotifier;
   StreamSubscription<Map<String, dynamic>>? _playerEventsSubscription;
 
-  PlaybackNotifier(this._nativePlayerService, this._youtubeService)
+  PlaybackNotifier(this._nativePlayerService, this._youtubeService, this._libraryNotifier)
       : super(PlaybackState()) {
     _playerEventsSubscription = _nativePlayerService.playerStateStream.listen(
       _handleNativePlayerEvent,
@@ -102,6 +131,13 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     }
 
     try {
+      await _libraryNotifier.recordTrack(
+        videoId: videoId,
+        videoUrl: videoUrl,
+        title: title,
+        artist: artist,
+        thumbnailUrl: thumbnailUrl,
+      );
       await _nativePlayerService.playYoutubeStream(
         url: audioUrl,
         headers: _buildPlaybackHeaders(),
@@ -114,8 +150,16 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         currentTitle: title,
         currentArtist: artist,
         currentThumbnailUrl: thumbnailUrl,
+        currentVideoUrl: videoUrl,
         position: Duration.zero,
         duration: Duration.zero,
+        recentlyPlayed: _updatedRecentlyPlayed(
+          videoId: videoId,
+          videoUrl: videoUrl,
+          title: title,
+          artist: artist,
+          thumbnailUrl: thumbnailUrl,
+        ),
         lastError: null,
       );
     } catch (e) {
@@ -124,6 +168,27 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         e.toString(),
       );
     }
+  }
+
+  List<RecentlyPlayedTrack> _updatedRecentlyPlayed({
+    required String videoId,
+    required String videoUrl,
+    required String title,
+    required String artist,
+    required String thumbnailUrl,
+  }) {
+    final track = RecentlyPlayedTrack(
+      videoId: videoId,
+      videoUrl: videoUrl,
+      title: title,
+      artist: artist,
+      thumbnailUrl: thumbnailUrl,
+    );
+
+    final filtered = state.recentlyPlayed
+        .where((item) => item.videoId != videoId)
+        .toList();
+    return [track, ...filtered].take(8).toList(growable: false);
   }
 
   void _handleNativePlayerEvent(Map<String, dynamic> event) {

@@ -1,5 +1,9 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../providers/library_provider.dart';
+import '../providers/playback_provider.dart';
 import '../theme.dart';
 
 class LibraryScreen extends ConsumerWidget {
@@ -13,13 +17,20 @@ class LibraryScreen extends ConsumerWidget {
         appBar: AppBar(
           backgroundColor: bgBase,
           elevation: 0,
-          title: Text('LIBRARY', style: Theme.of(context).textTheme.displayLarge),
+          title: Text(
+            'LIBRARY',
+            style: Theme.of(context).textTheme.displayLarge,
+          ),
           bottom: const TabBar(
             indicatorColor: accentPrimary,
             indicatorWeight: 2,
             labelColor: accentPrimary,
             unselectedLabelColor: textSecondary,
-            labelStyle: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, letterSpacing: 0.1),
+            labelStyle: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              letterSpacing: 0.1,
+            ),
             tabs: [
               Tab(text: 'TRACKS'),
               Tab(text: 'PLAYLISTS'),
@@ -39,147 +50,239 @@ class LibraryScreen extends ConsumerWidget {
   }
 }
 
-class TracksTab extends StatelessWidget {
+class TracksTab extends ConsumerWidget {
   const TracksTab({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          child: Row(
-            children: [
-              _buildFilterChip('ALL', true),
-              const SizedBox(width: 8),
-              _buildFilterChip('DOWNLOADED', false),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ListView.separated(
-            itemCount: 10,
-            separatorBuilder: (context, index) => const Divider(height: 1, color: bgDivider),
-            itemBuilder: (context, index) {
-              return _buildTrackItem(context, index % 2 == 0); // Mock downloaded state
-            },
-          ),
-        ),
-      ],
-    );
-  }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final libraryState = ref.watch(libraryProvider);
+    if (libraryState.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: accentPrimary),
+      );
+    }
 
-  Widget _buildFilterChip(String label, bool isSelected) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: isSelected ? accentPrimary : bgDivider,
-        border: Border.all(color: isSelected ? accentPrimary : Colors.transparent),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: isSelected ? bgBase : textPrimary,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
+    if (libraryState.allTracks.isEmpty) {
+      return _LibraryEmptyState(
+        message: 'PLAY TRACKS TO BUILD YOUR LIBRARY',
+      );
+    }
 
-  Widget _buildTrackItem(BuildContext context, bool isDownloaded) {
-    return Container(
-      height: 72,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Stack(
-            children: [
-              Container(width: 56, height: 56, color: bgDivider),
-              if (isDownloaded)
-                Positioned(
-                  top: 0,
-                  right: 0,
-                  child: Container(
-                    color: accentPrimary,
-                    padding: const EdgeInsets.all(2),
-                    child: const Text('DL', style: TextStyle(fontSize: 8, color: bgBase, fontWeight: FontWeight.bold)),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text('Sample Track from Library', style: Theme.of(context).textTheme.bodyLarge, maxLines: 1, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 4),
-                Text('ARTIST NAME', style: Theme.of(context).textTheme.labelSmall),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return ListView.separated(
+      itemCount: libraryState.allTracks.length,
+      separatorBuilder: (_, __) => const Divider(height: 1, color: bgDivider),
+      itemBuilder: (context, index) {
+        final track = libraryState.allTracks[index];
+        return _LibraryTrackRow(track: track);
+      },
     );
   }
 }
 
-class PlaylistsTab extends StatelessWidget {
+class PlaylistsTab extends ConsumerWidget {
   const PlaylistsTab({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: TextButton(
-            onPressed: () {},
-            child: const Text('NEW PLAYLIST'),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final libraryState = ref.watch(libraryProvider);
+    if (libraryState.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: accentPrimary),
+      );
+    }
+
+    if (libraryState.playlists.isEmpty) {
+      return _LibraryEmptyState(
+        message: 'NO PLAYLISTS YET',
+      );
+    }
+
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: libraryState.playlists.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (context, index) {
+        final playlist = libraryState.playlists[index];
+        return Container(
+          height: 88,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: bgCard,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: bgDivider),
           ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: 3,
-            itemBuilder: (context, index) {
-              return Container(
-                height: 80,
-                color: bgCard,
-                margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
+          child: Row(
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  color: accentPrimary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  playlist.id == 'liked'
+                      ? Icons.favorite
+                      : Icons.queue_music_rounded,
+                  color: accentPrimary,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text('My Awesome Playlist ${index + 1}', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                          Text('12 TRACKS', style: Theme.of(context).textTheme.labelSmall),
-                        ],
-                      ),
+                    Text(
+                      playlist.name.toUpperCase(),
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
-                    const Icon(Icons.chevron_right, color: accentPrimary),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${playlist.trackCount} TRACKS',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
                   ],
                 ),
-              );
-            },
+              ),
+            ],
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }
 
-class LikedTab extends StatelessWidget {
+class LikedTab extends ConsumerWidget {
   const LikedTab({super.key});
 
   @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final libraryState = ref.watch(libraryProvider);
+    if (libraryState.isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(color: accentPrimary),
+      );
+    }
+
+    if (libraryState.likedTracks.isEmpty) {
+      return _LibraryEmptyState(
+        message: 'LIKE SONGS TO SEE THEM HERE',
+      );
+    }
+
+    return ListView.separated(
+      itemCount: libraryState.likedTracks.length,
+      separatorBuilder: (_, __) => const Divider(height: 1, color: bgDivider),
+      itemBuilder: (context, index) {
+        final track = libraryState.likedTracks[index];
+        return _LibraryTrackRow(track: track);
+      },
+    );
+  }
+}
+
+class _LibraryTrackRow extends ConsumerWidget {
+  const _LibraryTrackRow({
+    required this.track,
+  });
+
+  final LibraryTrack track;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return InkWell(
+      onTap: () async {
+        try {
+          await ref.read(playbackNotifierProvider.notifier).playTrack(
+                track.videoId,
+                track.videoUrl,
+                track.title,
+                track.artist,
+                track.thumbnailUrl,
+              );
+        } on PlaybackFailure catch (error) {
+          if (!context.mounted) {
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(error.message)),
+          );
+        }
+      },
+      child: Container(
+        height: 76,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Row(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                width: 56,
+                height: 56,
+                color: bgDivider,
+                child: track.thumbnailUrl.isEmpty
+                    ? const Center(
+                        child: Icon(Icons.music_note, color: textSecondary),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: track.thumbnailUrl,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => const Center(
+                          child: Icon(Icons.music_note, color: textSecondary),
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    track.title,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    track.artist,
+                    style: Theme.of(context).textTheme.labelSmall,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            if (track.isDisliked)
+              const Icon(Icons.thumb_down_alt, color: textSecondary, size: 20),
+            if (track.isLiked)
+              const Icon(Icons.favorite, color: accentPrimary, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LibraryEmptyState extends StatelessWidget {
+  const _LibraryEmptyState({
+    required this.message,
+  });
+
+  final String message;
+
+  @override
   Widget build(BuildContext context) {
-    return Container();
+    return Center(
+      child: Text(
+        message,
+        style: Theme.of(context).textTheme.labelSmall,
+      ),
+    );
   }
 }

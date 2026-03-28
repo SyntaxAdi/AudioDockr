@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/library_provider.dart';
 import '../providers/playback_provider.dart';
 import '../theme.dart';
 
@@ -20,6 +21,12 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   Widget build(BuildContext context) {
     final playbackState = ref.watch(playbackNotifierProvider);
     final notifier = ref.read(playbackNotifierProvider.notifier);
+    final libraryState = ref.watch(libraryProvider);
+    final currentTrack = libraryState.isLoading
+        ? null
+        : ref
+            .read(libraryProvider.notifier)
+            .trackById(playbackState.currentTrackId);
 
     if (playbackState.currentTrackId == null) {
       return Container(
@@ -123,16 +130,56 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.favorite_border, color: accentPrimary),
-                  onPressed: () {},
+                  icon: Icon(
+                    currentTrack?.isDisliked == true
+                        ? Icons.thumb_down_alt
+                        : Icons.thumb_down_alt_outlined,
+                    color: currentTrack?.isDisliked == true
+                        ? accentPrimary
+                        : textSecondary,
+                  ),
+                  onPressed: () async {
+                    final currentTrackId = playbackState.currentTrackId;
+                    if (currentTrackId == null) {
+                      return;
+                    }
+                    await ref.read(libraryProvider.notifier).toggleDislike(
+                          videoId: currentTrackId,
+                          videoUrl: playbackState.currentVideoUrl ?? '',
+                          title: playbackState.currentTitle ?? 'Unknown track',
+                          artist:
+                              playbackState.currentArtist ?? 'Unknown artist',
+                          thumbnailUrl:
+                              playbackState.currentThumbnailUrl ?? '',
+                          durationSeconds:
+                              playbackState.duration.inSeconds,
+                        );
+                  },
                 ),
                 IconButton(
-                  icon: const Icon(Icons.file_download_outlined, color: textSecondary),
-                  onPressed: () {},
-                ),
-                IconButton(
-                  icon: const Icon(Icons.playlist_add, color: textSecondary),
-                  onPressed: () {},
+                  icon: Icon(
+                    currentTrack?.isLiked == true
+                        ? Icons.favorite
+                        : Icons.favorite_border,
+                    color: accentPrimary,
+                  ),
+                  onPressed: () async {
+                    final currentTrackId = playbackState.currentTrackId;
+                    if (currentTrackId == null) {
+                      return;
+                    }
+                    await ref.read(libraryProvider.notifier).toggleLike(
+                          videoId: currentTrackId,
+                          videoUrl: playbackState.currentVideoUrl ?? '',
+                          title: playbackState.currentTitle ?? 'Unknown track',
+                          artist:
+                              playbackState.currentArtist ?? 'Unknown artist',
+                          thumbnailUrl:
+                              playbackState.currentThumbnailUrl ?? '',
+                          durationSeconds:
+                              playbackState.duration.inSeconds,
+                        );
+                  },
                 ),
               ],
             ),

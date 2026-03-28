@@ -56,9 +56,9 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: Text(
-                'AUDIODOCKR',
+                'SEARCH',
                 style: Theme.of(context).textTheme.displayLarge,
               ),
             ),
@@ -80,7 +80,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
                           },
                         )
                       : null,
-                  hintText: 'Search YouTube',
+                  hintText: 'Search Music 🎵',
                 ),
                 onChanged: (value) {
                   setState(() {});
@@ -97,7 +97,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               child: _searchController.text.isEmpty
                   ? Center(
                       child: Text(
-                        'SEARCH YOUTUBE',
+                        'SEARCH MUSIC TO GET STARTED',
                         style: Theme.of(context).textTheme.labelSmall,
                       ),
                     )
@@ -238,14 +238,18 @@ class TrackListItem extends StatelessWidget {
                 ],
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              color: bgDivider,
-              child: Text(
-                _formatDuration(track.duration),
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(color: accentPrimary),
+            if (track.duration > Duration.zero)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                color: bgDivider,
+                child: Text(
+                  _formatDuration(track.duration),
+                  style: Theme.of(context)
+                      .textTheme
+                      .labelSmall
+                      ?.copyWith(color: accentPrimary),
+                ),
               ),
-            ),
           ],
         ),
       ),
