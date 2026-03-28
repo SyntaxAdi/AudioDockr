@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/library_provider.dart';
 import '../providers/playback_provider.dart';
 import '../theme.dart';
 
@@ -10,8 +11,8 @@ class HomeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playbackState = ref.watch(playbackNotifierProvider);
-    final recentlyPlayed = playbackState.recentlyPlayed;
+    final libraryState = ref.watch(libraryProvider);
+    final recentlyPlayed = libraryState.recentTracks;
 
     return Scaffold(
       body: SafeArea(
@@ -27,7 +28,14 @@ class HomeScreen extends ConsumerWidget {
                     ),
               ),
             ),
-            if (recentlyPlayed.isEmpty)
+            if (libraryState.isLoading)
+              const Padding(
+                padding: EdgeInsets.only(top: 80),
+                child: Center(
+                  child: CircularProgressIndicator(color: accentPrimary),
+                ),
+              )
+            else if (recentlyPlayed.isEmpty)
               SizedBox(
                 height: MediaQuery.of(context).size.height * 0.45,
                 child: Center(
@@ -96,7 +104,7 @@ class _RecentlyPlayedCard extends StatelessWidget {
     required this.onTap,
   });
 
-  final RecentlyPlayedTrack track;
+  final LibraryTrack track;
   final VoidCallback onTap;
 
   @override

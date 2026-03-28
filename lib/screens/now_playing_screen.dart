@@ -131,33 +131,6 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               children: [
                 IconButton(
                   icon: Icon(
-                    currentTrack?.isDisliked == true
-                        ? Icons.thumb_down_alt
-                        : Icons.thumb_down_alt_outlined,
-                    color: currentTrack?.isDisliked == true
-                        ? accentPrimary
-                        : textSecondary,
-                  ),
-                  onPressed: () async {
-                    final currentTrackId = playbackState.currentTrackId;
-                    if (currentTrackId == null) {
-                      return;
-                    }
-                    await ref.read(libraryProvider.notifier).toggleDislike(
-                          videoId: currentTrackId,
-                          videoUrl: playbackState.currentVideoUrl ?? '',
-                          title: playbackState.currentTitle ?? 'Unknown track',
-                          artist:
-                              playbackState.currentArtist ?? 'Unknown artist',
-                          thumbnailUrl:
-                              playbackState.currentThumbnailUrl ?? '',
-                          durationSeconds:
-                              playbackState.duration.inSeconds,
-                        );
-                  },
-                ),
-                IconButton(
-                  icon: Icon(
                     currentTrack?.isLiked == true
                         ? Icons.favorite
                         : Icons.favorite_border,
@@ -180,6 +153,20 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                               playbackState.duration.inSeconds,
                         );
                   },
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.file_download_outlined,
+                    color: textSecondary,
+                  ),
+                  onPressed: () {},
+                ),
+                IconButton(
+                  icon: const Icon(
+                    Icons.playlist_add,
+                    color: textSecondary,
+                  ),
+                  onPressed: () {},
                 ),
               ],
             ),

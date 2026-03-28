@@ -12,6 +12,7 @@ class StoredTrack {
     required this.durationSeconds,
     required this.thumbnailUrl,
     required this.reaction,
+    required this.lastPlayedAt,
   });
 
   final String videoId;
@@ -21,6 +22,7 @@ class StoredTrack {
   final int durationSeconds;
   final String thumbnailUrl;
   final String reaction;
+  final int lastPlayedAt;
 
   bool get isLiked => reaction == 'liked';
   bool get isDisliked => reaction == 'disliked';
@@ -34,6 +36,7 @@ class StoredTrack {
       durationSeconds: (map['duration'] as int?) ?? 0,
       thumbnailUrl: (map['thumbnail_url'] as String?) ?? '',
       reaction: (map['state'] as String?) ?? 'neutral',
+      lastPlayedAt: (map['last_played_at'] as int?) ?? 0,
     );
   }
 }
@@ -71,7 +74,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -87,7 +90,8 @@ class DatabaseHelper {
         duration INTEGER,
         thumbnail_url TEXT,
         liked INTEGER DEFAULT 0,
-        state TEXT DEFAULT 'neutral'
+        state TEXT DEFAULT 'neutral',
+        last_played_at INTEGER DEFAULT 0
       )
     ''');
 
@@ -116,6 +120,14 @@ class DatabaseHelper {
       await db.execute(
         "UPDATE tracks SET state = CASE WHEN liked = 1 THEN 'liked' "
         "WHEN state IS NULL OR state = '' THEN 'neutral' ELSE state END",
+      );
+    }
+    if (oldVersion < 3) {
+      await _ensureColumn(
+        db,
+        'tracks',
+        'last_played_at',
+        'INTEGER DEFAULT 0',
       );
     }
   }
@@ -165,6 +177,7 @@ class DatabaseHelper {
         'thumbnail_url': thumbnailUrl,
         'liked': 0,
         'state': 'neutral',
+        'last_played_at': DateTime.now().millisecondsSinceEpoch,
       },
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
@@ -177,6 +190,7 @@ class DatabaseHelper {
         'artist': artist,
         'duration': durationSeconds,
         'thumbnail_url': thumbnailUrl,
+        'last_played_at': DateTime.now().millisecondsSinceEpoch,
       },
       where: 'video_id = ?',
       whereArgs: [videoId],
@@ -258,6 +272,17 @@ class DatabaseHelper {
       WHERE pt.playlist_id = ?
       ORDER BY pt.position DESC
     ''', [likedPlaylistId]);
+    return result.map(StoredTrack.fromMap).toList();
+  }
+
+  Future<List<StoredTrack>> fetchRecentlyPlayed({int limit = 8}) async {
+    final db = await database;
+    final result = await db.query(
+      'tracks',
+      where: 'last_played_at > 0',
+      orderBy: 'last_played_at DESC',
+      limit: limit,
+    );
     return result.map(StoredTrack.fromMap).toList();
   }
 

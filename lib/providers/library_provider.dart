@@ -63,24 +63,28 @@ class LibraryState {
     this.allTracks = const [],
     this.likedTracks = const [],
     this.playlists = const [],
+    this.recentTracks = const [],
   });
 
   final bool isLoading;
   final List<LibraryTrack> allTracks;
   final List<LibraryTrack> likedTracks;
   final List<LibraryPlaylist> playlists;
+  final List<LibraryTrack> recentTracks;
 
   LibraryState copyWith({
     bool? isLoading,
     List<LibraryTrack>? allTracks,
     List<LibraryTrack>? likedTracks,
     List<LibraryPlaylist>? playlists,
+    List<LibraryTrack>? recentTracks,
   }) {
     return LibraryState(
       isLoading: isLoading ?? this.isLoading,
       allTracks: allTracks ?? this.allTracks,
       likedTracks: likedTracks ?? this.likedTracks,
       playlists: playlists ?? this.playlists,
+      recentTracks: recentTracks ?? this.recentTracks,
     );
   }
 }
@@ -101,11 +105,13 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
     final allTracks = await _databaseHelper.fetchAllTracks();
     final likedTracks = await _databaseHelper.fetchLikedTracks();
     final playlists = await _databaseHelper.fetchPlaylists();
+    final recentTracks = await _databaseHelper.fetchRecentlyPlayed();
     state = state.copyWith(
       isLoading: false,
       allTracks: allTracks.map(LibraryTrack.fromStoredTrack).toList(),
       likedTracks: likedTracks.map(LibraryTrack.fromStoredTrack).toList(),
       playlists: playlists.map(LibraryPlaylist.fromStoredPlaylist).toList(),
+      recentTracks: recentTracks.map(LibraryTrack.fromStoredTrack).toList(),
     );
   }
 

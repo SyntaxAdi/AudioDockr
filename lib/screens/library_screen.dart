@@ -258,8 +258,6 @@ class _LibraryTrackRow extends ConsumerWidget {
                 ],
               ),
             ),
-            if (track.isDisliked)
-              const Icon(Icons.thumb_down_alt, color: textSecondary, size: 20),
             if (track.isLiked)
               const Icon(Icons.favorite, color: accentPrimary, size: 20),
           ],
