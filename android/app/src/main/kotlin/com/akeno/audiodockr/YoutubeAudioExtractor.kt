@@ -1,5 +1,6 @@
 package com.akeno.audiodockr
 
+import android.util.Log
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -62,20 +63,44 @@ private class AudiodockrDownloader : Downloader() {
 }
 
 object YoutubeAudioExtractor {
+    private const val TAG = "YoutubeAudioExtractor"
     private val initialized = AtomicBoolean(false)
 
     fun extract(videoId: String, videoUrl: String): Result<String> = runCatching {
         ensureInitialized()
 
-        val targetUrl = when {
-            videoUrl.isNotBlank() -> videoUrl
-            videoId.isNotBlank() -> "https://www.youtube.com/watch?v=$videoId"
-            else -> throw IllegalArgumentException("Missing video identifier.")
+        val targetCandidates = buildTargetCandidates(videoId = videoId, videoUrl = videoUrl)
+        var lastError: Throwable? = null
+
+        for (targetUrl in targetCandidates) {
+            try {
+                Log.d(TAG, "Trying stream extraction for $targetUrl")
+                val streamInfo = StreamInfo.getInfo(NewPipe.getService(0), targetUrl)
+                Log.d(
+                    TAG,
+                    "Stream info loaded. audio=${streamInfo.audioStreams.size}, video=${streamInfo.videoStreams.size}, videoOnly=${streamInfo.videoOnlyStreams.size}",
+                )
+
+                pickBestAudioStream(streamInfo.audioStreams)?.content?.takeIf { it.isNotBlank() }?.let {
+                    Log.d(TAG, "Selected audio stream for ${streamInfo.id}")
+                    return@runCatching it
+                }
+
+                streamInfo.videoStreams
+                    .firstOrNull { !it.content.isNullOrBlank() }
+                    ?.content
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let {
+                        Log.d(TAG, "Falling back to muxed stream for ${streamInfo.id}")
+                        return@runCatching it
+                    }
+            } catch (error: Throwable) {
+                lastError = error
+                Log.e(TAG, "Extraction failed for $targetUrl: ${error.message}", error)
+            }
         }
 
-        val streamInfo = StreamInfo.getInfo(NewPipe.getService(0), targetUrl)
-        pickBestAudioStream(streamInfo.audioStreams)?.content
-            ?: throw ExtractionException("No playable audio stream was found.")
+        throw lastError ?: ExtractionException("No playable stream was found.")
     }
 
     fun mapError(error: Throwable): ExtractorFailure {
@@ -98,7 +123,13 @@ object YoutubeAudioExtractor {
             )
             else -> ExtractorFailure(
                 code = "extract_failed",
-                message = "Unable to prepare audio playback for this track.",
+                message = buildString {
+                    append("Unable to prepare audio playback for this track.")
+                    error.message?.takeIf { it.isNotBlank() }?.let {
+                        append(" ")
+                        append(it)
+                    }
+                },
             )
         }
     }
@@ -124,5 +155,30 @@ object YoutubeAudioExtractor {
                 },
             )
             .firstOrNull()
+    }
+
+    private fun buildTargetCandidates(videoId: String, videoUrl: String): List<String> {
+        val candidates = linkedSetOf<String>()
+
+        if (videoUrl.isNotBlank()) {
+            candidates += videoUrl
+            if (videoUrl.contains("music.youtube.com")) {
+                candidates += videoUrl.replace("music.youtube.com", "www.youtube.com")
+            } else if (videoUrl.contains("www.youtube.com")) {
+                candidates += videoUrl.replace("www.youtube.com", "music.youtube.com")
+            }
+        }
+
+        if (videoId.isNotBlank()) {
+            candidates += "https://www.youtube.com/watch?v=$videoId"
+            candidates += "https://music.youtube.com/watch?v=$videoId"
+            candidates += "https://youtu.be/$videoId"
+        }
+
+        if (candidates.isEmpty()) {
+            throw IllegalArgumentException("Missing video identifier.")
+        }
+
+        return candidates.toList()
     }
 }
