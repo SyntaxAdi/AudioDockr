@@ -42,6 +42,9 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "play" -> {
                         val url = call.argument<String>("url").orEmpty()
+                        val title = call.argument<String>("title").orEmpty()
+                        val artist = call.argument<String>("artist").orEmpty()
+                        val artworkUrl = call.argument<String>("artworkUrl").orEmpty()
                         @Suppress("UNCHECKED_CAST")
                         val headers = (call.argument<Map<String, Any?>>("headers") ?: emptyMap())
                             .mapValues { it.value?.toString().orEmpty() }
@@ -51,7 +54,14 @@ class MainActivity : FlutterActivity() {
                             return@setMethodCallHandler
                         }
 
-                        val intent = PlaybackService.buildPlayIntent(this, url, headers)
+                        val intent = PlaybackService.buildPlayIntent(
+                            this,
+                            url,
+                            headers,
+                            title,
+                            artist,
+                            artworkUrl,
+                        )
                         startService(intent)
                         result.success(null)
                     }

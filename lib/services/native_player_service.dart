@@ -17,13 +17,22 @@ class NativePlayerService {
     });
   }
 
-  Future<void> playYoutubeStream(String url, Map<String, String> headers) async {
+  Future<void> playYoutubeStream({
+    required String url,
+    required Map<String, String> headers,
+    required String title,
+    required String artist,
+    required String thumbnailUrl,
+  }) async {
     try {
       await _commandChannel.invokeMethod<void>(
         'play',
         {
           'url': url,
           'headers': headers,
+          'title': title,
+          'artist': artist,
+          'artworkUrl': thumbnailUrl,
         },
       );
     } on PlatformException catch (error) {
