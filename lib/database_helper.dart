@@ -157,6 +157,25 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> createPlaylist(String name) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      return;
+    }
+
+    final db = await database;
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    await db.insert(
+      'playlists',
+      {
+        'id': 'playlist_$timestamp',
+        'name': trimmedName,
+        'created_at': timestamp,
+      },
+      conflictAlgorithm: ConflictAlgorithm.abort,
+    );
+  }
+
   Future<void> saveTrack({
     required String videoId,
     required String videoUrl,

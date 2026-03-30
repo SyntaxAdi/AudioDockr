@@ -134,6 +134,11 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
     await _loadLibrary();
   }
 
+  Future<void> createPlaylist(String name) async {
+    await _databaseHelper.createPlaylist(name);
+    await _loadLibrary();
+  }
+
   Future<void> toggleLike({
     required String videoId,
     required String videoUrl,
