@@ -21,12 +21,6 @@ class SettingsScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          _buildSectionHeader('CACHE'),
-          _buildListTile('Cache Duration', trailing: const Text('6 HOURS', style: TextStyle(color: accentPrimary, fontWeight: FontWeight.bold))),
-          const SizedBox(height: 8),
-          _buildDestructiveButton('CLEAR URL CACHE'),
-          
-          const SizedBox(height: 32),
           _buildSectionHeader('STORAGE'),
           _buildListTile('Download Location', trailing: const Text('/storage/emulated/0/Music')),
           const SizedBox(height: 8),
