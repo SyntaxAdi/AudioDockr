@@ -11,6 +11,21 @@ import '../theme.dart';
 class SearchScreen extends ConsumerWidget {
   const SearchScreen({super.key});
 
+  static const List<String> _browseGenres = [
+    'Pop',
+    'Hip-Hop',
+    'Rock',
+    'Lo-fi',
+    'Phonk',
+    'Indie',
+    'Electronic',
+    'Jazz',
+    'K-Pop',
+    'Classical',
+    'R&B',
+    'Metal',
+  ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -51,6 +66,48 @@ class SearchScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                'Browse Category',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: accentPrimary,
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: _browseGenres
+                    .map(
+                      (genre) => OutlinedButton(
+                        onPressed: () {},
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: bgDivider),
+                          foregroundColor: textPrimary,
+                          backgroundColor: bgCard,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 12,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: Text(
+                          genre,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ),
+            const SizedBox(height: 20),
             Expanded(
               child: Center(
                 child: Text(
