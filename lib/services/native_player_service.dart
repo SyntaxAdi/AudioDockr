@@ -54,4 +54,11 @@ class NativePlayerService {
       {'position': milliseconds},
     );
   }
+
+  Future<void> setRepeatMode(String mode) async {
+    await _commandChannel.invokeMethod<void>(
+      'setRepeatMode',
+      {'mode': mode},
+    );
+  }
 }

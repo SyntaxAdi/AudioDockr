@@ -265,8 +265,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                   onPressed: () {},
                 ),
                 IconButton(
-                  icon: const Icon(Icons.repeat, color: textSecondary),
-                  onPressed: () {},
+                  icon: _buildRepeatIcon(playbackState.repeatMode),
+                  onPressed: () => notifier.cycleRepeatMode(),
                 ),
               ],
             ),
@@ -283,5 +283,33 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final minutes = twoDigits(d.inMinutes.remainder(60));
     final seconds = twoDigits(d.inSeconds.remainder(60));
     return '$minutes:$seconds';
+  }
+
+  Widget _buildRepeatIcon(PlaybackRepeatMode mode) {
+    switch (mode) {
+      case PlaybackRepeatMode.one:
+        return Stack(
+          alignment: Alignment.center,
+          children: const [
+            Icon(Icons.repeat, color: accentPrimary),
+            Positioned(
+              right: 0,
+              top: 2,
+              child: Text(
+                '1',
+                style: TextStyle(
+                  color: accentPrimary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        );
+      case PlaybackRepeatMode.all:
+        return const Icon(Icons.repeat_on_rounded, color: accentPrimary);
+      case PlaybackRepeatMode.off:
+        return const Icon(Icons.repeat, color: textSecondary);
+    }
   }
 }

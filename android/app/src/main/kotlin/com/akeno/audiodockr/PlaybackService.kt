@@ -125,6 +125,14 @@ class PlaybackService : MediaSessionService() {
                 player.seekTo(intent.getLongExtra(EXTRA_POSITION, 0L))
                 publishState()
             }
+            ACTION_SET_REPEAT_MODE -> {
+                when (intent.getStringExtra(EXTRA_REPEAT_MODE)) {
+                    "one" -> player.repeatMode = Player.REPEAT_MODE_ONE
+                    "all" -> player.repeatMode = Player.REPEAT_MODE_ALL
+                    else -> player.repeatMode = Player.REPEAT_MODE_OFF
+                }
+                publishState()
+            }
         }
 
         return START_STICKY
@@ -173,6 +181,11 @@ class PlaybackService : MediaSessionService() {
             "isPlaying" to player.isPlaying,
             "position" to player.currentPosition.coerceAtLeast(0L),
             "duration" to (player.duration.takeIf { it > 0 } ?: 0L),
+            "repeatMode" to when (player.repeatMode) {
+                Player.REPEAT_MODE_ONE -> "one"
+                Player.REPEAT_MODE_ALL -> "all"
+                else -> "off"
+            },
             "error" to error,
         )
 
@@ -204,9 +217,11 @@ class PlaybackService : MediaSessionService() {
         private const val ACTION_PAUSE = "com.akeno.audiodockr.action.PAUSE"
         private const val ACTION_RESUME = "com.akeno.audiodockr.action.RESUME"
         private const val ACTION_SEEK = "com.akeno.audiodockr.action.SEEK"
+        private const val ACTION_SET_REPEAT_MODE = "com.akeno.audiodockr.action.SET_REPEAT_MODE"
         private const val EXTRA_URL = "url"
         private const val EXTRA_HEADERS = "headers"
         private const val EXTRA_POSITION = "position"
+        private const val EXTRA_REPEAT_MODE = "repeatMode"
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_ARTIST = "artist"
         private const val EXTRA_ARTWORK_URL = "artworkUrl"
@@ -221,6 +236,7 @@ class PlaybackService : MediaSessionService() {
             "isPlaying" to false,
             "position" to 0L,
             "duration" to 0L,
+            "repeatMode" to "off",
             "error" to null,
         )
 
@@ -271,6 +287,13 @@ class PlaybackService : MediaSessionService() {
             return Intent(context, PlaybackService::class.java).apply {
                 action = ACTION_SEEK
                 putExtra(EXTRA_POSITION, position)
+            }
+        }
+
+        fun buildRepeatModeIntent(context: Context, mode: String): Intent {
+            return Intent(context, PlaybackService::class.java).apply {
+                action = ACTION_SET_REPEAT_MODE
+                putExtra(EXTRA_REPEAT_MODE, mode)
             }
         }
 

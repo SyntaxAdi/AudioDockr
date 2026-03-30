@@ -78,6 +78,11 @@ class MainActivity : FlutterActivity() {
                         startService(PlaybackService.buildSeekIntent(this, position))
                         result.success(null)
                     }
+                    "setRepeatMode" -> {
+                        val mode = call.argument<String>("mode").orEmpty()
+                        startService(PlaybackService.buildRepeatModeIntent(this, mode))
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }

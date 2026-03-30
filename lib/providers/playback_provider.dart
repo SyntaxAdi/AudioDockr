@@ -46,6 +46,12 @@ class RecentlyPlayedTrack {
   final String thumbnailUrl;
 }
 
+enum PlaybackRepeatMode {
+  off,
+  one,
+  all,
+}
+
 class PlaybackState {
   final String? currentTrackId;
   final String? currentTitle;
@@ -55,10 +61,12 @@ class PlaybackState {
   final bool isPlaying;
   final Duration position;
   final Duration duration;
+  final PlaybackRepeatMode? _repeatMode;
   final String? lastError;
   final List<RecentlyPlayedTrack>? _recentlyPlayed;
 
   List<RecentlyPlayedTrack> get recentlyPlayed => _recentlyPlayed ?? const [];
+  PlaybackRepeatMode get repeatMode => _repeatMode ?? PlaybackRepeatMode.off;
 
   PlaybackState({
     this.currentTrackId,
@@ -69,9 +77,11 @@ class PlaybackState {
     this.isPlaying = false,
     this.position = Duration.zero,
     this.duration = Duration.zero,
+    PlaybackRepeatMode? repeatMode,
     this.lastError,
     List<RecentlyPlayedTrack>? recentlyPlayed,
-  }) : _recentlyPlayed = recentlyPlayed;
+  })  : _repeatMode = repeatMode,
+        _recentlyPlayed = recentlyPlayed;
   
   PlaybackState copyWith({
     String? currentTrackId,
@@ -82,6 +92,7 @@ class PlaybackState {
     bool? isPlaying,
     Duration? position,
     Duration? duration,
+    PlaybackRepeatMode? repeatMode,
     List<RecentlyPlayedTrack>? recentlyPlayed,
     Object? lastError = _playbackStateNoChange,
   }) {
@@ -94,6 +105,7 @@ class PlaybackState {
       isPlaying: isPlaying ?? this.isPlaying,
       position: position ?? this.position,
       duration: duration ?? this.duration,
+      repeatMode: repeatMode ?? this.repeatMode,
       recentlyPlayed: recentlyPlayed ?? this.recentlyPlayed,
       lastError: identical(lastError, _playbackStateNoChange)
           ? this.lastError
@@ -197,8 +209,20 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       isPlaying: event['isPlaying'] as bool? ?? state.isPlaying,
       position: Duration(milliseconds: (event['position'] as num?)?.toInt() ?? state.position.inMilliseconds),
       duration: Duration(milliseconds: (event['duration'] as num?)?.toInt() ?? state.duration.inMilliseconds),
+      repeatMode: _repeatModeFromNative(event['repeatMode'] as String?),
       lastError: error,
     );
+  }
+
+  PlaybackRepeatMode _repeatModeFromNative(String? mode) {
+    switch (mode) {
+      case 'one':
+        return PlaybackRepeatMode.one;
+      case 'all':
+        return PlaybackRepeatMode.all;
+      default:
+        return PlaybackRepeatMode.off;
+    }
   }
 
   Map<String, String> _buildPlaybackHeaders() {
@@ -294,6 +318,24 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
 
   Future<void> seek(Duration pos) async {
     await _nativePlayerService.seekTo(pos.inMilliseconds);
+  }
+
+  Future<void> cycleRepeatMode() async {
+    final nextMode = switch (state.repeatMode) {
+      PlaybackRepeatMode.off => PlaybackRepeatMode.one,
+      PlaybackRepeatMode.one => PlaybackRepeatMode.all,
+      PlaybackRepeatMode.all => PlaybackRepeatMode.off,
+    };
+
+    await _nativePlayerService.setRepeatMode(
+      switch (nextMode) {
+        PlaybackRepeatMode.off => 'off',
+        PlaybackRepeatMode.one => 'one',
+        PlaybackRepeatMode.all => 'all',
+      },
+    );
+
+    state = state.copyWith(repeatMode: nextMode);
   }
 
   @override
