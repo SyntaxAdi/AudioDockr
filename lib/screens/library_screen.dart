@@ -9,6 +9,70 @@ import '../theme.dart';
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
 
+  void _showPlaylistOptions(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) {
+        return FractionallySizedBox(
+          heightFactor: 0.5,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: bgSurface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      margin: const EdgeInsets.only(top: 12, bottom: 20),
+                      decoration: BoxDecoration(
+                        color: bgDivider,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      'Add Playlist',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: textPrimary,
+                          ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  _PlaylistOptionTile(
+                    icon: Icons.add_box_rounded,
+                    title: 'Create Playlist',
+                    subtitle: 'Start a fresh playlist in your library',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                  _PlaylistOptionTile(
+                    icon: Icons.queue_music_rounded,
+                    title: 'Import Playlist from Spotify',
+                    subtitle: 'Coming next',
+                    onTap: () {
+                      Navigator.of(context).pop();
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final libraryState = ref.watch(libraryProvider);
@@ -25,6 +89,16 @@ class LibraryScreen extends ConsumerWidget {
           'LIBRARY',
           style: titleStyle,
         ),
+        actions: [
+          IconButton(
+            onPressed: () => _showPlaylistOptions(context),
+            icon: const Icon(
+              Icons.add_rounded,
+              color: accentPrimary,
+            ),
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: libraryState.isLoading
           ? const Center(
@@ -66,6 +140,74 @@ class LibraryScreen extends ConsumerWidget {
                 ),
               ],
             ),
+    );
+  }
+}
+
+class _PlaylistOptionTile extends StatelessWidget {
+  const _PlaylistOptionTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: bgDivider),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: accentPrimary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, color: accentPrimary),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: textSecondary,
+                            letterSpacing: 0,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: accentPrimary),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
