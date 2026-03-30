@@ -11,19 +11,15 @@ import '../theme.dart';
 class SearchScreen extends ConsumerWidget {
   const SearchScreen({super.key});
 
-  static const List<String> _browseGenres = [
-    'Pop',
-    'Hip-Hop',
-    'Rock',
-    'Lo-fi',
-    'Phonk',
-    'Indie',
-    'Electronic',
-    'Jazz',
-    'K-Pop',
-    'Classical',
-    'R&B',
-    'Metal',
+  static const List<_BrowseCategory> _browseGenres = [
+    _BrowseCategory('Music', Color(0xFFD81B8A), Icons.music_note_rounded),
+    _BrowseCategory('Podcasts', Color(0xFF0A7E69), Icons.mic_rounded),
+    _BrowseCategory('Live Events', Color(0xFF7B20F2), Icons.sensors_rounded),
+    _BrowseCategory('K-Pop', Color(0xFF2F5FD0), Icons.album_rounded),
+    _BrowseCategory('Phonk', Color(0xFFCC5A18), Icons.graphic_eq_rounded),
+    _BrowseCategory('Bollywood', Color(0xFF84540B), Icons.movie_rounded),
+    _BrowseCategory('Lo-fi', Color(0xFF4852D6), Icons.nightlight_round),
+    _BrowseCategory('Jazz', Color(0xFF8E234A), Icons.piano_rounded),
   ];
 
   @override
@@ -69,54 +65,104 @@ class SearchScreen extends ConsumerWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Text(
-                'Browse Category',
+                'Start browsing',
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: accentPrimary,
                       fontWeight: FontWeight.bold,
                     ),
               ),
             ),
             const SizedBox(height: 14),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: _browseGenres
-                    .map(
-                      (genre) => OutlinedButton(
-                        onPressed: () {},
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: bgDivider),
-                          foregroundColor: textPrimary,
-                          backgroundColor: bgCard,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        child: Text(
-                          genre,
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      ),
-                    )
-                    .toList(),
-              ),
-            ),
-            const SizedBox(height: 20),
             Expanded(
-              child: Center(
-                child: Text(
-                  'TAP THE SEARCH BAR TO START',
-                  style: Theme.of(context).textTheme.labelSmall,
+              child: GridView.builder(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1.72,
                 ),
+                itemCount: _browseGenres.length,
+                itemBuilder: (context, index) {
+                  return _BrowseCategoryTile(
+                    category: _browseGenres[index],
+                  );
+                },
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BrowseCategory {
+  const _BrowseCategory(this.title, this.color, this.icon);
+
+  final String title;
+  final Color color;
+  final IconData icon;
+}
+
+class _BrowseCategoryTile extends StatelessWidget {
+  const _BrowseCategoryTile({
+    required this.category,
+  });
+
+  final _BrowseCategory category;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () {},
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: category.color,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: 14,
+                top: 14,
+                right: 56,
+                child: Text(
+                  category.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        height: 1,
+                      ),
+                ),
+              ),
+              Positioned(
+                right: -4,
+                bottom: -6,
+                child: Transform.rotate(
+                  angle: -0.38,
+                  child: Container(
+                    width: 58,
+                    height: 58,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.18),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(
+                      category.icon,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
