@@ -11,175 +11,172 @@ class LibraryScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return DefaultTabController(
-      length: 3,
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: bgBase,
-          elevation: 0,
-          title: Text(
-            'LIBRARY',
-            style: Theme.of(context).textTheme.displayLarge,
-          ),
-          bottom: const TabBar(
-            indicatorColor: accentPrimary,
-            indicatorWeight: 2,
-            labelColor: accentPrimary,
-            unselectedLabelColor: textSecondary,
-            labelStyle: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 0.1,
-            ),
-            tabs: [
-              Tab(text: 'TRACKS'),
-              Tab(text: 'PLAYLISTS'),
-              Tab(text: 'LIKED'),
-            ],
-          ),
+    final libraryState = ref.watch(libraryProvider);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
+          fontSize: screenWidth < 360 ? 22 : 26,
+        );
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: bgBase,
+        elevation: 0,
+        title: Text(
+          'LIBRARY',
+          style: titleStyle,
         ),
-        body: const TabBarView(
+      ),
+      body: libraryState.isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: accentPrimary),
+            )
+          : ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _PlaylistCard(
+                  title: 'Liked Songs',
+                  subtitle: '${libraryState.likedTracks.length} tracks',
+                  icon: Icons.favorite,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PlaylistDetailsScreen(
+                          title: 'Liked Songs',
+                          tracks: libraryState.likedTracks,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                const SizedBox(height: 12),
+                _PlaylistCard(
+                  title: 'Recents',
+                  subtitle: '${libraryState.recentTracks.length} tracks',
+                  icon: Icons.history,
+                  onTap: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PlaylistDetailsScreen(
+                          title: 'Recents',
+                          tracks: libraryState.recentTracks,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+class PlaylistDetailsScreen extends StatelessWidget {
+  const PlaylistDetailsScreen({
+    super.key,
+    required this.title,
+    required this.tracks,
+  });
+
+  final String title;
+  final List<LibraryTrack> tracks;
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
+          fontSize: screenWidth < 360 ? 22 : 26,
+        );
+
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: bgBase,
+        elevation: 0,
+        title: Text(
+          title.toUpperCase(),
+          style: titleStyle,
+        ),
+      ),
+      body: tracks.isEmpty
+          ? Center(
+              child: Text(
+                'NO TRACKS YET',
+                style: Theme.of(context).textTheme.labelSmall,
+              ),
+            )
+          : ListView.separated(
+              itemCount: tracks.length,
+              separatorBuilder: (_, __) =>
+                  const Divider(height: 1, color: bgDivider),
+              itemBuilder: (context, index) {
+                final track = tracks[index];
+                return _LibraryTrackRow(track: track);
+              },
+            ),
+    );
+  }
+}
+
+class _PlaylistCard extends StatelessWidget {
+  const _PlaylistCard({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.onTap,
+  });
+
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        height: 88,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        decoration: BoxDecoration(
+          color: bgCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: bgDivider),
+        ),
+        child: Row(
           children: [
-            TracksTab(),
-            PlaylistsTab(),
-            LikedTab(),
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                color: accentPrimary.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, color: accentPrimary),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle.toUpperCase(),
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right, color: accentPrimary),
           ],
         ),
       ),
-    );
-  }
-}
-
-class TracksTab extends ConsumerWidget {
-  const TracksTab({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final libraryState = ref.watch(libraryProvider);
-    if (libraryState.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: accentPrimary),
-      );
-    }
-
-    if (libraryState.allTracks.isEmpty) {
-      return _LibraryEmptyState(
-        message: 'PLAY TRACKS TO BUILD YOUR LIBRARY',
-      );
-    }
-
-    return ListView.separated(
-      itemCount: libraryState.allTracks.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: bgDivider),
-      itemBuilder: (context, index) {
-        final track = libraryState.allTracks[index];
-        return _LibraryTrackRow(track: track);
-      },
-    );
-  }
-}
-
-class PlaylistsTab extends ConsumerWidget {
-  const PlaylistsTab({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final libraryState = ref.watch(libraryProvider);
-    if (libraryState.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: accentPrimary),
-      );
-    }
-
-    if (libraryState.playlists.isEmpty) {
-      return _LibraryEmptyState(
-        message: 'NO PLAYLISTS YET',
-      );
-    }
-
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: libraryState.playlists.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, index) {
-        final playlist = libraryState.playlists[index];
-        return Container(
-          height: 88,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: BoxDecoration(
-            color: bgCard,
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: bgDivider),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: accentPrimary.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  playlist.id == 'liked'
-                      ? Icons.favorite
-                      : Icons.queue_music_rounded,
-                  color: accentPrimary,
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      playlist.name.toUpperCase(),
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${playlist.trackCount} TRACKS',
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class LikedTab extends ConsumerWidget {
-  const LikedTab({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final libraryState = ref.watch(libraryProvider);
-    if (libraryState.isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(color: accentPrimary),
-      );
-    }
-
-    if (libraryState.likedTracks.isEmpty) {
-      return _LibraryEmptyState(
-        message: 'LIKE SONGS TO SEE THEM HERE',
-      );
-    }
-
-    return ListView.separated(
-      itemCount: libraryState.likedTracks.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: bgDivider),
-      itemBuilder: (context, index) {
-        final track = libraryState.likedTracks[index];
-        return _LibraryTrackRow(track: track);
-      },
     );
   }
 }
@@ -262,24 +259,6 @@ class _LibraryTrackRow extends ConsumerWidget {
               const Icon(Icons.favorite, color: accentPrimary, size: 20),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _LibraryEmptyState extends StatelessWidget {
-  const _LibraryEmptyState({
-    required this.message,
-  });
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        message,
-        style: Theme.of(context).textTheme.labelSmall,
       ),
     );
   }
