@@ -74,7 +74,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -111,6 +111,13 @@ class DatabaseHelper {
         PRIMARY KEY(playlist_id, video_id)
       )
     ''');
+
+    await db.execute('''
+      CREATE TABLE search_history (
+        query TEXT PRIMARY KEY,
+        searched_at INTEGER
+      )
+    ''');
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -129,6 +136,14 @@ class DatabaseHelper {
         'last_played_at',
         'INTEGER DEFAULT 0',
       );
+    }
+    if (oldVersion < 4) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS search_history (
+          query TEXT PRIMARY KEY,
+          searched_at INTEGER
+        )
+      ''');
     }
   }
 
@@ -323,6 +338,36 @@ class DatabaseHelper {
             trackCount: (map['track_count'] as int?) ?? 0,
           ),
         )
+        .toList();
+  }
+
+  Future<void> saveSearchQuery(String query) async {
+    final trimmedQuery = query.trim();
+    if (trimmedQuery.isEmpty) {
+      return;
+    }
+
+    final db = await database;
+    await db.insert(
+      'search_history',
+      {
+        'query': trimmedQuery,
+        'searched_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<String>> fetchSearchHistory({int limit = 12}) async {
+    final db = await database;
+    final result = await db.query(
+      'search_history',
+      orderBy: 'searched_at DESC',
+      limit: limit,
+    );
+    return result
+        .map((row) => (row['query'] as String?) ?? '')
+        .where((query) => query.isNotEmpty)
         .toList();
   }
 }

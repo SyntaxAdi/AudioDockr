@@ -1,11 +1,18 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../database_helper.dart';
 import '../api/youtube_service.dart';
 
 final searchProvider =
     StateNotifierProvider<SearchNotifier, AsyncValue<List<SearchResult>>>((ref) {
   final youtubeService = ref.read(youtubeServiceProvider);
-  return SearchNotifier(youtubeService);
+  final databaseHelper = DatabaseHelper.instance;
+  return SearchNotifier(youtubeService, databaseHelper);
+});
+
+final searchHistoryProvider =
+    StateNotifierProvider<SearchHistoryNotifier, List<String>>((ref) {
+  return SearchHistoryNotifier(DatabaseHelper.instance);
 });
 
 class SearchFailure implements Exception {
@@ -63,13 +70,15 @@ class SearchResult {
 }
 
 class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
-  SearchNotifier(this._youtubeService) : super(const AsyncValue.data([]));
+  SearchNotifier(this._youtubeService, this._databaseHelper)
+      : super(const AsyncValue.data([]));
 
   final YoutubeService _youtubeService;
+  final DatabaseHelper _databaseHelper;
 
   String _latestQuery = '';
 
-  Future<void> search(String query) async {
+  Future<void> search(String query, {bool saveToHistory = false}) async {
     final trimmedQuery = query.trim();
     _latestQuery = trimmedQuery;
 
@@ -81,6 +90,9 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
     state = const AsyncValue.loading();
 
     try {
+      if (saveToHistory) {
+        await _databaseHelper.saveSearchQuery(trimmedQuery);
+      }
       final items = await _youtubeService.search(trimmedQuery);
 
       if (_latestQuery != trimmedQuery) {
@@ -158,5 +170,17 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
       'search_failed',
       'Search failed. Please try again.',
     );
+  }
+}
+
+class SearchHistoryNotifier extends StateNotifier<List<String>> {
+  SearchHistoryNotifier(this._databaseHelper) : super(const []) {
+    load();
+  }
+
+  final DatabaseHelper _databaseHelper;
+
+  Future<void> load() async {
+    state = await _databaseHelper.fetchSearchHistory();
   }
 }
