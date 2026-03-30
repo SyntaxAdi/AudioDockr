@@ -289,17 +289,18 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     switch (mode) {
       case PlaybackRepeatMode.one:
         return Stack(
+          clipBehavior: Clip.none,
           alignment: Alignment.center,
           children: const [
             Icon(Icons.repeat, color: accentPrimary),
             Positioned(
-              right: 0,
-              top: 2,
+              right: -5,
+              top: -3,
               child: Text(
                 '1',
                 style: TextStyle(
                   color: accentPrimary,
-                  fontSize: 10,
+                  fontSize: 11,
                   fontWeight: FontWeight.bold,
                 ),
               ),
