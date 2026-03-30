@@ -49,6 +49,10 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     final searchState = ref.watch(searchProvider);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
+          fontSize: screenWidth < 360 ? 22 : 26,
+        );
 
     return Scaffold(
       body: SafeArea(
@@ -59,7 +63,7 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: Text(
                 'SEARCH',
-                style: Theme.of(context).textTheme.displayLarge,
+                style: titleStyle,
               ),
             ),
             Padding(

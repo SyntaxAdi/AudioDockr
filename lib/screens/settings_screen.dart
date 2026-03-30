@@ -7,11 +7,16 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
+          fontSize: screenWidth < 360 ? 22 : 26,
+        );
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: bgBase,
         elevation: 0,
-        title: Text('SETTINGS', style: Theme.of(context).textTheme.displayLarge),
+        title: Text('SETTINGS', style: titleStyle),
       ),
       body: ListView(
         padding: const EdgeInsets.all(16),

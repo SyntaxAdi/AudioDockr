@@ -18,6 +18,11 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final libraryState = ref.watch(libraryProvider);
     final recentlyPlayed = libraryState.recentTracks.take(20).toList();
+    final screenWidth = MediaQuery.of(context).size.width;
+    final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
+          color: accentPrimary,
+          fontSize: screenWidth < 360 ? 22 : 26,
+        );
 
     return Scaffold(
       body: SafeArea(
@@ -28,9 +33,7 @@ class HomeScreen extends ConsumerWidget {
               padding: const EdgeInsets.all(16.0),
               child: Text(
                 'AUDIO DOCKR',
-                style: Theme.of(context).textTheme.displayLarge?.copyWith(
-                      color: accentPrimary,
-                    ),
+                style: titleStyle,
               ),
             ),
             if (libraryState.isLoading)
