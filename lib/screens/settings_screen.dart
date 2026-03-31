@@ -5,6 +5,24 @@ import '../theme.dart';
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
+  static const String _downloadPath = '/storage/emulated/0/Music';
+
+  String _pathLabel(String path) {
+    final trimmed = path.trim();
+    if (trimmed.isEmpty) {
+      return '';
+    }
+
+    final normalized = trimmed.endsWith('/') && trimmed.length > 1
+        ? trimmed.substring(0, trimmed.length - 1)
+        : trimmed;
+    final segments = normalized.split('/').where((segment) => segment.isNotEmpty);
+    if (segments.isEmpty) {
+      return normalized;
+    }
+    return segments.last;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final screenWidth = MediaQuery.of(context).size.width;
@@ -22,7 +40,17 @@ class SettingsScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           _buildSectionHeader('STORAGE'),
-          _buildListTile('Download Location', trailing: const Text('/storage/emulated/0/Music')),
+          _buildListTile(
+            'Download Location',
+            trailing: Text(
+              _pathLabel(_downloadPath),
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: accentPrimary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
           const SizedBox(height: 8),
           _buildDestructiveButton('CLEAR ALL DOWNLOADS'),
 
