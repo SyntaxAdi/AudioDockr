@@ -244,7 +244,7 @@ class _PlaylistOptionTile extends StatelessWidget {
   }
 }
 
-class PlaylistDetailsScreen extends ConsumerWidget {
+class PlaylistDetailsScreen extends ConsumerStatefulWidget {
   const PlaylistDetailsScreen({
     super.key,
     required this.title,
@@ -258,7 +258,38 @@ class PlaylistDetailsScreen extends ConsumerWidget {
   final String? playlistId;
   final ValueChanged<int>? onNavigateToTab;
 
-  bool get _isEditableCustomPlaylist => playlistId != null;
+  @override
+  ConsumerState<PlaylistDetailsScreen> createState() =>
+      _PlaylistDetailsScreenState();
+}
+
+class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
+  Future<List<LibraryTrack>>? _playlistTracksFuture;
+
+  bool get _isEditableCustomPlaylist => widget.playlistId != null;
+
+  @override
+  void initState() {
+    super.initState();
+    _refreshPlaylistTracksFuture();
+  }
+
+  @override
+  void didUpdateWidget(covariant PlaylistDetailsScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.playlistId != widget.playlistId) {
+      _refreshPlaylistTracksFuture();
+    }
+  }
+
+  void _refreshPlaylistTracksFuture() {
+    if (widget.playlistId == null) {
+      _playlistTracksFuture = null;
+      return;
+    }
+    _playlistTracksFuture =
+        ref.read(libraryProvider.notifier).fetchPlaylistTracks(widget.playlistId!);
+  }
 
   void _handleBottomNavigation(BuildContext context, int index) {
     if (index == 2) {
@@ -267,7 +298,7 @@ class PlaylistDetailsScreen extends ConsumerWidget {
     }
 
     Navigator.of(context).popUntil((route) => route.isFirst);
-    onNavigateToTab?.call(index);
+    widget.onNavigateToTab?.call(index);
   }
 
   Future<void> _showEditPlaylistSheet(
@@ -275,124 +306,29 @@ class PlaylistDetailsScreen extends ConsumerWidget {
     WidgetRef ref,
     LibraryPlaylist playlist,
   ) async {
-    final nameController = TextEditingController(text: playlist.name);
-
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        final mediaQuery = MediaQuery.of(sheetContext);
-        return AnimatedPadding(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          padding: EdgeInsets.only(
-            bottom: mediaQuery.viewInsets.bottom > 0
-                ? mediaQuery.viewInsets.bottom
-                : mediaQuery.viewPadding.bottom,
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: mediaQuery.size.height * 0.7,
-            ),
-            child: Container(
-              decoration: const BoxDecoration(
-                color: bgSurface,
-                borderRadius: BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
-              ),
-              child: SafeArea(
-                top: false,
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 44,
-                          height: 4,
-                          decoration: BoxDecoration(
-                            color: bgDivider,
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Edit Playlist',
-                        style: Theme.of(context)
-                            .textTheme
-                            .titleLarge
-                            ?.copyWith(color: textPrimary),
-                      ),
-                      const SizedBox(height: 20),
-                      Text(
-                        'Playlist name',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: textSecondary,
-                              letterSpacing: 0,
-                            ),
-                      ),
-                      const SizedBox(height: 10),
-                      TextField(
-                        controller: nameController,
-                        autofocus: true,
-                        style: Theme.of(context).textTheme.bodyLarge,
-                        decoration: const InputDecoration(
-                          hintText: 'Give your playlist a name',
-                          border: UnderlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 28),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.of(sheetContext).pop(),
-                              child: const Text('Cancel'),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton(
-                              onPressed: () async {
-                                final trimmedName = nameController.text.trim();
-                                if (trimmedName.isEmpty) {
-                                  return;
-                                }
-                                await ref
-                                    .read(libraryProvider.notifier)
-                                    .updatePlaylist(
-                                      playlistId: playlist.id,
-                                      name: trimmedName,
-                                      coverImagePath: playlist.coverImagePath,
-                                    );
-                                if (!sheetContext.mounted) {
-                                  return;
-                                }
-                                Navigator.of(sheetContext).pop();
-                              },
-                              child: const Text('Save'),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
+      builder: (context) => _EditPlaylistSheet(
+        playlist: playlist,
+        onSave: (trimmedName) async {
+          await ref.read(libraryProvider.notifier).updatePlaylist(
+                playlistId: playlist.id,
+                name: trimmedName,
+                coverImagePath: playlist.coverImagePath,
+              );
+        },
+      ),
     );
+
+    setState(() {
+      _refreshPlaylistTracksFuture();
+    });
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
           fontSize: screenWidth < 360 ? 22 : 26,
@@ -400,7 +336,7 @@ class PlaylistDetailsScreen extends ConsumerWidget {
     final playlists = ref.watch(libraryProvider).playlists;
     LibraryPlaylist? playlist;
     for (final entry in playlists) {
-      if (entry.id == playlistId) {
+      if (entry.id == widget.playlistId) {
         playlist = entry;
         break;
       }
@@ -414,15 +350,14 @@ class PlaylistDetailsScreen extends ConsumerWidget {
         title: canEdit
             ? null
             : Text(
-                title.toUpperCase(),
+                widget.title.toUpperCase(),
                 style: titleStyle,
               ),
       ),
-      body: playlistId == null
-          ? _PlaylistTrackList(tracks: tracks ?? const [])
+      body: widget.playlistId == null
+          ? _PlaylistTrackList(tracks: widget.tracks ?? const [])
           : FutureBuilder<List<LibraryTrack>>(
-              future:
-                  ref.read(libraryProvider.notifier).fetchPlaylistTracks(playlistId!),
+              future: _playlistTracksFuture,
               builder: (context, snapshot) {
                 if (!snapshot.hasData) {
                   return const Center(
@@ -450,13 +385,6 @@ class PlaylistDetailsScreen extends ConsumerWidget {
                     const SizedBox(height: 28),
                     if (playlistTracks.isEmpty)
                       _EmptyPlaylistState(
-                        playlistName: editablePlaylist.name,
-                        onChangePressed: () =>
-                            _showEditPlaylistSheet(
-                          context,
-                          ref,
-                          editablePlaylist,
-                        ),
                       )
                     else
                       ...[
@@ -525,11 +453,11 @@ class _EditablePlaylistHeader extends StatelessWidget {
                       ),
                 ),
                 const SizedBox(height: 10),
-                FilledButton.tonal(
+                FilledButton(
                   onPressed: onChangePressed,
                   style: FilledButton.styleFrom(
-                    backgroundColor: bgCard,
-                    foregroundColor: textPrimary,
+                    backgroundColor: accentPrimary,
+                    foregroundColor: bgBase,
                   ),
                   child: const Text('Edit name'),
                 ),
@@ -551,13 +479,7 @@ class _EditablePlaylistHeader extends StatelessWidget {
 }
 
 class _EmptyPlaylistState extends StatelessWidget {
-  const _EmptyPlaylistState({
-    required this.playlistName,
-    required this.onChangePressed,
-  });
-
-  final String playlistName;
-  final VoidCallback onChangePressed;
+  const _EmptyPlaylistState();
 
   @override
   Widget build(BuildContext context) {
@@ -583,11 +505,6 @@ class _EmptyPlaylistState extends StatelessWidget {
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: textSecondary,
                 ),
-          ),
-          const SizedBox(height: 18),
-          FilledButton(
-            onPressed: onChangePressed,
-            child: Text('Edit $playlistName'),
           ),
         ],
       ),
@@ -646,6 +563,145 @@ class _PlaylistCoverArt extends StatelessWidget {
           Icons.music_note_rounded,
           color: textSecondary,
           size: 42,
+        ),
+      ),
+    );
+  }
+}
+
+class _EditPlaylistSheet extends StatefulWidget {
+  const _EditPlaylistSheet({
+    required this.playlist,
+    required this.onSave,
+  });
+
+  final LibraryPlaylist playlist;
+  final Future<void> Function(String name) onSave;
+
+  @override
+  State<_EditPlaylistSheet> createState() => _EditPlaylistSheetState();
+}
+
+class _EditPlaylistSheetState extends State<_EditPlaylistSheet> {
+  late final TextEditingController _nameController;
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController(text: widget.playlist.name);
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (mounted) {
+        _focusNode.requestFocus();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+
+    return Padding(
+      padding: EdgeInsets.only(
+        bottom: mediaQuery.viewInsets.bottom > 0
+            ? mediaQuery.viewInsets.bottom
+            : mediaQuery.viewPadding.bottom,
+      ),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: mediaQuery.size.height * 0.7,
+        ),
+        child: Container(
+          decoration: const BoxDecoration(
+            color: bgSurface,
+            borderRadius: BorderRadius.vertical(
+              top: Radius.circular(24),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: bgDivider,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Edit Playlist',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleLarge
+                        ?.copyWith(color: textPrimary),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'Playlist name',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: textSecondary,
+                          letterSpacing: 0,
+                        ),
+                  ),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: _nameController,
+                    focusNode: _focusNode,
+                    autofocus: false,
+                    style: Theme.of(context).textTheme.bodyLarge,
+                    decoration: const InputDecoration(
+                      hintText: 'Give your playlist a name',
+                      border: UnderlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            final trimmedName = _nameController.text.trim();
+                            if (trimmedName.isEmpty) {
+                              return;
+                            }
+
+                            await widget.onSave(trimmedName);
+                            if (context.mounted) {
+                              Navigator.of(context).pop();
+                            }
+                          },
+                          child: const Text('Save'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
