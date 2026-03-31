@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -277,159 +276,114 @@ class PlaylistDetailsScreen extends ConsumerWidget {
     LibraryPlaylist playlist,
   ) async {
     final nameController = TextEditingController(text: playlist.name);
-    var selectedCoverPath = playlist.coverImagePath;
 
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return StatefulBuilder(
-          builder: (context, setSheetState) {
-            final mediaQuery = MediaQuery.of(context);
-            return AnimatedPadding(
-              duration: const Duration(milliseconds: 180),
-              curve: Curves.easeOut,
-              padding: EdgeInsets.only(
-                bottom: mediaQuery.viewInsets.bottom,
+        final mediaQuery = MediaQuery.of(sheetContext);
+        return AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: EdgeInsets.only(
+            bottom: mediaQuery.viewInsets.bottom + mediaQuery.viewPadding.bottom,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: mediaQuery.size.height * 0.7,
+            ),
+            child: Container(
+              decoration: const BoxDecoration(
+                color: bgSurface,
+                borderRadius: BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
               ),
-              child: FractionallySizedBox(
-                heightFactor: 0.55,
-                child: Container(
-                  decoration: const BoxDecoration(
-                    color: bgSurface,
-                    borderRadius: BorderRadius.vertical(
-                      top: Radius.circular(24),
-                    ),
-                  ),
-                  child: SafeArea(
-                    top: false,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+              child: SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Center(
+                        child: Container(
+                          width: 44,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: bgDivider,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Edit Playlist',
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(color: textPrimary),
+                      ),
+                      const SizedBox(height: 20),
+                      Text(
+                        'Playlist name',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: textSecondary,
+                              letterSpacing: 0,
+                            ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: nameController,
+                        autofocus: true,
+                        style: Theme.of(context).textTheme.bodyLarge,
+                        decoration: const InputDecoration(
+                          hintText: 'Give your playlist a name',
+                          border: UnderlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 28),
+                      Row(
                         children: [
-                          Center(
-                            child: Container(
-                              width: 44,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: bgDivider,
-                                borderRadius: BorderRadius.circular(999),
-                              ),
+                          Expanded(
+                            child: OutlinedButton(
+                              onPressed: () => Navigator.of(sheetContext).pop(),
+                              child: const Text('Cancel'),
                             ),
                           ),
-                          const SizedBox(height: 20),
-                          Text(
-                            'Edit Playlist',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleLarge
-                                ?.copyWith(color: textPrimary),
-                          ),
-                          const SizedBox(height: 20),
-                          Text(
-                            'Playlist name',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color: textSecondary,
-                                  letterSpacing: 0,
-                                ),
-                          ),
-                          const SizedBox(height: 10),
-                          TextField(
-                            controller: nameController,
-                            autofocus: false,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                            decoration: const InputDecoration(
-                              hintText: 'Give your playlist a name',
-                              border: UnderlineInputBorder(),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: ElevatedButton(
+                              onPressed: () async {
+                                final trimmedName = nameController.text.trim();
+                                if (trimmedName.isEmpty) {
+                                  return;
+                                }
+                                await ref
+                                    .read(libraryProvider.notifier)
+                                    .updatePlaylist(
+                                      playlistId: playlist.id,
+                                      name: trimmedName,
+                                      coverImagePath: playlist.coverImagePath,
+                                    );
+                                if (!sheetContext.mounted) {
+                                  return;
+                                }
+                                Navigator.of(sheetContext).pop();
+                              },
+                              child: const Text('Save'),
                             ),
-                          ),
-                          const SizedBox(height: 24),
-                          Text(
-                            'Cover image',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(
-                                  color: textSecondary,
-                                  letterSpacing: 0,
-                                ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              _PlaylistCoverArt(
-                                imagePath: selectedCoverPath,
-                                imageUrl: '',
-                                size: 72,
-                              ),
-                              const SizedBox(width: 14),
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () async {
-                                    final result = await FilePicker.platform
-                                        .pickFiles(type: FileType.image);
-                                    final filePath =
-                                        result?.files.single.path ?? '';
-                                    if (filePath.isEmpty) {
-                                      return;
-                                    }
-                                    setSheetState(() {
-                                      selectedCoverPath = filePath;
-                                    });
-                                  },
-                                  child: const Text('Choose image'),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const Spacer(),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: OutlinedButton(
-                                  onPressed: () => Navigator.of(sheetContext).pop(),
-                                  child: const Text('Cancel'),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: ElevatedButton(
-                                  onPressed: () async {
-                                    final trimmedName =
-                                        nameController.text.trim();
-                                    if (trimmedName.isEmpty) {
-                                      return;
-                                    }
-                                    await ref
-                                        .read(libraryProvider.notifier)
-                                        .updatePlaylist(
-                                          playlistId: playlist.id,
-                                          name: trimmedName,
-                                          coverImagePath: selectedCoverPath,
-                                        );
-                                    if (!sheetContext.mounted) {
-                                      return;
-                                    }
-                                    Navigator.of(sheetContext).pop();
-                                  },
-                                  child: const Text('Save'),
-                                ),
-                              ),
-                            ],
                           ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
                 ),
               ),
-            );
-          },
+            ),
+          ),
         );
       },
     );
@@ -575,7 +529,7 @@ class _EditablePlaylistHeader extends StatelessWidget {
                     backgroundColor: bgCard,
                     foregroundColor: textPrimary,
                   ),
-                  child: const Text('Change'),
+                  child: const Text('Edit name'),
                 ),
                 const SizedBox(height: 12),
                 Text(
