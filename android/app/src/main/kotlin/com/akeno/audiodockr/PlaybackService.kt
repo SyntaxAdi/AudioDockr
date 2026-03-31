@@ -46,6 +46,8 @@ class PlaybackService : MediaSessionService() {
     private lateinit var player: ExoPlayer
     private var mediaSession: MediaSession? = null
     private lateinit var notificationManager: PlayerNotificationManager
+    private var currentRepeatMode: String = "off"
+    private var repeatOnePendingReplay = false
     private val artworkExecutor = Executors.newSingleThreadExecutor()
     private val artworkCache = object : LruCache<String, Bitmap>(24) {}
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -72,6 +74,24 @@ class PlaybackService : MediaSessionService() {
                         }
 
                         override fun onPlaybackStateChanged(playbackState: Int) {
+                            if (playbackState == Player.STATE_ENDED &&
+                                currentRepeatMode == "one" &&
+                                repeatOnePendingReplay
+                            ) {
+                                repeatOnePendingReplay = false
+                                player.seekToDefaultPosition()
+                                player.prepare()
+                                player.play()
+                                publishState()
+                                return
+                            }
+
+                            if (playbackState == Player.STATE_ENDED &&
+                                currentRepeatMode == "one" &&
+                                !repeatOnePendingReplay
+                            ) {
+                                currentRepeatMode = "off"
+                            }
                             publishState()
                         }
 
@@ -127,9 +147,21 @@ class PlaybackService : MediaSessionService() {
             }
             ACTION_SET_REPEAT_MODE -> {
                 when (intent.getStringExtra(EXTRA_REPEAT_MODE)) {
-                    "one" -> player.repeatMode = Player.REPEAT_MODE_ONE
-                    "all" -> player.repeatMode = Player.REPEAT_MODE_ALL
-                    else -> player.repeatMode = Player.REPEAT_MODE_OFF
+                    "one" -> {
+                        currentRepeatMode = "one"
+                        repeatOnePendingReplay = true
+                        player.repeatMode = Player.REPEAT_MODE_OFF
+                    }
+                    "all" -> {
+                        currentRepeatMode = "all"
+                        repeatOnePendingReplay = false
+                        player.repeatMode = Player.REPEAT_MODE_ALL
+                    }
+                    else -> {
+                        currentRepeatMode = "off"
+                        repeatOnePendingReplay = false
+                        player.repeatMode = Player.REPEAT_MODE_OFF
+                    }
                 }
                 publishState()
             }
@@ -169,6 +201,9 @@ class PlaybackService : MediaSessionService() {
 
         player.stop()
         player.clearMediaItems()
+        if (currentRepeatMode == "one") {
+            repeatOnePendingReplay = true
+        }
         player.setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
         player.prepare()
         player.play()
@@ -181,11 +216,7 @@ class PlaybackService : MediaSessionService() {
             "isPlaying" to player.isPlaying,
             "position" to player.currentPosition.coerceAtLeast(0L),
             "duration" to (player.duration.takeIf { it > 0 } ?: 0L),
-            "repeatMode" to when (player.repeatMode) {
-                Player.REPEAT_MODE_ONE -> "one"
-                Player.REPEAT_MODE_ALL -> "all"
-                else -> "off"
-            },
+            "repeatMode" to currentRepeatMode,
             "error" to error,
         )
 
