@@ -1,11 +1,58 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme.dart';
 
-class SettingsScreen extends ConsumerWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
-  static const String _downloadPath = '/storage/emulated/0/Music';
+  @override
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
+}
+
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
+  static const String _defaultDownloadPath = '/storage/emulated/0/Music';
+  static const String _downloadPathKey = 'download_path';
+
+  String _downloadPath = _defaultDownloadPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadDownloadPath();
+  }
+
+  Future<void> _loadDownloadPath() async {
+    final preferences = await SharedPreferences.getInstance();
+    final savedPath = preferences.getString(_downloadPathKey);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _downloadPath = (savedPath == null || savedPath.trim().isEmpty)
+          ? _defaultDownloadPath
+          : savedPath;
+    });
+  }
+
+  Future<void> _pickDownloadPath() async {
+    final selectedPath = await FilePicker.platform.getDirectoryPath(
+      dialogTitle: 'Select Download Folder',
+    );
+    if (selectedPath == null || selectedPath.trim().isEmpty) {
+      return;
+    }
+
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(_downloadPathKey, selectedPath);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _downloadPath = selectedPath;
+    });
+  }
 
   String _pathLabel(String path) {
     final trimmed = path.trim();
@@ -24,7 +71,7 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
           fontSize: screenWidth < 360 ? 22 : 26,
@@ -50,6 +97,11 @@ class SettingsScreen extends ConsumerWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: _pickDownloadPath,
+            child: const Text('CHANGE DOWNLOAD LOCATION'),
           ),
           const SizedBox(height: 8),
           _buildDestructiveButton('CLEAR ALL DOWNLOADS'),

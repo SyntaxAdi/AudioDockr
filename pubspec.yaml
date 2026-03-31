@@ -15,6 +15,8 @@ dependencies:
   path_provider: ^2.1.1
   google_fonts: ^6.1.0
   permission_handler: ^11.3.1
+  file_picker: ^8.1.2
+  shared_preferences: ^2.3.2
   youtube_explode_dart: ^3.0.5
 
 dev_dependencies:
