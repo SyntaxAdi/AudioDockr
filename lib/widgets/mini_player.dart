@@ -6,6 +6,7 @@ import '../providers/library_provider.dart';
 import '../providers/playback_provider.dart';
 import '../screens/now_playing_screen.dart';
 import '../theme.dart';
+import 'infinite_marquee_text.dart';
 
 class MiniPlayer extends ConsumerWidget {
   const MiniPlayer({
@@ -86,17 +87,16 @@ class MiniPlayer extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          playbackState.currentTitle ??
+                        InfiniteMarqueeText(
+                          text: playbackState.currentTitle ??
                               (playbackState.isPreparing
                                   ? 'Preparing track...'
                                   : 'Unknown track'),
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                fontSize: 13,
-                                color: textPrimary,
-                              ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontSize: 13,
+                                    color: textPrimary,
+                                  ),
                         ),
                         Text(
                           playbackState.isPreparing
