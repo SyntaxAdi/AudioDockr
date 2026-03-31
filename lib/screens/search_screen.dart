@@ -217,11 +217,7 @@ class _SearchEntryScreenState extends ConsumerState<SearchEntryScreen> {
     if (value.isEmpty) {
       return;
     }
-    await ref.read(searchProvider.notifier).search(
-          value,
-          saveToHistory: true,
-        );
-    await ref.read(searchHistoryProvider.notifier).load();
+    await ref.read(searchHistoryProvider.notifier).addQuery(value);
   }
 
   @override

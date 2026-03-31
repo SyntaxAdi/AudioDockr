@@ -180,6 +180,11 @@ class SearchHistoryNotifier extends StateNotifier<List<String>> {
 
   final DatabaseHelper _databaseHelper;
 
+  Future<void> addQuery(String query) async {
+    await _databaseHelper.saveSearchQuery(query);
+    await load();
+  }
+
   Future<void> load() async {
     state = await _databaseHelper.fetchSearchHistory();
   }
