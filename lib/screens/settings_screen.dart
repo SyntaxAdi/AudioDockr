@@ -101,7 +101,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           const SizedBox(height: 8),
           ElevatedButton(
             onPressed: _pickDownloadPath,
-            child: const Text('CHANGE DOWNLOAD LOCATION'),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                'CHANGE DOWNLOAD LOCATION',
+                maxLines: 1,
+                style: TextStyle(
+                  fontSize: screenWidth < 360 ? 12 : 13,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: screenWidth < 360 ? 0.2 : 0.4,
+                ),
+              ),
+            ),
           ),
           const SizedBox(height: 8),
           _buildDestructiveButton('CLEAR ALL DOWNLOADS'),
