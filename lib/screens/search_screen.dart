@@ -200,17 +200,15 @@ class _SearchEntryScreenState extends ConsumerState<SearchEntryScreen> {
     _searchDebounce?.cancel();
     _searchDebounce = Timer(const Duration(milliseconds: 400), () async {
       await ref.read(searchProvider.notifier).search(value);
-      await ref.read(searchHistoryProvider.notifier).load();
     });
   }
 
   Future<void> _submitSearch(String value) async {
     _searchDebounce?.cancel();
-    await ref.read(searchProvider.notifier).search(
-          value,
-          saveToHistory: true,
-        );
-    await ref.read(searchHistoryProvider.notifier).load();
+    await Future.wait([
+      ref.read(searchProvider.notifier).search(value),
+      ref.read(searchHistoryProvider.notifier).addQuery(value),
+    ]);
   }
 
   Future<void> _recordCurrentQuery() async {
@@ -225,7 +223,6 @@ class _SearchEntryScreenState extends ConsumerState<SearchEntryScreen> {
   Widget build(BuildContext context) {
     final searchState = ref.watch(searchProvider);
     final history = ref.watch(searchHistoryProvider);
-    final query = _searchController.text.trim();
 
     return Scaffold(
       body: SafeArea(
@@ -240,114 +237,122 @@ class _SearchEntryScreenState extends ConsumerState<SearchEntryScreen> {
                     icon: const Icon(Icons.arrow_back, color: textPrimary),
                   ),
                   Expanded(
-                    child: TextField(
-                      controller: _searchController,
-                      autofocus: true,
-                      decoration: InputDecoration(
-                        prefixIcon:
-                            const Icon(Icons.search, color: textSecondary),
-                        suffixIcon: _searchController.text.isNotEmpty
-                            ? IconButton(
-                                icon: const Icon(
-                                  Icons.close,
-                                  color: textSecondary,
-                                ),
-                                onPressed: () {
-                                  _searchController.clear();
-                                  _searchDebounce?.cancel();
-                                  ref.read(searchProvider.notifier).clear();
-                                  setState(() {});
-                                },
-                              )
-                            : null,
-                        hintText: 'Search Music 🎵',
-                      ),
-                      onChanged: (value) {
-                        setState(() {});
-                        _runSearch(value);
+                    child: ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _searchController,
+                      builder: (context, value, _) {
+                        return TextField(
+                          controller: _searchController,
+                          autofocus: true,
+                          decoration: InputDecoration(
+                            prefixIcon:
+                                const Icon(Icons.search, color: textSecondary),
+                            suffixIcon: value.text.isNotEmpty
+                                ? IconButton(
+                                    icon: const Icon(
+                                      Icons.close,
+                                      color: textSecondary,
+                                    ),
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      _searchDebounce?.cancel();
+                                      ref.read(searchProvider.notifier).clear();
+                                    },
+                                  )
+                                : null,
+                            hintText: 'Search Music 🎵',
+                          ),
+                          onChanged: _runSearch,
+                          onSubmitted: _submitSearch,
+                        );
                       },
-                      onSubmitted: _submitSearch,
                     ),
                   ),
                 ],
               ),
             ),
             Expanded(
-              child: query.isEmpty
-                  ? _SearchHistoryList(
-                      history: history,
-                      onTapQuery: (item) {
-                        _searchController.text = item;
-                        _searchController.selection = TextSelection.fromPosition(
-                          TextPosition(offset: item.length),
-                        );
-                        setState(() {});
-                        _submitSearch(item);
-                      },
-                    )
-                  : searchState.when(
-                      data: (results) {
-                        if (results.isEmpty) {
-                          return Center(
-                            child: Text(
-                              'NO RESULTS FOUND',
-                              style: Theme.of(context).textTheme.labelSmall,
-                            ),
-                          );
-                        }
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _searchController,
+                builder: (context, value, _) {
+                  final query = value.text.trim();
+                  return query.isEmpty
+                      ? _SearchHistoryList(
+                          history: history,
+                          onTapQuery: (item) {
+                            _searchController.text = item;
+                            _searchController.selection =
+                                TextSelection.fromPosition(
+                              TextPosition(offset: item.length),
+                            );
+                            _submitSearch(item);
+                          },
+                        )
+                      : searchState.when(
+                          data: (results) {
+                            if (results.isEmpty) {
+                              return Center(
+                                child: Text(
+                                  'NO RESULTS FOUND',
+                                  style: Theme.of(context).textTheme.labelSmall,
+                                ),
+                              );
+                            }
 
-                        return ListView.separated(
-                          itemCount: results.length,
-                          separatorBuilder: (_, __) =>
-                              const Divider(height: 1, color: bgDivider),
-                          itemBuilder: (context, index) {
-                            final track = results[index];
-                            return TrackListItem(
-                              track: track,
-                              onTap: () async {
-                                try {
-                                  await _recordCurrentQuery();
-                                  await ref
-                                      .read(playbackNotifierProvider.notifier)
-                                      .playTrack(
-                                        track.videoId,
-                                        track.videoUrl,
-                                        track.title,
-                                        track.artist,
-                                        track.thumbnailUrl,
-                                      );
-                                } on PlaybackFailure catch (error) {
-                                  if (!context.mounted) {
-                                    return;
-                                  }
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(content: Text(error.message)),
-                                  );
-                                }
+                            return ListView.builder(
+                              itemCount: results.length,
+                              itemBuilder: (context, index) {
+                                final track = results[index];
+                                return SizedBox(
+                                  height: 72,
+                                  child: TrackListItem(
+                                    track: track,
+                                    onTap: () async {
+                                      try {
+                                        await _recordCurrentQuery();
+                                        await ref
+                                            .read(playbackNotifierProvider.notifier)
+                                            .playTrack(
+                                              track.videoId,
+                                              track.videoUrl,
+                                              track.title,
+                                              track.artist,
+                                              track.thumbnailUrl,
+                                            );
+                                      } on PlaybackFailure catch (error) {
+                                        if (!context.mounted) {
+                                          return;
+                                        }
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(content: Text(error.message)),
+                                        );
+                                      }
+                                    },
+                                  ),
+                                );
                               },
                             );
                           },
-                        );
-                      },
-                      loading: () => const Center(
-                        child: CircularProgressIndicator(color: accentPrimary),
-                      ),
-                      error: (error, _) => Center(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 24),
-                          child: Text(
-                            error is SearchFailure
-                                ? error.message
-                                : 'Search failed. Please try again.',
-                            style: Theme.of(context)
-                                .textTheme
-                                .labelSmall
-                                ?.copyWith(color: textSecondary),
-                            textAlign: TextAlign.center,
+                          loading: () => const Center(
+                            child: CircularProgressIndicator(color: accentPrimary),
                           ),
-                        ),
-                      ),
-                    ),
+                          error: (error, _) => Center(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              child: Text(
+                                error is SearchFailure
+                                    ? error.message
+                                    : 'Search failed. Please try again.',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(color: textSecondary),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        );
+                },
+              ),
             ),
           ],
         ),
@@ -409,6 +414,8 @@ class TrackListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+    final artworkCacheSize = (56 * devicePixelRatio).round();
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -426,6 +433,10 @@ class TrackListItem extends StatelessWidget {
                     )
                   : CachedNetworkImage(
                       imageUrl: track.thumbnailUrl,
+                      memCacheWidth: artworkCacheSize,
+                      memCacheHeight: artworkCacheSize,
+                      maxWidthDiskCache: artworkCacheSize,
+                      maxHeightDiskCache: artworkCacheSize,
                       fit: BoxFit.cover,
                       placeholder: (_, __) => const Center(
                         child: SizedBox(

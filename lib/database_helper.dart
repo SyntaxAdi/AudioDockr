@@ -76,7 +76,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 5,
+      version: 6,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -121,6 +121,17 @@ class DatabaseHelper {
         searched_at INTEGER
       )
     ''');
+
+    await db.execute(
+      'CREATE INDEX idx_playlist_tracks_playlist_position '
+      'ON playlist_tracks(playlist_id, position)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_tracks_last_played_at ON tracks(last_played_at)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_search_history_searched_at ON search_history(searched_at)',
+    );
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -154,6 +165,20 @@ class DatabaseHelper {
         'playlists',
         'cover_image_path',
         "TEXT DEFAULT ''",
+      );
+    }
+    if (oldVersion < 6) {
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_playlist_tracks_playlist_position '
+        'ON playlist_tracks(playlist_id, position)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_tracks_last_played_at '
+        'ON tracks(last_played_at)',
+      );
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_search_history_searched_at '
+        'ON search_history(searched_at)',
       );
     }
   }
@@ -285,34 +310,37 @@ class DatabaseHelper {
     required int durationSeconds,
   }) async {
     final db = await database;
-    await db.insert(
-      'tracks',
-      {
-        'video_id': videoId,
-        'video_url': videoUrl,
-        'title': title,
-        'artist': artist,
-        'duration': durationSeconds,
-        'thumbnail_url': thumbnailUrl,
-        'liked': 0,
-        'state': 'neutral',
-        'last_played_at': DateTime.now().millisecondsSinceEpoch,
-      },
-      conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
-
-    await db.update(
-      'tracks',
-      {
-        'video_url': videoUrl,
-        'title': title,
-        'artist': artist,
-        'duration': durationSeconds,
-        'thumbnail_url': thumbnailUrl,
-        'last_played_at': DateTime.now().millisecondsSinceEpoch,
-      },
-      where: 'video_id = ?',
-      whereArgs: [videoId],
+    final lastPlayedAt = DateTime.now().millisecondsSinceEpoch;
+    await db.rawInsert(
+      '''
+      INSERT INTO tracks (
+        video_id,
+        video_url,
+        title,
+        artist,
+        duration,
+        thumbnail_url,
+        liked,
+        state,
+        last_played_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 0, 'neutral', ?)
+      ON CONFLICT(video_id) DO UPDATE SET
+        video_url = excluded.video_url,
+        title = excluded.title,
+        artist = excluded.artist,
+        duration = excluded.duration,
+        thumbnail_url = excluded.thumbnail_url,
+        last_played_at = excluded.last_played_at
+      ''',
+      [
+        videoId,
+        videoUrl,
+        title,
+        artist,
+        durationSeconds,
+        thumbnailUrl,
+        lastPlayedAt,
+      ],
     );
   }
 

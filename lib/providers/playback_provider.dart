@@ -159,19 +159,21 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         );
       }
 
-      await _libraryNotifier.recordTrack(
-        videoId: videoId,
-        videoUrl: videoUrl,
-        title: title,
-        artist: artist,
-        thumbnailUrl: thumbnailUrl,
-      );
       await _nativePlayerService.playYoutubeStream(
         url: audioUrl,
         headers: _buildPlaybackHeaders(),
         title: title,
         artist: artist,
         thumbnailUrl: thumbnailUrl,
+      );
+      unawaited(
+        _libraryNotifier.recordTrack(
+          videoId: videoId,
+          videoUrl: videoUrl,
+          title: title,
+          artist: artist,
+          thumbnailUrl: thumbnailUrl,
+        ).catchError((_) {}),
       );
       state = state.copyWith(
         currentTrackId: videoId,

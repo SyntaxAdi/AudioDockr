@@ -138,6 +138,8 @@ class _RecentlyPlayedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+    final artworkCacheSize = (112 * devicePixelRatio).round();
     return SizedBox(
       width: 112,
       child: InkWell(
@@ -164,6 +166,10 @@ class _RecentlyPlayedCard extends StatelessWidget {
                         )
                       : CachedNetworkImage(
                           imageUrl: track.thumbnailUrl,
+                          memCacheWidth: artworkCacheSize,
+                          memCacheHeight: artworkCacheSize,
+                          maxWidthDiskCache: artworkCacheSize,
+                          maxHeightDiskCache: artworkCacheSize,
                           fit: BoxFit.cover,
                           placeholder: (_, __) => const Center(
                             child: SizedBox(

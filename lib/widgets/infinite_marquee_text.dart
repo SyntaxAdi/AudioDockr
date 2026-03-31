@@ -79,16 +79,10 @@ class _InfiniteMarqueeTextState extends State<InfiniteMarqueeText>
         final textWidth = textPainter.width;
         final shouldAnimate = textWidth > constraints.maxWidth;
         final cycleWidth = textWidth + widget.gap;
-
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (!mounted) {
-            return;
-          }
-          _syncAnimation(
-            shouldAnimate: shouldAnimate,
-            cycleWidth: cycleWidth,
-          );
-        });
+        _syncAnimation(
+          shouldAnimate: shouldAnimate,
+          cycleWidth: cycleWidth,
+        );
 
         if (!shouldAnimate) {
           return Text(

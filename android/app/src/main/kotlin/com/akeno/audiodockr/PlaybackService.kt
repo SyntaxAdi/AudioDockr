@@ -20,6 +20,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.util.LruCache
+import com.akeno.audiodockr.BuildConfig
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
@@ -29,13 +30,21 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
+import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
 import androidx.media3.session.MediaSession
 import androidx.media3.session.MediaSessionService
 import androidx.media3.ui.PlayerNotificationManager
-import java.net.URL
 import java.util.concurrent.CopyOnWriteArraySet
-import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
 
 class PlaybackService : MediaSessionService() {
     private val audioAttributes = AudioAttributes.Builder()
@@ -48,13 +57,18 @@ class PlaybackService : MediaSessionService() {
     private lateinit var notificationManager: PlayerNotificationManager
     private var currentRepeatMode: String = "off"
     private var repeatOnePendingReplay = false
-    private val artworkExecutor = Executors.newSingleThreadExecutor()
-    private val artworkCache = object : LruCache<String, Bitmap>(24) {}
+    private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val artworkHttpClient = OkHttpClient()
+    private val artworkCache = object : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 16L).toInt()) {
+        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount
+    }
     private val mainHandler = Handler(Looper.getMainLooper())
     private val progressRunnable = object : Runnable {
         override fun run() {
             publishState()
-            mainHandler.postDelayed(this, 500L)
+            if (player.isPlaying && listeners.isNotEmpty()) {
+                mainHandler.postDelayed(this, PROGRESS_UPDATE_MS)
+            }
         }
     }
 
@@ -62,7 +76,25 @@ class PlaybackService : MediaSessionService() {
         super.onCreate()
         instance = this
 
+        val trackSelector = DefaultTrackSelector(this).apply {
+            setParameters(
+                buildUponParameters()
+                    .setTrackTypeDisabled(C.TRACK_TYPE_VIDEO, true)
+                    .setForceHighestSupportedBitrate(false),
+            )
+        }
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                2_500,
+                10_000,
+                250,
+                500,
+            )
+            .build()
+
         player = ExoPlayer.Builder(this)
+            .setTrackSelector(trackSelector)
+            .setLoadControl(loadControl)
             .build()
             .also { exoPlayer ->
                 exoPlayer.setAudioAttributes(audioAttributes, true)
@@ -70,6 +102,11 @@ class PlaybackService : MediaSessionService() {
                 exoPlayer.addListener(
                     object : Player.Listener {
                         override fun onIsPlayingChanged(isPlaying: Boolean) {
+                            if (isPlaying) {
+                                startProgressUpdates()
+                            } else {
+                                stopProgressUpdates()
+                            }
                             publishState()
                         }
 
@@ -92,6 +129,13 @@ class PlaybackService : MediaSessionService() {
                             ) {
                                 currentRepeatMode = "off"
                             }
+                            if (playbackState == Player.STATE_READY && player.isPlaying) {
+                                startProgressUpdates()
+                            } else if (playbackState == Player.STATE_ENDED ||
+                                playbackState == Player.STATE_IDLE
+                            ) {
+                                stopProgressUpdates()
+                            }
                             publishState()
                         }
 
@@ -110,7 +154,6 @@ class PlaybackService : MediaSessionService() {
             mediaSession?.platformToken?.let(it::setMediaSessionToken)
             it.setPlayer(player)
         }
-        mainHandler.post(progressRunnable)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -129,6 +172,7 @@ class PlaybackService : MediaSessionService() {
             }
             ACTION_PAUSE -> {
                 player.pause()
+                stopProgressUpdates()
                 publishState()
             }
             ACTION_RESUME -> {
@@ -139,6 +183,7 @@ class PlaybackService : MediaSessionService() {
                     }
                 }
                 player.play()
+                startProgressUpdates()
                 publishState()
             }
             ACTION_SEEK -> {
@@ -177,7 +222,9 @@ class PlaybackService : MediaSessionService() {
         artist: String,
         artworkUrl: String,
     ) {
-        Log.d(TAG, "Starting playback for $url")
+        if (BuildConfig.DEBUG) {
+            Log.d(TAG, "Starting playback for $url")
+        }
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setDefaultRequestProperties(headers)
             .setAllowCrossProtocolRedirects(true)
@@ -231,15 +278,36 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
-        mainHandler.removeCallbacks(progressRunnable)
+        stopProgressUpdates()
         notificationManager.setPlayer(null)
-        artworkExecutor.shutdown()
+        serviceScope.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)
         mediaSession?.release()
         mediaSession = null
         player.release()
         instance = null
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        if (!player.isPlaying) {
+            stopProgressUpdates()
+            stopSelf()
+        }
+        super.onTaskRemoved(rootIntent)
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= TRIM_MEMORY_RUNNING_LOW) {
+            artworkCache.trimToSize(artworkCache.maxSize() / 2)
+        }
+        if (level >= TRIM_MEMORY_RUNNING_CRITICAL || level >= TRIM_MEMORY_BACKGROUND) {
+            artworkCache.evictAll()
+        }
+        if (!player.isPlaying) {
+            stopProgressUpdates()
+        }
     }
 
     companion object {
@@ -259,6 +327,8 @@ class PlaybackService : MediaSessionService() {
         private const val NOTIFICATION_CHANNEL_ID = "audiodockr_playback"
         private const val NOTIFICATION_CHANNEL_NAME = "AudioDockr Playback"
         private const val NOTIFICATION_ID = 1001
+        private const val PROGRESS_UPDATE_MS = 1000L
+        private const val NOTIFICATION_ARTWORK_SIZE = 256
 
         @Volatile
         private var instance: PlaybackService? = null
@@ -273,10 +343,14 @@ class PlaybackService : MediaSessionService() {
 
         fun registerPlaybackListener(listener: (Map<String, Any?>) -> Unit) {
             listeners.add(listener)
+            instance?.startProgressUpdates()
         }
 
         fun unregisterPlaybackListener(listener: (Map<String, Any?>) -> Unit) {
             listeners.remove(listener)
+            if (listeners.isEmpty()) {
+                instance?.stopProgressUpdates()
+            }
         }
 
         fun currentPlaybackState(): Map<String, Any?> = lastState
@@ -354,6 +428,17 @@ class PlaybackService : MediaSessionService() {
         manager.createNotificationChannel(channel)
     }
 
+    private fun startProgressUpdates() {
+        mainHandler.removeCallbacks(progressRunnable)
+        if (player.isPlaying && listeners.isNotEmpty()) {
+            mainHandler.post(progressRunnable)
+        }
+    }
+
+    private fun stopProgressUpdates() {
+        mainHandler.removeCallbacks(progressRunnable)
+    }
+
     private fun createSessionActivity(): PendingIntent? {
         val launchIntent = packageManager.getLaunchIntentForPackage(packageName) ?: return null
         return PendingIntent.getActivity(
@@ -394,9 +479,11 @@ class PlaybackService : MediaSessionService() {
                             return cachedBitmap
                         }
 
-                        artworkExecutor.execute {
+                        serviceScope.launch {
                             runCatching {
-                                URL(artworkUri.toString()).openStream().use(BitmapFactory::decodeStream)
+                                withContext(Dispatchers.IO) {
+                                    fetchScaledArtworkBitmap(artworkUri.toString(), NOTIFICATION_ARTWORK_SIZE)
+                                }
                             }.getOrNull()?.let { rawBitmap ->
                                 val processedBitmap = processNotificationArtwork(rawBitmap)
                                 artworkCache.put(artworkUri.toString(), processedBitmap)
@@ -505,5 +592,50 @@ class PlaybackService : MediaSessionService() {
         val destinationRect = Rect(0, 0, targetSize, targetSize)
         canvas.drawBitmap(source, sourceRect, destinationRect, Paint(Paint.ANTI_ALIAS_FLAG))
         return output
+    }
+
+    private fun fetchScaledArtworkBitmap(url: String, targetSize: Int): Bitmap? {
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .build()
+        artworkHttpClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) {
+                return null
+            }
+            val bytes = response.body?.bytes() ?: return null
+            val bounds = BitmapFactory.Options().apply {
+                inJustDecodeBounds = true
+            }
+            BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+            val decodeOptions = BitmapFactory.Options().apply {
+                inSampleSize = calculateInSampleSize(bounds, targetSize, targetSize)
+                inPreferredConfig = Bitmap.Config.ARGB_8888
+            }
+            return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOptions)
+        }
+    }
+
+    private fun calculateInSampleSize(
+        options: BitmapFactory.Options,
+        reqWidth: Int,
+        reqHeight: Int,
+    ): Int {
+        val height = options.outHeight
+        val width = options.outWidth
+        var inSampleSize = 1
+
+        if (height > reqHeight || width > reqWidth) {
+            var halfHeight = height / 2
+            var halfWidth = width / 2
+
+            while ((halfHeight / inSampleSize) >= reqHeight &&
+                (halfWidth / inSampleSize) >= reqWidth
+            ) {
+                inSampleSize *= 2
+            }
+        }
+
+        return inSampleSize.coerceAtLeast(1)
     }
 }

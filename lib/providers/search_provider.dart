@@ -90,10 +90,12 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
     state = const AsyncValue.loading();
 
     try {
-      if (saveToHistory) {
-        await _databaseHelper.saveSearchQuery(trimmedQuery);
-      }
-      final items = await _youtubeService.search(trimmedQuery);
+      final futures = <Future<Object?>>[
+        _youtubeService.search(trimmedQuery),
+        if (saveToHistory) _databaseHelper.saveSearchQuery(trimmedQuery),
+      ];
+      final results = await Future.wait(futures);
+      final items = results.first as List<YoutubeSearchItem>;
 
       if (_latestQuery != trimmedQuery) {
         return;
@@ -181,8 +183,17 @@ class SearchHistoryNotifier extends StateNotifier<List<String>> {
   final DatabaseHelper _databaseHelper;
 
   Future<void> addQuery(String query) async {
-    await _databaseHelper.saveSearchQuery(query);
-    await load();
+    final trimmedQuery = query.trim();
+    if (trimmedQuery.isEmpty) {
+      return;
+    }
+
+    state = [
+      trimmedQuery,
+      ...state.where((item) => item != trimmedQuery),
+    ].take(12).toList();
+
+    await _databaseHelper.saveSearchQuery(trimmedQuery);
   }
 
   Future<void> load() async {

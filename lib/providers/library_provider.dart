@@ -106,17 +106,31 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
 
   final DatabaseHelper _databaseHelper;
 
+  List<LibraryTrack> _mapTracks(List<StoredTrack> tracks) {
+    return tracks.map(LibraryTrack.fromStoredTrack).toList();
+  }
+
+  List<LibraryPlaylist> _mapPlaylists(List<StoredPlaylist> playlists) {
+    return playlists.map(LibraryPlaylist.fromStoredPlaylist).toList();
+  }
+
   Future<void> _loadLibrary() async {
-    final allTracks = await _databaseHelper.fetchAllTracks();
-    final likedTracks = await _databaseHelper.fetchLikedTracks();
-    final playlists = await _databaseHelper.fetchPlaylists();
-    final recentTracks = await _databaseHelper.fetchRecentlyPlayed();
+    final results = await Future.wait([
+      _databaseHelper.fetchAllTracks(),
+      _databaseHelper.fetchLikedTracks(),
+      _databaseHelper.fetchPlaylists(),
+      _databaseHelper.fetchRecentlyPlayed(),
+    ]);
+    final allTracks = results[0] as List<StoredTrack>;
+    final likedTracks = results[1] as List<StoredTrack>;
+    final playlists = results[2] as List<StoredPlaylist>;
+    final recentTracks = results[3] as List<StoredTrack>;
     state = state.copyWith(
       isLoading: false,
-      allTracks: allTracks.map(LibraryTrack.fromStoredTrack).toList(),
-      likedTracks: likedTracks.map(LibraryTrack.fromStoredTrack).toList(),
-      playlists: playlists.map(LibraryPlaylist.fromStoredPlaylist).toList(),
-      recentTracks: recentTracks.map(LibraryTrack.fromStoredTrack).toList(),
+      allTracks: _mapTracks(allTracks),
+      likedTracks: _mapTracks(likedTracks),
+      playlists: _mapPlaylists(playlists),
+      recentTracks: _mapTracks(recentTracks),
     );
   }
 
@@ -136,12 +150,22 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
       thumbnailUrl: thumbnailUrl,
       durationSeconds: durationSeconds,
     );
-    await _loadLibrary();
+    final results = await Future.wait([
+      _databaseHelper.fetchAllTracks(),
+      _databaseHelper.fetchRecentlyPlayed(),
+    ]);
+    state = state.copyWith(
+      allTracks: _mapTracks(results[0] as List<StoredTrack>),
+      recentTracks: _mapTracks(results[1] as List<StoredTrack>),
+    );
   }
 
   Future<void> createPlaylist(String name) async {
     await _databaseHelper.createPlaylist(name);
-    await _loadLibrary();
+    final playlists = await _databaseHelper.fetchPlaylists();
+    state = state.copyWith(
+      playlists: _mapPlaylists(playlists),
+    );
   }
 
   Future<void> updatePlaylist({
@@ -154,7 +178,10 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
       name: name,
       coverImagePath: coverImagePath,
     );
-    await _loadLibrary();
+    final playlists = await _databaseHelper.fetchPlaylists();
+    state = state.copyWith(
+      playlists: _mapPlaylists(playlists),
+    );
   }
 
   Future<bool> addTrackToPlaylist({
@@ -175,7 +202,16 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
       thumbnailUrl: thumbnailUrl,
       durationSeconds: durationSeconds,
     );
-    await _loadLibrary();
+    final results = await Future.wait([
+      _databaseHelper.fetchAllTracks(),
+      _databaseHelper.fetchPlaylists(),
+      _databaseHelper.fetchRecentlyPlayed(),
+    ]);
+    state = state.copyWith(
+      allTracks: _mapTracks(results[0] as List<StoredTrack>),
+      playlists: _mapPlaylists(results[1] as List<StoredPlaylist>),
+      recentTracks: _mapTracks(results[2] as List<StoredTrack>),
+    );
     return added;
   }
 
@@ -245,7 +281,18 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
       durationSeconds: durationSeconds,
       reaction: reaction,
     );
-    await _loadLibrary();
+    final results = await Future.wait([
+      _databaseHelper.fetchAllTracks(),
+      _databaseHelper.fetchLikedTracks(),
+      _databaseHelper.fetchPlaylists(),
+      _databaseHelper.fetchRecentlyPlayed(),
+    ]);
+    state = state.copyWith(
+      allTracks: _mapTracks(results[0] as List<StoredTrack>),
+      likedTracks: _mapTracks(results[1] as List<StoredTrack>),
+      playlists: _mapPlaylists(results[2] as List<StoredPlaylist>),
+      recentTracks: _mapTracks(results[3] as List<StoredTrack>),
+    );
   }
 
   LibraryTrack? trackById(String? videoId) {

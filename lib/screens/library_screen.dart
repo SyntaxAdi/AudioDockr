@@ -370,44 +370,71 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                 }
                 final editablePlaylist = playlist!;
 
-                return ListView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                  children: [
-                    _EditablePlaylistHeader(
-                      playlist: editablePlaylist,
-                      onChangePressed: () =>
-                          _showEditPlaylistSheet(
-                        context,
-                        ref,
-                        editablePlaylist,
+                if (playlistTracks.isEmpty) {
+                  return ListView(
+                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                    children: [
+                      _EditablePlaylistHeader(
+                        playlist: editablePlaylist,
+                        onChangePressed: () => _showEditPlaylistSheet(
+                          context,
+                          ref,
+                          editablePlaylist,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 28),
-                    if (playlistTracks.isEmpty)
-                      _EmptyPlaylistState(
-                      )
-                    else
-                      ...[
-                        Text(
-                          'Songs',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleLarge
-                              ?.copyWith(color: textPrimary),
-                        ),
-                        const SizedBox(height: 12),
-                        ...List.generate(
-                          playlistTracks.length,
-                          (index) => Column(
-                            children: [
-                              _LibraryTrackRow(track: playlistTracks[index]),
-                              if (index != playlistTracks.length - 1)
-                                const Divider(height: 1, color: bgDivider),
-                            ],
+                      const SizedBox(height: 28),
+                      const _EmptyPlaylistState(),
+                    ],
+                  );
+                }
+
+                return ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  itemCount: playlistTracks.length + 2,
+                  itemBuilder: (context, index) {
+                    if (index == 0) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _EditablePlaylistHeader(
+                            playlist: editablePlaylist,
+                            onChangePressed: () => _showEditPlaylistSheet(
+                              context,
+                              ref,
+                              editablePlaylist,
+                            ),
                           ),
-                        ),
-                      ],
-                  ],
+                          const SizedBox(height: 28),
+                          Text(
+                            'Songs',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(color: textPrimary),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                      );
+                    }
+
+                    if (index == playlistTracks.length + 1) {
+                      return const SizedBox(height: 0);
+                    }
+
+                    final track = playlistTracks[index - 1];
+                    return SizedBox(
+                      height: 77,
+                      child: Column(
+                        children: [
+                          Expanded(
+                            child: _LibraryTrackRow(track: track),
+                          ),
+                          if (index != playlistTracks.length)
+                            const Divider(height: 1, color: bgDivider),
+                        ],
+                      ),
+                    );
+                  },
                 );
               },
             ),
@@ -526,17 +553,26 @@ class _PlaylistCoverArt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(18);
+    final targetCacheSize = (size * MediaQuery.of(context).devicePixelRatio).round();
     Widget child;
 
     if (imagePath.isNotEmpty) {
-      child = Image.file(
-        File(imagePath),
+      child = Image(
+        image: ResizeImage(
+          FileImage(File(imagePath)),
+          width: targetCacheSize,
+          height: targetCacheSize,
+        ),
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) => _playlistFallbackArt(),
       );
     } else if (imageUrl.isNotEmpty) {
       child = CachedNetworkImage(
         imageUrl: imageUrl,
+        memCacheWidth: targetCacheSize,
+        memCacheHeight: targetCacheSize,
+        maxWidthDiskCache: targetCacheSize,
+        maxHeightDiskCache: targetCacheSize,
         fit: BoxFit.cover,
         errorWidget: (_, __, ___) => _playlistFallbackArt(),
       );
@@ -726,12 +762,14 @@ class _PlaylistTrackList extends StatelessWidget {
       );
     }
 
-    return ListView.separated(
+    return ListView.builder(
       itemCount: tracks.length,
-      separatorBuilder: (_, __) => const Divider(height: 1, color: bgDivider),
       itemBuilder: (context, index) {
         final track = tracks[index];
-        return _LibraryTrackRow(track: track);
+        return SizedBox(
+          height: 76,
+          child: _LibraryTrackRow(track: track),
+        );
       },
     );
   }
@@ -811,6 +849,8 @@ class _LibraryTrackRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+    final artworkCacheSize = (56 * devicePixelRatio).round();
     return InkWell(
       onTap: () async {
         try {
@@ -847,6 +887,10 @@ class _LibraryTrackRow extends ConsumerWidget {
                       )
                     : CachedNetworkImage(
                         imageUrl: track.thumbnailUrl,
+                        memCacheWidth: artworkCacheSize,
+                        memCacheHeight: artworkCacheSize,
+                        maxWidthDiskCache: artworkCacheSize,
+                        maxHeightDiskCache: artworkCacheSize,
                         fit: BoxFit.cover,
                         errorWidget: (_, __, ___) => const Center(
                           child: Icon(Icons.music_note, color: textSecondary),

@@ -18,14 +18,42 @@ class MiniPlayer extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playbackState = ref.watch(playbackNotifierProvider);
-    final libraryState = ref.watch(libraryProvider);
-    final currentTrack = libraryState.isLoading
-        ? null
-        : ref
-            .read(libraryProvider.notifier)
-            .trackById(playbackState.currentTrackId);
-    if (playbackState.currentTrackId == null && !playbackState.isPreparing) {
+    final currentTrackId = ref.watch(
+      playbackNotifierProvider.select((state) => state.currentTrackId),
+    );
+    final currentTitle = ref.watch(
+      playbackNotifierProvider.select((state) => state.currentTitle),
+    );
+    final currentArtist = ref.watch(
+      playbackNotifierProvider.select((state) => state.currentArtist),
+    );
+    final currentThumbnailUrl = ref.watch(
+      playbackNotifierProvider.select((state) => state.currentThumbnailUrl),
+    );
+    final currentVideoUrl = ref.watch(
+      playbackNotifierProvider.select((state) => state.currentVideoUrl),
+    );
+    final isPreparing = ref.watch(
+      playbackNotifierProvider.select((state) => state.isPreparing),
+    );
+    final isPlaying = ref.watch(
+      playbackNotifierProvider.select((state) => state.isPlaying),
+    );
+    final isLiked = ref.watch(
+      libraryProvider.select((state) {
+        if (state.isLoading || currentTrackId == null) {
+          return false;
+        }
+        for (final track in state.allTracks) {
+          if (track.videoId == currentTrackId) {
+            return track.isLiked;
+          }
+        }
+        return false;
+      }),
+    );
+
+    if (currentTrackId == null && !isPreparing) {
       return const SizedBox.shrink();
     }
 
@@ -34,11 +62,6 @@ class MiniPlayer extends ConsumerWidget {
         ? (mediaQuery.viewInsets.bottom > 0
             ? mediaQuery.viewInsets.bottom
             : mediaQuery.viewPadding.bottom)
-        : 0.0;
-
-    final progress = playbackState.duration.inMilliseconds > 0
-        ? playbackState.position.inMilliseconds /
-            playbackState.duration.inMilliseconds
         : 0.0;
 
     return AnimatedPadding(
@@ -69,12 +92,14 @@ class MiniPlayer extends ConsumerWidget {
                     height: 48,
                     margin: const EdgeInsets.only(left: 8),
                     color: bgDivider,
-                    child: (playbackState.currentThumbnailUrl ?? '').isEmpty
+                    child: (currentThumbnailUrl ?? '').isEmpty
                         ? const Center(
                             child: Icon(Icons.music_note, color: textSecondary),
                           )
                         : CachedNetworkImage(
-                            imageUrl: playbackState.currentThumbnailUrl!,
+                            imageUrl: currentThumbnailUrl!,
+                            memCacheWidth: 144,
+                            memCacheHeight: 144,
                             fit: BoxFit.cover,
                             errorWidget: (_, __, ___) => const Center(
                               child: Icon(Icons.music_note, color: textSecondary),
@@ -88,8 +113,8 @@ class MiniPlayer extends ConsumerWidget {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         InfiniteMarqueeText(
-                          text: playbackState.currentTitle ??
-                              (playbackState.isPreparing
+                          text: currentTitle ??
+                              (isPreparing
                                   ? 'Preparing track...'
                                   : 'Unknown track'),
                           style:
@@ -99,9 +124,9 @@ class MiniPlayer extends ConsumerWidget {
                                   ),
                         ),
                         Text(
-                          playbackState.isPreparing
+                          isPreparing
                               ? 'Starting playback'
-                              : (playbackState.currentArtist ?? 'Unknown artist'),
+                              : (currentArtist ?? 'Unknown artist'),
                           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                 fontSize: 11,
                                 color: textSecondary,
@@ -112,7 +137,7 @@ class MiniPlayer extends ConsumerWidget {
                       ],
                     ),
                   ),
-                  if (playbackState.isPreparing)
+                  if (isPreparing)
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       child: SizedBox(
@@ -127,31 +152,27 @@ class MiniPlayer extends ConsumerWidget {
                   else ...[
                     IconButton(
                       icon: Icon(
-                        currentTrack?.isLiked == true
-                            ? Icons.favorite
-                            : Icons.favorite_border,
+                        isLiked ? Icons.favorite : Icons.favorite_border,
                         color: accentPrimary,
                       ),
                       onPressed: () async {
-                        final currentTrackId = playbackState.currentTrackId;
                         if (currentTrackId == null) {
                           return;
                         }
                         await ref.read(libraryProvider.notifier).toggleLike(
                               videoId: currentTrackId,
-                              videoUrl: playbackState.currentVideoUrl ?? '',
-                              title: playbackState.currentTitle ?? 'Unknown track',
-                              artist: playbackState.currentArtist ?? 'Unknown artist',
-                              thumbnailUrl:
-                                  playbackState.currentThumbnailUrl ?? '',
+                              videoUrl: currentVideoUrl ?? '',
+                              title: currentTitle ?? 'Unknown track',
+                              artist: currentArtist ?? 'Unknown artist',
+                              thumbnailUrl: currentThumbnailUrl ?? '',
                               durationSeconds:
-                                  playbackState.duration.inSeconds,
+                                  ref.read(playbackNotifierProvider).duration.inSeconds,
                             );
                       },
                     ),
                     IconButton(
                       icon: Icon(
-                        playbackState.isPlaying ? Icons.pause : Icons.play_arrow,
+                        isPlaying ? Icons.pause : Icons.play_arrow,
                         color: accentPrimary,
                       ),
                       onPressed: () => ref
@@ -166,15 +187,7 @@ class MiniPlayer extends ConsumerWidget {
                 bottom: 0,
                 left: 0,
                 right: 0,
-                child: Container(
-                  height: 1,
-                  alignment: Alignment.centerLeft,
-                  color: bgDivider,
-                  child: FractionallySizedBox(
-                    widthFactor: progress.clamp(0.0, 1.0),
-                    child: Container(color: accentPrimary),
-                  ),
-                ),
+                child: const _MiniPlayerProgressBar(),
               ),
               Positioned(
                 top: 0,
@@ -185,6 +198,32 @@ class MiniPlayer extends ConsumerWidget {
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _MiniPlayerProgressBar extends ConsumerWidget {
+  const _MiniPlayerProgressBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final progress = ref.watch(
+      playbackNotifierProvider.select((state) {
+        if (state.duration.inMilliseconds <= 0) {
+          return 0.0;
+        }
+        return state.position.inMilliseconds / state.duration.inMilliseconds;
+      }),
+    );
+
+    return Container(
+      height: 1,
+      alignment: Alignment.centerLeft,
+      color: bgDivider,
+      child: FractionallySizedBox(
+        widthFactor: progress.clamp(0.0, 1.0),
+        child: Container(color: accentPrimary),
       ),
     );
   }

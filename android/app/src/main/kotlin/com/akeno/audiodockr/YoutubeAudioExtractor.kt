@@ -1,6 +1,7 @@
 package com.akeno.audiodockr
 
 import android.util.Log
+import com.akeno.audiodockr.BuildConfig
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
@@ -74,15 +75,21 @@ object YoutubeAudioExtractor {
 
         for (targetUrl in targetCandidates) {
             try {
-                Log.d(TAG, "Trying stream extraction for $targetUrl")
+                if (BuildConfig.DEBUG) {
+                    Log.d(TAG, "Trying stream extraction for $targetUrl")
+                }
                 val streamInfo = StreamInfo.getInfo(NewPipe.getService(0), targetUrl)
-                Log.d(
-                    TAG,
-                    "Stream info loaded. audio=${streamInfo.audioStreams.size}, video=${streamInfo.videoStreams.size}, videoOnly=${streamInfo.videoOnlyStreams.size}",
-                )
+                if (BuildConfig.DEBUG) {
+                    Log.d(
+                        TAG,
+                        "Stream info loaded. audio=${streamInfo.audioStreams.size}, video=${streamInfo.videoStreams.size}, videoOnly=${streamInfo.videoOnlyStreams.size}",
+                    )
+                }
 
                 pickBestAudioStream(streamInfo.audioStreams)?.content?.takeIf { it.isNotBlank() }?.let {
-                    Log.d(TAG, "Selected audio stream for ${streamInfo.id}")
+                    if (BuildConfig.DEBUG) {
+                        Log.d(TAG, "Selected audio stream for ${streamInfo.id}")
+                    }
                     return@runCatching it
                 }
 
@@ -91,12 +98,16 @@ object YoutubeAudioExtractor {
                     ?.content
                     ?.takeIf { it.isNotBlank() }
                     ?.let {
-                        Log.d(TAG, "Falling back to muxed stream for ${streamInfo.id}")
+                        if (BuildConfig.DEBUG) {
+                            Log.d(TAG, "Falling back to muxed stream for ${streamInfo.id}")
+                        }
                         return@runCatching it
                     }
             } catch (error: Throwable) {
                 lastError = error
-                Log.e(TAG, "Extraction failed for $targetUrl: ${error.message}", error)
+                if (BuildConfig.DEBUG) {
+                    Log.e(TAG, "Extraction failed for $targetUrl: ${error.message}", error)
+                }
             }
         }
 

@@ -6,3 +6,8 @@
 -dontwarn java.beans.Introspector
 -dontwarn java.beans.PropertyDescriptor
 -dontwarn javax.script.ScriptEngineFactory
+
+-keep class androidx.media3.common.** { *; }
+-keep class androidx.media3.session.** { *; }
+-keep class androidx.media3.exoplayer.** { *; }
+-keep class org.schabi.newpipe.extractor.** { *; }

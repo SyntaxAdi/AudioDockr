@@ -5,10 +5,15 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
-import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainActivity : FlutterActivity() {
-    private val extractorExecutor = Executors.newSingleThreadExecutor()
+    private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val playerCommandsChannel = "com.akeno.audiodockr/player_commands"
     private val playerEventsChannel = "com.akeno.audiodockr/player_events"
     private var playbackListener: ((Map<String, Any?>) -> Unit)? = null
@@ -21,7 +26,7 @@ class MainActivity : FlutterActivity() {
                 object : EventChannel.StreamHandler {
                     override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
                         val listener: (Map<String, Any?>) -> Unit = { state ->
-                            runOnUiThread {
+                            activityScope.launch {
                                 events?.success(state)
                             }
                         }
@@ -97,13 +102,15 @@ class MainActivity : FlutterActivity() {
                 val videoId = call.argument<String>("videoId").orEmpty()
                 val videoUrl = call.argument<String>("videoUrl").orEmpty()
 
-                extractorExecutor.execute {
-                    val extractionResult = YoutubeAudioExtractor.extract(
-                        videoId = videoId,
-                        videoUrl = videoUrl,
-                    )
+                activityScope.launch {
+                    val extractionResult = withContext(Dispatchers.IO) {
+                        YoutubeAudioExtractor.extract(
+                            videoId = videoId,
+                            videoUrl = videoUrl,
+                        )
+                    }
 
-                    runOnUiThread {
+                    withContext(Dispatchers.Main.immediate) {
                         extractionResult.fold(
                             onSuccess = { streamUrl -> result.success(streamUrl) },
                             onFailure = { error ->
@@ -119,7 +126,7 @@ class MainActivity : FlutterActivity() {
     override fun onDestroy() {
         playbackListener?.let { PlaybackService.unregisterPlaybackListener(it) }
         playbackListener = null
-        extractorExecutor.shutdown()
+        activityScope.cancel()
         super.onDestroy()
     }
 }
