@@ -212,6 +212,18 @@ class _SearchEntryScreenState extends ConsumerState<SearchEntryScreen> {
     await ref.read(searchHistoryProvider.notifier).load();
   }
 
+  Future<void> _recordCurrentQuery() async {
+    final value = _searchController.text.trim();
+    if (value.isEmpty) {
+      return;
+    }
+    await ref.read(searchProvider.notifier).search(
+          value,
+          saveToHistory: true,
+        );
+    await ref.read(searchHistoryProvider.notifier).load();
+  }
+
   @override
   Widget build(BuildContext context) {
     final searchState = ref.watch(searchProvider);
@@ -297,6 +309,7 @@ class _SearchEntryScreenState extends ConsumerState<SearchEntryScreen> {
                               track: track,
                               onTap: () async {
                                 try {
+                                  await _recordCurrentQuery();
                                   await ref
                                       .read(playbackNotifierProvider.notifier)
                                       .playTrack(
