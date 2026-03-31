@@ -287,7 +287,9 @@ class PlaylistDetailsScreen extends ConsumerWidget {
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOut,
           padding: EdgeInsets.only(
-            bottom: mediaQuery.viewInsets.bottom + mediaQuery.viewPadding.bottom,
+            bottom: mediaQuery.viewInsets.bottom > 0
+                ? mediaQuery.viewInsets.bottom
+                : mediaQuery.viewPadding.bottom,
           ),
           child: ConstrainedBox(
             constraints: BoxConstraints(
