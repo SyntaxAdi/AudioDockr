@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/library_provider.dart';
 import '../providers/playback_provider.dart';
 import '../screens/now_playing_screen.dart';
 import '../theme.dart';
@@ -17,6 +18,12 @@ class MiniPlayer extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final playbackState = ref.watch(playbackNotifierProvider);
+    final libraryState = ref.watch(libraryProvider);
+    final currentTrack = libraryState.isLoading
+        ? null
+        : ref
+            .read(libraryProvider.notifier)
+            .trackById(playbackState.currentTrackId);
     if (playbackState.currentTrackId == null && !playbackState.isPreparing) {
       return const SizedBox.shrink();
     }
@@ -120,16 +127,36 @@ class MiniPlayer extends ConsumerWidget {
                   else ...[
                     IconButton(
                       icon: Icon(
+                        currentTrack?.isLiked == true
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        color: accentPrimary,
+                      ),
+                      onPressed: () async {
+                        final currentTrackId = playbackState.currentTrackId;
+                        if (currentTrackId == null) {
+                          return;
+                        }
+                        await ref.read(libraryProvider.notifier).toggleLike(
+                              videoId: currentTrackId,
+                              videoUrl: playbackState.currentVideoUrl ?? '',
+                              title: playbackState.currentTitle ?? 'Unknown track',
+                              artist: playbackState.currentArtist ?? 'Unknown artist',
+                              thumbnailUrl:
+                                  playbackState.currentThumbnailUrl ?? '',
+                              durationSeconds:
+                                  playbackState.duration.inSeconds,
+                            );
+                      },
+                    ),
+                    IconButton(
+                      icon: Icon(
                         playbackState.isPlaying ? Icons.pause : Icons.play_arrow,
                         color: accentPrimary,
                       ),
                       onPressed: () => ref
                           .read(playbackNotifierProvider.notifier)
                           .togglePlayPause(),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.skip_next, color: textSecondary),
-                      onPressed: () {},
                     ),
                     const SizedBox(width: 8),
                   ],
