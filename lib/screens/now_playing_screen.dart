@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/library_provider.dart';
 import '../providers/playback_provider.dart';
 import '../theme.dart';
+import '../widgets/playlist_sheets.dart';
 
 class NowPlayingScreen extends ConsumerStatefulWidget {
   const NowPlayingScreen({super.key});
@@ -16,6 +17,210 @@ class NowPlayingScreen extends ConsumerStatefulWidget {
 class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
   bool _isSeeking = false;
   double? _seekPreviewMs;
+
+  Future<void> _showAddToPlaylistSheet(
+    BuildContext context,
+    LibraryState libraryState,
+    PlaybackState playbackState,
+  ) async {
+    final userPlaylists = libraryState.userPlaylists;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final screenHeight = MediaQuery.of(sheetContext).size.height;
+        final maxHeight = screenHeight * (screenHeight < 700 ? 0.72 : 0.56);
+
+        return FractionallySizedBox(
+          heightFactor: screenHeight < 700 ? 0.6 : 0.5,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: bgSurface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxHeight: maxHeight),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Center(
+                      child: Container(
+                        width: 44,
+                        height: 4,
+                        margin: const EdgeInsets.only(top: 12, bottom: 20),
+                        decoration: BoxDecoration(
+                          color: bgDivider,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      child: Text(
+                        'Add to playlist',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              color: textPrimary,
+                            ),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    if (userPlaylists.isEmpty)
+                      Expanded(
+                        child: Center(
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 24),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  'NO PLAYLISTS YET',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(color: textSecondary),
+                                ),
+                                const SizedBox(height: 14),
+                                ElevatedButton(
+                                  onPressed: () async {
+                                    Navigator.of(sheetContext).pop();
+                                    final created = await showCreatePlaylistSheet(
+                                      context,
+                                      ref,
+                                    );
+                                    if (created && mounted) {
+                                      final refreshedState =
+                                          ref.read(libraryProvider);
+                                      await _showAddToPlaylistSheet(
+                                        context,
+                                        refreshedState,
+                                        playbackState,
+                                      );
+                                    }
+                                  },
+                                  child: const Text('CREATE PLAYLIST'),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      )
+                    else
+                      Expanded(
+                        child: ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                          itemCount: userPlaylists.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final playlist = userPlaylists[index];
+                            return InkWell(
+                              onTap: () async {
+                                final added = await ref
+                                    .read(libraryProvider.notifier)
+                                    .addTrackToPlaylist(
+                                      playlistId: playlist.id,
+                                      videoId:
+                                          playbackState.currentTrackId ?? '',
+                                      videoUrl:
+                                          playbackState.currentVideoUrl ?? '',
+                                      title: playbackState.currentTitle ??
+                                          'Unknown track',
+                                      artist: playbackState.currentArtist ??
+                                          'Unknown artist',
+                                      thumbnailUrl:
+                                          playbackState.currentThumbnailUrl ??
+                                              '',
+                                      durationSeconds:
+                                          playbackState.duration.inSeconds,
+                                    );
+                                if (!sheetContext.mounted) {
+                                  return;
+                                }
+                                Navigator.of(sheetContext).pop();
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      added
+                                          ? 'Added to ${playlist.name}'
+                                          : 'Already in ${playlist.name}',
+                                    ),
+                                  ),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(16),
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: bgCard,
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(color: bgDivider),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        color: accentPrimary.withValues(
+                                          alpha: 0.12,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: const Icon(
+                                        Icons.queue_music_rounded,
+                                        color: accentPrimary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 14),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            playlist.name,
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .bodyLarge
+                                                ?.copyWith(
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${playlist.trackCount} TRACKS',
+                                            style: Theme.of(context)
+                                                .textTheme
+                                                .labelSmall
+                                                ?.copyWith(letterSpacing: 0),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const Icon(
+                                      Icons.add_rounded,
+                                      color: accentPrimary,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -166,7 +371,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                     Icons.playlist_add,
                     color: textSecondary,
                   ),
-                  onPressed: () {},
+                  onPressed: () => _showAddToPlaylistSheet(
+                    context,
+                    libraryState,
+                    playbackState,
+                  ),
                 ),
               ],
             ),

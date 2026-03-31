@@ -71,6 +71,8 @@ class LibraryState {
   final List<LibraryTrack> likedTracks;
   final List<LibraryPlaylist> playlists;
   final List<LibraryTrack> recentTracks;
+  List<LibraryPlaylist> get userPlaylists =>
+      playlists.where((playlist) => playlist.id != likedPlaylistId).toList();
 
   LibraryState copyWith({
     bool? isLoading,
@@ -137,6 +139,33 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
   Future<void> createPlaylist(String name) async {
     await _databaseHelper.createPlaylist(name);
     await _loadLibrary();
+  }
+
+  Future<bool> addTrackToPlaylist({
+    required String playlistId,
+    required String videoId,
+    required String videoUrl,
+    required String title,
+    required String artist,
+    required String thumbnailUrl,
+    int durationSeconds = 0,
+  }) async {
+    final added = await _databaseHelper.addTrackToPlaylist(
+      playlistId: playlistId,
+      videoId: videoId,
+      videoUrl: videoUrl,
+      title: title,
+      artist: artist,
+      thumbnailUrl: thumbnailUrl,
+      durationSeconds: durationSeconds,
+    );
+    await _loadLibrary();
+    return added;
+  }
+
+  Future<List<LibraryTrack>> fetchPlaylistTracks(String playlistId) async {
+    final tracks = await _databaseHelper.fetchPlaylistTracks(playlistId);
+    return tracks.map(LibraryTrack.fromStoredTrack).toList();
   }
 
   Future<void> toggleLike({

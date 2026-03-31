@@ -191,6 +191,56 @@ class DatabaseHelper {
     );
   }
 
+  Future<bool> addTrackToPlaylist({
+    required String playlistId,
+    required String videoId,
+    required String videoUrl,
+    required String title,
+    required String artist,
+    required String thumbnailUrl,
+    required int durationSeconds,
+  }) async {
+    final db = await database;
+    await saveTrack(
+      videoId: videoId,
+      videoUrl: videoUrl,
+      title: title,
+      artist: artist,
+      thumbnailUrl: thumbnailUrl,
+      durationSeconds: durationSeconds,
+    );
+
+    final existing = await db.query(
+      'playlist_tracks',
+      columns: ['video_id'],
+      where: 'playlist_id = ? AND video_id = ?',
+      whereArgs: [playlistId, videoId],
+      limit: 1,
+    );
+    if (existing.isNotEmpty) {
+      return false;
+    }
+
+    final maxPositionResult = await db.rawQuery(
+      'SELECT COALESCE(MAX(position), -1) AS max_position '
+      'FROM playlist_tracks WHERE playlist_id = ?',
+      [playlistId],
+    );
+    final nextPosition =
+        ((maxPositionResult.first['max_position'] as int?) ?? -1) + 1;
+
+    await db.insert(
+      'playlist_tracks',
+      {
+        'playlist_id': playlistId,
+        'video_id': videoId,
+        'position': nextPosition,
+      },
+      conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+    return true;
+  }
+
   Future<void> saveTrack({
     required String videoId,
     required String videoUrl,
@@ -306,6 +356,19 @@ class DatabaseHelper {
       WHERE pt.playlist_id = ?
       ORDER BY pt.position DESC
     ''', [likedPlaylistId]);
+    return result.map(StoredTrack.fromMap).toList();
+  }
+
+  Future<List<StoredTrack>> fetchPlaylistTracks(String playlistId) async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT t.video_id, t.video_url, t.title, t.artist, t.duration,
+             t.thumbnail_url, t.state, t.last_played_at
+      FROM playlist_tracks pt
+      INNER JOIN tracks t ON t.video_id = pt.video_id
+      WHERE pt.playlist_id = ?
+      ORDER BY pt.position ASC
+    ''', [playlistId]);
     return result.map(StoredTrack.fromMap).toList();
   }
 

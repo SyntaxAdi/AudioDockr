@@ -2,157 +2,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../database_helper.dart';
 import '../providers/library_provider.dart';
 import '../providers/playback_provider.dart';
 import '../theme.dart';
+import '../widgets/playlist_sheets.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({super.key});
-
-  Future<void> _showCreatePlaylistSheet(
-    BuildContext context,
-    WidgetRef ref,
-  ) async {
-    final controller = TextEditingController();
-
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) {
-        final mediaQuery = MediaQuery.of(sheetContext);
-        final screenHeight = mediaQuery.size.height;
-        final bottomInset = mediaQuery.viewInsets.bottom;
-        final maxHeight = screenHeight * (screenHeight < 700 ? 0.72 : 0.6);
-
-        return AnimatedPadding(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          padding: EdgeInsets.only(bottom: bottomInset),
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                maxHeight: maxHeight,
-                minHeight: 280,
-              ),
-              child: Container(
-                decoration: const BoxDecoration(
-                  color: bgSurface,
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-                ),
-                child: SafeArea(
-                  top: false,
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        minHeight: maxHeight - 32,
-                      ),
-                      child: IntrinsicHeight(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Center(
-                              child: Container(
-                                width: 44,
-                                height: 4,
-                                margin: const EdgeInsets.only(bottom: 20),
-                                decoration: BoxDecoration(
-                                  color: bgDivider,
-                                  borderRadius: BorderRadius.circular(999),
-                                ),
-                              ),
-                            ),
-                            Text(
-                              'Give your playlist a name',
-                              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                    color: textPrimary,
-                                  ),
-                            ),
-                            const SizedBox(height: 24),
-                            Text(
-                              'Playlist name',
-                              style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: textSecondary,
-                                    letterSpacing: 0,
-                                  ),
-                            ),
-                            const SizedBox(height: 8),
-                            TextField(
-                              controller: controller,
-                              autofocus: true,
-                              textInputAction: TextInputAction.done,
-                              style: Theme.of(context).textTheme.bodyLarge,
-                              decoration: const InputDecoration(
-                                hintText: 'My Playlist',
-                                filled: false,
-                                contentPadding: EdgeInsets.symmetric(vertical: 12),
-                                enabledBorder: UnderlineInputBorder(
-                                  borderSide: BorderSide(color: bgDivider),
-                                ),
-                                focusedBorder: UnderlineInputBorder(
-                                  borderSide: BorderSide(color: accentPrimary),
-                                ),
-                              ),
-                              onSubmitted: (value) async {
-                                final trimmed = value.trim();
-                                if (trimmed.isEmpty) {
-                                  return;
-                                }
-                                await ref.read(libraryProvider.notifier).createPlaylist(
-                                      trimmed,
-                                    );
-                                if (sheetContext.mounted) {
-                                  Navigator.of(sheetContext).pop();
-                                }
-                              },
-                            ),
-                            const Spacer(),
-                            const SizedBox(height: 24),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextButton(
-                                    onPressed: () => Navigator.of(sheetContext).pop(),
-                                    child: const Text('CANCEL'),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: ElevatedButton(
-                                    onPressed: () async {
-                                      final trimmed = controller.text.trim();
-                                      if (trimmed.isEmpty) {
-                                        return;
-                                      }
-                                      await ref
-                                          .read(libraryProvider.notifier)
-                                          .createPlaylist(trimmed);
-                                      if (sheetContext.mounted) {
-                                        Navigator.of(sheetContext).pop();
-                                      }
-                                    },
-                                    child: const Text('DONE'),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
 
   void _showPlaylistOptions(BuildContext context, WidgetRef ref) {
     final parentContext = context;
@@ -200,7 +56,7 @@ class LibraryScreen extends ConsumerWidget {
                     subtitle: 'Start a fresh playlist in your library',
                     onTap: () async {
                       Navigator.of(sheetContext).pop();
-                      await _showCreatePlaylistSheet(parentContext, ref);
+                      await showCreatePlaylistSheet(parentContext, ref);
                     },
                   ),
                   _PlaylistOptionTile(
@@ -285,8 +141,7 @@ class LibraryScreen extends ConsumerWidget {
                     );
                   },
                 ),
-                for (final playlist in libraryState.playlists)
-                  if (playlist.id != likedPlaylistId) ...[
+                for (final playlist in libraryState.userPlaylists) ...[
                     const SizedBox(height: 12),
                     _PlaylistCard(
                       title: playlist.name,
@@ -295,9 +150,9 @@ class LibraryScreen extends ConsumerWidget {
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => const PlaylistDetailsScreen(
-                              title: 'Playlist',
-                              tracks: [],
+                            builder: (_) => PlaylistDetailsScreen(
+                              title: playlist.name,
+                              playlistId: playlist.id,
                             ),
                           ),
                         );
@@ -382,11 +237,13 @@ class PlaylistDetailsScreen extends StatelessWidget {
   const PlaylistDetailsScreen({
     super.key,
     required this.title,
-    required this.tracks,
+    this.tracks,
+    this.playlistId,
   });
 
   final String title;
-  final List<LibraryTrack> tracks;
+  final List<LibraryTrack>? tracks;
+  final String? playlistId;
 
   @override
   Widget build(BuildContext context) {
@@ -404,22 +261,55 @@ class PlaylistDetailsScreen extends StatelessWidget {
           style: titleStyle,
         ),
       ),
-      body: tracks.isEmpty
-          ? Center(
-              child: Text(
-                'NO TRACKS YET',
-                style: Theme.of(context).textTheme.labelSmall,
-              ),
-            )
-          : ListView.separated(
-              itemCount: tracks.length,
-              separatorBuilder: (_, __) =>
-                  const Divider(height: 1, color: bgDivider),
-              itemBuilder: (context, index) {
-                final track = tracks[index];
-                return _LibraryTrackRow(track: track);
+      body: playlistId == null
+          ? _PlaylistTrackList(tracks: tracks ?? const [])
+          : Consumer(
+              builder: (context, ref, _) {
+                final future = ref
+                    .read(libraryProvider.notifier)
+                    .fetchPlaylistTracks(playlistId!);
+                return FutureBuilder<List<LibraryTrack>>(
+                  future: future,
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(
+                        child: CircularProgressIndicator(color: accentPrimary),
+                      );
+                    }
+                    return _PlaylistTrackList(tracks: snapshot.data!);
+                  },
+                );
               },
             ),
+    );
+  }
+}
+
+class _PlaylistTrackList extends StatelessWidget {
+  const _PlaylistTrackList({
+    required this.tracks,
+  });
+
+  final List<LibraryTrack> tracks;
+
+  @override
+  Widget build(BuildContext context) {
+    if (tracks.isEmpty) {
+      return Center(
+        child: Text(
+          'NO TRACKS YET',
+          style: Theme.of(context).textTheme.labelSmall,
+        ),
+      );
+    }
+
+    return ListView.separated(
+      itemCount: tracks.length,
+      separatorBuilder: (_, __) => const Divider(height: 1, color: bgDivider),
+      itemBuilder: (context, index) {
+        final track = tracks[index];
+        return _LibraryTrackRow(track: track);
+      },
     );
   }
 }
