@@ -7,18 +7,29 @@ import 'search_screen.dart';
 import 'library_screen.dart';
 import 'downloads_screen.dart';
 import 'settings_screen.dart';
-import '../widgets/mini_player.dart';
+import '../widgets/app_bottom_bar.dart';
 
 class AppShell extends ConsumerStatefulWidget {
-  const AppShell({super.key});
+  const AppShell({
+    super.key,
+    this.initialIndex = 0,
+  });
+
+  final int initialIndex;
 
   @override
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
-  int _currentIndex = 0;
+  late int _currentIndex;
   int _libraryResetToken = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentIndex = widget.initialIndex;
+  }
 
   void _onTabTapped(int index) {
     setState(() {
@@ -38,7 +49,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     final pages = [
       HomeScreen(onViewMore: _openLibraryTracks),
       const SearchScreen(),
-      LibraryScreen(key: ValueKey('library-$_libraryResetToken')),
+      LibraryScreen(
+        key: ValueKey('library-$_libraryResetToken'),
+        onNavigateToTab: _onTabTapped,
+      ),
       const DownloadsScreen(),
       const SettingsScreen(),
     ];
@@ -48,41 +62,9 @@ class _AppShellState extends ConsumerState<AppShell> {
         index: _currentIndex,
         children: pages,
       ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const MiniPlayer(),
-          Container(
-            height: 1,
-            color: bgDivider,
-          ),
-          BottomNavigationBar(
-            currentIndex: _currentIndex,
-            onTap: _onTabTapped,
-            items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_rounded),
-              label: 'HOME',
-            ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.search),
-                label: 'SEARCH',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.library_music),
-                label: 'LIBRARY',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.download_rounded),
-                label: 'DOWNLOADS',
-              ),
-              BottomNavigationBarItem(
-                icon: Icon(Icons.tune),
-                label: 'SETTINGS',
-              ),
-            ],
-          ),
-        ],
+      bottomNavigationBar: AppBottomBar(
+        currentIndex: _currentIndex,
+        onTap: _onTabTapped,
       ),
     );
   }

@@ -6,9 +6,15 @@ import '../providers/library_provider.dart';
 import '../providers/playback_provider.dart';
 import '../theme.dart';
 import '../widgets/playlist_sheets.dart';
+import '../widgets/app_bottom_bar.dart';
 
 class LibraryScreen extends ConsumerWidget {
-  const LibraryScreen({super.key});
+  const LibraryScreen({
+    super.key,
+    this.onNavigateToTab,
+  });
+
+  final ValueChanged<int>? onNavigateToTab;
 
   void _showPlaylistOptions(BuildContext context, WidgetRef ref) {
     final parentContext = context;
@@ -120,6 +126,7 @@ class LibraryScreen extends ConsumerWidget {
                         builder: (_) => PlaylistDetailsScreen(
                           title: 'Liked Songs',
                           tracks: libraryState.likedTracks,
+                          onNavigateToTab: onNavigateToTab,
                         ),
                       ),
                     );
@@ -136,6 +143,7 @@ class LibraryScreen extends ConsumerWidget {
                         builder: (_) => PlaylistDetailsScreen(
                           title: 'Recents',
                           tracks: libraryState.recentTracks,
+                          onNavigateToTab: onNavigateToTab,
                         ),
                       ),
                     );
@@ -153,6 +161,7 @@ class LibraryScreen extends ConsumerWidget {
                             builder: (_) => PlaylistDetailsScreen(
                               title: playlist.name,
                               playlistId: playlist.id,
+                              onNavigateToTab: onNavigateToTab,
                             ),
                           ),
                         );
@@ -239,11 +248,23 @@ class PlaylistDetailsScreen extends StatelessWidget {
     required this.title,
     this.tracks,
     this.playlistId,
+    this.onNavigateToTab,
   });
 
   final String title;
   final List<LibraryTrack>? tracks;
   final String? playlistId;
+  final ValueChanged<int>? onNavigateToTab;
+
+  void _handleBottomNavigation(BuildContext context, int index) {
+    if (index == 2) {
+      Navigator.of(context).pop();
+      return;
+    }
+
+    Navigator.of(context).popUntil((route) => route.isFirst);
+    onNavigateToTab?.call(index);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -281,6 +302,10 @@ class PlaylistDetailsScreen extends StatelessWidget {
                 );
               },
             ),
+      bottomNavigationBar: AppBottomBar(
+        currentIndex: 2,
+        onTap: (index) => _handleBottomNavigation(context, index),
+      ),
     );
   }
 }
