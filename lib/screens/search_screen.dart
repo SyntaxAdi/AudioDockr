@@ -352,7 +352,7 @@ class _SearchEntryScreenState extends ConsumerState<SearchEntryScreen> {
           ],
         ),
       ),
-      bottomNavigationBar: const MiniPlayer(),
+      bottomNavigationBar: const MiniPlayer(avoidBottomInset: true),
     );
   }
 }
