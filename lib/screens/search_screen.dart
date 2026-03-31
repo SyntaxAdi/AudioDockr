@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/playback_provider.dart';
 import '../providers/search_provider.dart';
 import '../theme.dart';
+import '../widgets/mini_player.dart';
 
 class SearchScreen extends ConsumerWidget {
   const SearchScreen({super.key});
@@ -351,6 +352,7 @@ class _SearchEntryScreenState extends ConsumerState<SearchEntryScreen> {
           ],
         ),
       ),
+      bottomNavigationBar: const MiniPlayer(),
     );
   }
 }

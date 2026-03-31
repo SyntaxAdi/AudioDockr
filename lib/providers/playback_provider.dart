@@ -58,6 +58,7 @@ class PlaybackState {
   final String? currentArtist;
   final String? currentThumbnailUrl;
   final String? currentVideoUrl;
+  final bool isPreparing;
   final bool isPlaying;
   final Duration position;
   final Duration duration;
@@ -74,6 +75,7 @@ class PlaybackState {
     this.currentArtist,
     this.currentThumbnailUrl,
     this.currentVideoUrl,
+    this.isPreparing = false,
     this.isPlaying = false,
     this.position = Duration.zero,
     this.duration = Duration.zero,
@@ -89,6 +91,7 @@ class PlaybackState {
     String? currentArtist,
     String? currentThumbnailUrl,
     String? currentVideoUrl,
+    bool? isPreparing,
     bool? isPlaying,
     Duration? position,
     Duration? duration,
@@ -102,6 +105,7 @@ class PlaybackState {
       currentArtist: currentArtist ?? this.currentArtist,
       currentThumbnailUrl: currentThumbnailUrl ?? this.currentThumbnailUrl,
       currentVideoUrl: currentVideoUrl ?? this.currentVideoUrl,
+      isPreparing: isPreparing ?? this.isPreparing,
       isPlaying: isPlaying ?? this.isPlaying,
       position: position ?? this.position,
       duration: duration ?? this.duration,
@@ -133,16 +137,28 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
 
   Future<void> playTrack(String videoId, String videoUrl, String title, String artist, String thumbnailUrl) async {
     await _ensurePlaybackPermissions();
-    final audioUrl = await _extractTrackUrl(videoId, videoUrl);
-
-    if (audioUrl == null || audioUrl.isEmpty) {
-      throw const PlaybackFailure(
-        'extract_empty',
-        'Audio playback could not be prepared.',
-      );
-    }
-
     try {
+      state = state.copyWith(
+        currentTrackId: videoId,
+        currentTitle: title,
+        currentArtist: artist,
+        currentThumbnailUrl: thumbnailUrl,
+        currentVideoUrl: videoUrl,
+        position: Duration.zero,
+        duration: Duration.zero,
+        isPreparing: true,
+        lastError: null,
+      );
+      final audioUrl = await _extractTrackUrl(videoId, videoUrl);
+
+      if (audioUrl == null || audioUrl.isEmpty) {
+        state = state.copyWith(isPreparing: false);
+        throw const PlaybackFailure(
+          'extract_empty',
+          'Audio playback could not be prepared.',
+        );
+      }
+
       await _libraryNotifier.recordTrack(
         videoId: videoId,
         videoUrl: videoUrl,
@@ -165,6 +181,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         currentVideoUrl: videoUrl,
         position: Duration.zero,
         duration: Duration.zero,
+        isPreparing: false,
         recentlyPlayed: _updatedRecentlyPlayed(
           videoId: videoId,
           videoUrl: videoUrl,
@@ -175,6 +192,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         lastError: null,
       );
     } catch (e) {
+      state = state.copyWith(isPreparing: false);
       throw PlaybackFailure(
         'playback_failed',
         e.toString(),
@@ -206,6 +224,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   void _handleNativePlayerEvent(Map<String, dynamic> event) {
     final error = event['error'] as String?;
     state = state.copyWith(
+      isPreparing: false,
       isPlaying: event['isPlaying'] as bool? ?? state.isPlaying,
       position: Duration(milliseconds: (event['position'] as num?)?.toInt() ?? state.position.inMilliseconds),
       duration: Duration(milliseconds: (event['duration'] as num?)?.toInt() ?? state.duration.inMilliseconds),
