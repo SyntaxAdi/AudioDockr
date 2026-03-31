@@ -19,12 +19,15 @@ Future<bool> showCreatePlaylistSheet(
       final mediaQuery = MediaQuery.of(sheetContext);
       final screenHeight = mediaQuery.size.height;
       final bottomInset = mediaQuery.viewInsets.bottom;
+      final systemBottomInset = mediaQuery.viewPadding.bottom;
+      final bottomOffset =
+          bottomInset > 0 ? bottomInset : systemBottomInset;
       final maxHeight = screenHeight * (screenHeight < 700 ? 0.72 : 0.6);
 
       return AnimatedPadding(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOut,
-        padding: EdgeInsets.only(bottom: bottomInset),
+        padding: EdgeInsets.only(bottom: bottomOffset),
         child: Align(
           alignment: Alignment.bottomCenter,
           child: ConstrainedBox(
@@ -40,7 +43,12 @@ Future<bool> showCreatePlaylistSheet(
               child: SafeArea(
                 top: false,
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+                  padding: EdgeInsets.fromLTRB(
+                    20,
+                    12,
+                    20,
+                    20 + systemBottomInset,
+                  ),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
                       minHeight: maxHeight - 32,
