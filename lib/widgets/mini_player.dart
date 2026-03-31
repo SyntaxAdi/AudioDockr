@@ -86,8 +86,8 @@ class MiniPlayer extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _LoopingMarqueeText(
-                          text: playbackState.currentTitle ??
+                        Text(
+                          playbackState.currentTitle ??
                               (playbackState.isPreparing
                                   ? 'Preparing track...'
                                   : 'Unknown track'),
@@ -95,6 +95,8 @@ class MiniPlayer extends ConsumerWidget {
                                 fontSize: 13,
                                 color: textPrimary,
                               ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                         Text(
                           playbackState.isPreparing
@@ -184,121 +186,6 @@ class MiniPlayer extends ConsumerWidget {
           ),
         ),
       ),
-    );
-  }
-}
-
-class _LoopingMarqueeText extends StatefulWidget {
-  const _LoopingMarqueeText({
-    required this.text,
-    this.style,
-  });
-
-  final String text;
-  final TextStyle? style;
-
-  @override
-  State<_LoopingMarqueeText> createState() => _LoopingMarqueeTextState();
-}
-
-class _LoopingMarqueeTextState extends State<_LoopingMarqueeText>
-    with SingleTickerProviderStateMixin {
-  static const double _gap = 32;
-  static const double _pixelsPerSecond = 28;
-
-  late final AnimationController _controller;
-  double? _lastCycleWidth;
-  bool _isAnimating = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(vsync: this);
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final effectiveStyle =
-        widget.style ?? DefaultTextStyle.of(context).style;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final availableWidth = constraints.maxWidth;
-        final textPainter = TextPainter(
-          text: TextSpan(text: widget.text, style: effectiveStyle),
-          maxLines: 1,
-          textDirection: Directionality.of(context),
-        )..layout(minWidth: 0, maxWidth: double.infinity);
-
-        final textWidth = textPainter.width;
-        final shouldAnimate = textWidth > availableWidth;
-
-        if (!shouldAnimate) {
-          if (_isAnimating) {
-            _controller.stop();
-            _controller.value = 0;
-            _isAnimating = false;
-            _lastCycleWidth = null;
-          }
-
-          return Text(
-            widget.text,
-            style: effectiveStyle,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          );
-        }
-
-        final cycleWidth = textWidth + _gap;
-        if (_lastCycleWidth != cycleWidth || !_isAnimating) {
-          final duration = Duration(
-            milliseconds: (cycleWidth / _pixelsPerSecond * 1000).round(),
-          );
-          _controller
-            ..duration = duration
-            ..repeat();
-          _isAnimating = true;
-          _lastCycleWidth = cycleWidth;
-        }
-
-        return ClipRect(
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              final offset = -cycleWidth * _controller.value;
-              return Transform.translate(
-                offset: Offset(offset, 0),
-                child: child,
-              );
-            },
-            child: Row(
-              children: [
-                Text(
-                  widget.text,
-                  style: effectiveStyle,
-                  maxLines: 1,
-                  softWrap: false,
-                ),
-                const SizedBox(width: _gap),
-                ExcludeSemantics(
-                  child: Text(
-                    widget.text,
-                    style: effectiveStyle,
-                    maxLines: 1,
-                    softWrap: false,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
     );
   }
 }
