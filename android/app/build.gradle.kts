@@ -5,6 +5,31 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+import java.io.ByteArrayOutputStream
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+
+fun gitOutput(vararg args: String): String? {
+    return runCatching {
+        val stdout = ByteArrayOutputStream()
+        exec {
+            commandLine("git", *args)
+            standardOutput = stdout
+        }
+        stdout.toString().trim().takeIf { it.isNotEmpty() }
+    }.getOrNull()
+}
+
+val autoVersionCode = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyDDDHHmm")).toInt()
+val gitSha = gitOutput("rev-parse", "--short", "HEAD") ?: "nogit"
+val gitDirty = gitOutput("status", "--porcelain").isNullOrBlank().not()
+val computedVersionName = buildString {
+    append(gitSha)
+    if (gitDirty) {
+        append("-dirty")
+    }
+}
+
 android {
     namespace = "com.akeno.audiodockr"
     compileSdk = flutter.compileSdkVersion
@@ -30,8 +55,8 @@ android {
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
         targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        versionCode = autoVersionCode
+        versionName = computedVersionName
     }
 
     buildTypes {
