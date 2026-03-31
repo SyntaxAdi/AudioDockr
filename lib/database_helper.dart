@@ -46,11 +46,13 @@ class StoredPlaylist {
     required this.id,
     required this.name,
     required this.trackCount,
+    required this.coverImagePath,
   });
 
   final String id;
   final String name;
   final int trackCount;
+  final String coverImagePath;
 }
 
 class DatabaseHelper {
@@ -74,7 +76,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -99,6 +101,7 @@ class DatabaseHelper {
       CREATE TABLE playlists (
         id TEXT PRIMARY KEY,
         name TEXT,
+        cover_image_path TEXT DEFAULT '',
         created_at INTEGER
       )
     ''');
@@ -145,6 +148,14 @@ class DatabaseHelper {
         )
       ''');
     }
+    if (oldVersion < 5) {
+      await _ensureColumn(
+        db,
+        'playlists',
+        'cover_image_path',
+        "TEXT DEFAULT ''",
+      );
+    }
   }
 
   Future<void> _ensureColumn(
@@ -166,6 +177,7 @@ class DatabaseHelper {
       {
         'id': likedPlaylistId,
         'name': 'Liked',
+        'cover_image_path': '',
         'created_at': DateTime.now().millisecondsSinceEpoch,
       },
       conflictAlgorithm: ConflictAlgorithm.ignore,
@@ -185,9 +197,32 @@ class DatabaseHelper {
       {
         'id': 'playlist_$timestamp',
         'name': trimmedName,
+        'cover_image_path': '',
         'created_at': timestamp,
       },
       conflictAlgorithm: ConflictAlgorithm.abort,
+    );
+  }
+
+  Future<void> updatePlaylist({
+    required String playlistId,
+    required String name,
+    required String coverImagePath,
+  }) async {
+    final trimmedName = name.trim();
+    if (trimmedName.isEmpty) {
+      return;
+    }
+
+    final db = await database;
+    await db.update(
+      'playlists',
+      {
+        'name': trimmedName,
+        'cover_image_path': coverImagePath,
+      },
+      where: 'id = ?',
+      whereArgs: [playlistId],
     );
   }
 
@@ -386,10 +421,10 @@ class DatabaseHelper {
   Future<List<StoredPlaylist>> fetchPlaylists() async {
     final db = await database;
     final result = await db.rawQuery('''
-      SELECT p.id, p.name, COUNT(pt.video_id) AS track_count
+      SELECT p.id, p.name, p.cover_image_path, COUNT(pt.video_id) AS track_count
       FROM playlists p
       LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
-      GROUP BY p.id, p.name
+      GROUP BY p.id, p.name, p.cover_image_path
       ORDER BY CASE WHEN p.id = ? THEN 0 ELSE 1 END, p.created_at ASC
     ''', [likedPlaylistId]);
 
@@ -399,6 +434,7 @@ class DatabaseHelper {
             id: (map['id'] as String?) ?? '',
             name: (map['name'] as String?) ?? '',
             trackCount: (map['track_count'] as int?) ?? 0,
+            coverImagePath: (map['cover_image_path'] as String?) ?? '',
           ),
         )
         .toList();

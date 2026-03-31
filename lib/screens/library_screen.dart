@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -242,7 +245,7 @@ class _PlaylistOptionTile extends StatelessWidget {
   }
 }
 
-class PlaylistDetailsScreen extends StatelessWidget {
+class PlaylistDetailsScreen extends ConsumerWidget {
   const PlaylistDetailsScreen({
     super.key,
     required this.title,
@@ -256,6 +259,8 @@ class PlaylistDetailsScreen extends StatelessWidget {
   final String? playlistId;
   final ValueChanged<int>? onNavigateToTab;
 
+  bool get _isEditableCustomPlaylist => playlistId != null;
+
   void _handleBottomNavigation(BuildContext context, int index) {
     if (index == 2) {
       Navigator.of(context).pop();
@@ -266,45 +271,426 @@ class PlaylistDetailsScreen extends StatelessWidget {
     onNavigateToTab?.call(index);
   }
 
+  Future<void> _showEditPlaylistSheet(
+    BuildContext context,
+    WidgetRef ref,
+    LibraryPlaylist playlist,
+  ) async {
+    final nameController = TextEditingController(text: playlist.name);
+    var selectedCoverPath = playlist.coverImagePath;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return StatefulBuilder(
+          builder: (context, setSheetState) {
+            final mediaQuery = MediaQuery.of(context);
+            return AnimatedPadding(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(
+                bottom: mediaQuery.viewInsets.bottom,
+              ),
+              child: FractionallySizedBox(
+                heightFactor: 0.55,
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: bgSurface,
+                    borderRadius: BorderRadius.vertical(
+                      top: Radius.circular(24),
+                    ),
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 44,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: bgDivider,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            'Edit Playlist',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(color: textPrimary),
+                          ),
+                          const SizedBox(height: 20),
+                          Text(
+                            'Playlist name',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: textSecondary,
+                                  letterSpacing: 0,
+                                ),
+                          ),
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: nameController,
+                            autofocus: false,
+                            style: Theme.of(context).textTheme.bodyLarge,
+                            decoration: const InputDecoration(
+                              hintText: 'Give your playlist a name',
+                              border: UnderlineInputBorder(),
+                            ),
+                          ),
+                          const SizedBox(height: 24),
+                          Text(
+                            'Cover image',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: textSecondary,
+                                  letterSpacing: 0,
+                                ),
+                          ),
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              _PlaylistCoverArt(
+                                imagePath: selectedCoverPath,
+                                imageUrl: '',
+                                size: 72,
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () async {
+                                    final result = await FilePicker.platform
+                                        .pickFiles(type: FileType.image);
+                                    final filePath =
+                                        result?.files.single.path ?? '';
+                                    if (filePath.isEmpty) {
+                                      return;
+                                    }
+                                    setSheetState(() {
+                                      selectedCoverPath = filePath;
+                                    });
+                                  },
+                                  child: const Text('Choose image'),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Spacer(),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton(
+                                  onPressed: () => Navigator.of(sheetContext).pop(),
+                                  child: const Text('Cancel'),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: ElevatedButton(
+                                  onPressed: () async {
+                                    final trimmedName =
+                                        nameController.text.trim();
+                                    if (trimmedName.isEmpty) {
+                                      return;
+                                    }
+                                    await ref
+                                        .read(libraryProvider.notifier)
+                                        .updatePlaylist(
+                                          playlistId: playlist.id,
+                                          name: trimmedName,
+                                          coverImagePath: selectedCoverPath,
+                                        );
+                                    if (!sheetContext.mounted) {
+                                      return;
+                                    }
+                                    Navigator.of(sheetContext).pop();
+                                  },
+                                  child: const Text('Save'),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final screenWidth = MediaQuery.of(context).size.width;
     final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
           fontSize: screenWidth < 360 ? 22 : 26,
         );
+    final playlists = ref.watch(libraryProvider).playlists;
+    LibraryPlaylist? playlist;
+    for (final entry in playlists) {
+      if (entry.id == playlistId) {
+        playlist = entry;
+        break;
+      }
+    }
+    final canEdit = _isEditableCustomPlaylist && playlist != null;
 
     return Scaffold(
       appBar: AppBar(
         backgroundColor: bgBase,
         elevation: 0,
-        title: Text(
-          title.toUpperCase(),
-          style: titleStyle,
-        ),
+        title: canEdit
+            ? null
+            : Text(
+                title.toUpperCase(),
+                style: titleStyle,
+              ),
       ),
       body: playlistId == null
           ? _PlaylistTrackList(tracks: tracks ?? const [])
-          : Consumer(
-              builder: (context, ref, _) {
-                final future = ref
-                    .read(libraryProvider.notifier)
-                    .fetchPlaylistTracks(playlistId!);
-                return FutureBuilder<List<LibraryTrack>>(
-                  future: future,
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return const Center(
-                        child: CircularProgressIndicator(color: accentPrimary),
-                      );
-                    }
-                    return _PlaylistTrackList(tracks: snapshot.data!);
-                  },
+          : FutureBuilder<List<LibraryTrack>>(
+              future:
+                  ref.read(libraryProvider.notifier).fetchPlaylistTracks(playlistId!),
+              builder: (context, snapshot) {
+                if (!snapshot.hasData) {
+                  return const Center(
+                    child: CircularProgressIndicator(color: accentPrimary),
+                  );
+                }
+                final playlistTracks = snapshot.data!;
+                if (!canEdit) {
+                  return _PlaylistTrackList(tracks: playlistTracks);
+                }
+                final editablePlaylist = playlist!;
+
+                return ListView(
+                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  children: [
+                    _EditablePlaylistHeader(
+                      playlist: editablePlaylist,
+                      onChangePressed: () =>
+                          _showEditPlaylistSheet(
+                        context,
+                        ref,
+                        editablePlaylist,
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+                    if (playlistTracks.isEmpty)
+                      _EmptyPlaylistState(
+                        playlistName: editablePlaylist.name,
+                        onChangePressed: () =>
+                            _showEditPlaylistSheet(
+                          context,
+                          ref,
+                          editablePlaylist,
+                        ),
+                      )
+                    else
+                      ...[
+                        Text(
+                          'Songs',
+                          style: Theme.of(context)
+                              .textTheme
+                              .titleLarge
+                              ?.copyWith(color: textPrimary),
+                        ),
+                        const SizedBox(height: 12),
+                        ...List.generate(
+                          playlistTracks.length,
+                          (index) => Column(
+                            children: [
+                              _LibraryTrackRow(track: playlistTracks[index]),
+                              if (index != playlistTracks.length - 1)
+                                const Divider(height: 1, color: bgDivider),
+                            ],
+                          ),
+                        ),
+                      ],
+                  ],
                 );
               },
             ),
       bottomNavigationBar: AppBottomBar(
         currentIndex: 2,
         onTap: (index) => _handleBottomNavigation(context, index),
+      ),
+    );
+  }
+}
+
+class _EditablePlaylistHeader extends StatelessWidget {
+  const _EditablePlaylistHeader({
+    required this.playlist,
+    required this.onChangePressed,
+  });
+
+  final LibraryPlaylist playlist;
+  final VoidCallback onChangePressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _PlaylistCoverArt(
+          imagePath: playlist.coverImagePath,
+          imageUrl: '',
+          size: 120,
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  playlist.name,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontSize: 32,
+                        color: textPrimary,
+                      ),
+                ),
+                const SizedBox(height: 10),
+                FilledButton.tonal(
+                  onPressed: onChangePressed,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: bgCard,
+                    foregroundColor: textPrimary,
+                  ),
+                  child: const Text('Change'),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  '${playlist.trackCount} tracks',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: textSecondary,
+                        letterSpacing: 0,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _EmptyPlaylistState extends StatelessWidget {
+  const _EmptyPlaylistState({
+    required this.playlistName,
+    required this.onChangePressed,
+  });
+
+  final String playlistName;
+  final VoidCallback onChangePressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: bgCard,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: bgDivider),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'This playlist is empty',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: textPrimary,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Add songs from the player using the add to playlist button, or update the cover art and name now.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: textSecondary,
+                ),
+          ),
+          const SizedBox(height: 18),
+          FilledButton(
+            onPressed: onChangePressed,
+            child: Text('Edit $playlistName'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PlaylistCoverArt extends StatelessWidget {
+  const _PlaylistCoverArt({
+    required this.imagePath,
+    required this.imageUrl,
+    required this.size,
+  });
+
+  final String imagePath;
+  final String imageUrl;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(18);
+    Widget child;
+
+    if (imagePath.isNotEmpty) {
+      child = Image.file(
+        File(imagePath),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _playlistFallbackArt(),
+      );
+    } else if (imageUrl.isNotEmpty) {
+      child = CachedNetworkImage(
+        imageUrl: imageUrl,
+        fit: BoxFit.cover,
+        errorWidget: (_, __, ___) => _playlistFallbackArt(),
+      );
+    } else {
+      child = _playlistFallbackArt();
+    }
+
+    return ClipRRect(
+      borderRadius: radius,
+      child: Container(
+        width: size,
+        height: size,
+        color: bgCard,
+        child: child,
+      ),
+    );
+  }
+
+  Widget _playlistFallbackArt() {
+    return Container(
+      color: bgCard,
+      child: const Center(
+        child: Icon(
+          Icons.music_note_rounded,
+          color: textSecondary,
+          size: 42,
+        ),
       ),
     );
   }

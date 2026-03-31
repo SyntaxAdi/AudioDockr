@@ -42,17 +42,20 @@ class LibraryPlaylist {
     required this.id,
     required this.name,
     required this.trackCount,
+    this.coverImagePath = '',
   });
 
   final String id;
   final String name;
   final int trackCount;
+  final String coverImagePath;
 
   factory LibraryPlaylist.fromStoredPlaylist(StoredPlaylist playlist) {
     return LibraryPlaylist(
       id: playlist.id,
       name: playlist.name,
       trackCount: playlist.trackCount,
+      coverImagePath: playlist.coverImagePath,
     );
   }
 }
@@ -138,6 +141,19 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
 
   Future<void> createPlaylist(String name) async {
     await _databaseHelper.createPlaylist(name);
+    await _loadLibrary();
+  }
+
+  Future<void> updatePlaylist({
+    required String playlistId,
+    required String name,
+    required String coverImagePath,
+  }) async {
+    await _databaseHelper.updatePlaylist(
+      playlistId: playlistId,
+      name: name,
+      coverImagePath: coverImagePath,
+    );
     await _loadLibrary();
   }
 
@@ -240,6 +256,19 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
     for (final track in state.allTracks) {
       if (track.videoId == videoId) {
         return track;
+      }
+    }
+    return null;
+  }
+
+  LibraryPlaylist? playlistById(String? playlistId) {
+    if (playlistId == null) {
+      return null;
+    }
+
+    for (final playlist in state.playlists) {
+      if (playlist.id == playlistId) {
+        return playlist;
       }
     }
     return null;
