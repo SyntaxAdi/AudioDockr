@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../providers/library_provider.dart';
 import '../providers/playback_provider.dart';
 import '../providers/search_provider.dart';
 import '../theme.dart';
@@ -400,7 +401,7 @@ class _SearchHistoryList extends StatelessWidget {
   }
 }
 
-class TrackListItem extends StatelessWidget {
+class TrackListItem extends ConsumerWidget {
   const TrackListItem({super.key, required this.track, required this.onTap});
 
   final SearchResult track;
@@ -413,9 +414,18 @@ class TrackListItem extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
     final artworkCacheSize = (56 * devicePixelRatio).round();
+    final isLiked = ref.watch(
+      libraryProvider.select(
+        (state) => state.allTracks.any(
+          (libraryTrack) =>
+              libraryTrack.videoId == track.videoId && libraryTrack.isLiked,
+        ),
+      ),
+    );
+
     return InkWell(
       onTap: onTap,
       child: Container(
@@ -467,7 +477,9 @@ class TrackListItem extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    track.artist,
+                    track.duration > Duration.zero
+                        ? '${track.artist} • ${_formatDuration(track.duration)}'
+                        : track.artist,
                     style: Theme.of(context).textTheme.labelSmall,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -475,18 +487,24 @@ class TrackListItem extends StatelessWidget {
                 ],
               ),
             ),
-            if (track.duration > Duration.zero)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                color: bgDivider,
-                child: Text(
-                  _formatDuration(track.duration),
-                  style: Theme.of(context)
-                      .textTheme
-                      .labelSmall
-                      ?.copyWith(color: accentPrimary),
-                ),
+            IconButton(
+              onPressed: () async {
+                await ref.read(libraryProvider.notifier).toggleLike(
+                      videoId: track.videoId,
+                      videoUrl: track.videoUrl,
+                      title: track.title,
+                      artist: track.artist,
+                      thumbnailUrl: track.thumbnailUrl,
+                      durationSeconds: track.duration.inSeconds,
+                    );
+              },
+              icon: Icon(
+                isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                color: isLiked ? accentPrimary : textSecondary,
               ),
+              splashRadius: 20,
+              tooltip: isLiked ? 'Remove from liked songs' : 'Add to liked songs',
+            ),
           ],
         ),
       ),

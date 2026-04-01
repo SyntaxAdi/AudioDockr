@@ -22,17 +22,66 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: stable
+          cache: true
+          cache-key: flutter-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
 
       - name: Install dependencies
         run: flutter pub get
 
       - name: Build release APK
         run: flutter build apk --release
+
+      - name: Collect release metadata
+        id: metadata
+        run: |
+          SHORT_SHA="$(git rev-parse --short HEAD)"
+          VERSION_CODE="$(date -u +%y%j%H%M)"
+          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
+          APK_SIZE="$(du -h "$APK_PATH" | cut -f1)"
+          BUILD_TIME_UTC="$(date -u +"%Y-%m-%d %H:%M UTC")"
+          {
+            echo "short_sha=$SHORT_SHA"
+            echo "version_name=$SHORT_SHA"
+            echo "version_code=$VERSION_CODE"
+            echo "apk_size=$APK_SIZE"
+            echo "build_time_utc=$BUILD_TIME_UTC"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog
+        id: changelog
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "push" ] && [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+            CHANGE_RANGE="${{ github.event.before }}..${{ github.sha }}"
+            CHANGELOG="$(git log "$CHANGE_RANGE" --pretty=format:'- %s (%h)')"
+          else
+            CHANGELOG="$(git log -10 --pretty=format:'- %s (%h)')"
+          fi
+
+          if [ -z "$CHANGELOG" ]; then
+            CHANGELOG="- No commit summary available for this build."
+          fi
+
+          {
+            echo "content<<EOF"
+            echo "$CHANGELOG"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Publish continuous release
         uses: ncipollo/release-action@v1
@@ -47,6 +96,19 @@ jobs:
           artifactErrorsFailBuild: true
           artifacts: build/app/outputs/flutter-apk/app-release.apk
           body: |
-            Automated APK build for `${{ github.sha }}`.
+            Automated Android release build for AudioDockr.
 
-            Branch: `${{ github.ref_name }}`
+            - Version: `${{ steps.metadata.outputs.version_name }}`
+            - Version code: `${{ steps.metadata.outputs.version_code }}`
+            - Commit: `${{ github.sha }}`
+            - Short SHA: `${{ steps.metadata.outputs.short_sha }}`
+            - Branch: `${{ github.ref_name }}`
+            - APK size: `${{ steps.metadata.outputs.apk_size }}`
+            - Built at: `${{ steps.metadata.outputs.build_time_utc }}`
+            - Workflow run: `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`
+
+            What's new:
+            ${{ steps.changelog.outputs.content }}
+
+            Files:
+            - `app-release.apk`
