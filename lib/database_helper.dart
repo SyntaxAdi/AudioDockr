@@ -301,6 +301,32 @@ class DatabaseHelper {
     return true;
   }
 
+  Future<void> removeTrackFromPlaylist({
+    required String playlistId,
+    required String videoId,
+  }) async {
+    final db = await database;
+    await db.delete(
+      'playlist_tracks',
+      where: 'playlist_id = ? AND video_id = ?',
+      whereArgs: [playlistId, videoId],
+    );
+  }
+
+  Future<Set<String>> fetchPlaylistIdsForTrack(String videoId) async {
+    final db = await database;
+    final result = await db.query(
+      'playlist_tracks',
+      columns: ['playlist_id'],
+      where: 'video_id = ?',
+      whereArgs: [videoId],
+    );
+    return result
+        .map((row) => (row['playlist_id'] as String?) ?? '')
+        .where((playlistId) => playlistId.isNotEmpty)
+        .toSet();
+  }
+
   Future<void> saveTrack({
     required String videoId,
     required String videoUrl,

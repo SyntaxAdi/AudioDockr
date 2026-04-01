@@ -428,97 +428,210 @@ class TrackListItem extends ConsumerWidget {
     );
 
     return InkWell(
-      onTap: onTap,
-      child: Container(
-        height: metrics.rowHeight,
-        padding: EdgeInsets.symmetric(horizontal: metrics.horizontalPadding),
-        child: Row(
-          children: [
-            Container(
-              width: metrics.artworkSize,
-              height: metrics.artworkSize,
-              color: bgDivider,
-              child: track.thumbnailUrl.isEmpty
-                  ? const Center(
-                      child: Icon(Icons.music_video, color: textSecondary),
-                    )
-                  : CachedNetworkImage(
-                      imageUrl: track.thumbnailUrl,
-                      memCacheWidth: artworkCacheSize,
-                      memCacheHeight: artworkCacheSize,
-                      maxWidthDiskCache: artworkCacheSize,
-                      maxHeightDiskCache: artworkCacheSize,
-                      fit: BoxFit.cover,
-                      placeholder: (_, __) => const Center(
-                        child: SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: accentPrimary,
+      child: _QueueSwipeWrapper(
+        track: track,
+        metrics: metrics,
+        onQueued: () {
+          final added = ref.read(playbackNotifierProvider.notifier).addToQueue(
+                videoId: track.videoId,
+                videoUrl: track.videoUrl,
+                title: track.title,
+                artist: track.artist,
+                thumbnailUrl: track.thumbnailUrl,
+              );
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                added
+                    ? 'Added "${track.title}" to queue'
+                    : '"${track.title}" is already in queue',
+              ),
+              duration: const Duration(milliseconds: 1200),
+            ),
+          );
+        },
+        child: InkWell(
+          onTap: onTap,
+          child: Container(
+            height: metrics.rowHeight,
+            padding: EdgeInsets.symmetric(horizontal: metrics.horizontalPadding),
+            child: Row(
+              children: [
+                Container(
+                  width: metrics.artworkSize,
+                  height: metrics.artworkSize,
+                  color: bgDivider,
+                  child: track.thumbnailUrl.isEmpty
+                      ? const Center(
+                          child: Icon(Icons.music_video, color: textSecondary),
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: track.thumbnailUrl,
+                          memCacheWidth: artworkCacheSize,
+                          memCacheHeight: artworkCacheSize,
+                          maxWidthDiskCache: artworkCacheSize,
+                          maxHeightDiskCache: artworkCacheSize,
+                          fit: BoxFit.cover,
+                          placeholder: (_, __) => const Center(
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: accentPrimary,
+                              ),
+                            ),
+                          ),
+                          errorWidget: (_, __, ___) => const Center(
+                            child: Icon(Icons.music_video, color: textSecondary),
                           ),
                         ),
+                ),
+                SizedBox(width: metrics.gap),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        track.title,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontSize: metrics.titleFontSize,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      errorWidget: (_, __, ___) => const Center(
-                        child: Icon(Icons.music_video, color: textSecondary),
+                      SizedBox(height: metrics.subtitleGap),
+                      Text(
+                        track.duration > Duration.zero
+                            ? '${track.artist} • ${_formatDuration(track.duration)}'
+                            : track.artist,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              fontSize: metrics.subtitleFontSize,
+                            ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-            ),
-            SizedBox(width: metrics.gap),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    track.title,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontSize: metrics.titleFontSize,
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                    ],
                   ),
-                  SizedBox(height: metrics.subtitleGap),
-                  Text(
-                    track.duration > Duration.zero
-                        ? '${track.artist} • ${_formatDuration(track.duration)}'
-                        : track.artist,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          fontSize: metrics.subtitleFontSize,
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                ),
+                IconButton(
+                  onPressed: () async {
+                    await ref.read(libraryProvider.notifier).toggleLike(
+                          videoId: track.videoId,
+                          videoUrl: track.videoUrl,
+                          title: track.title,
+                          artist: track.artist,
+                          thumbnailUrl: track.thumbnailUrl,
+                          durationSeconds: track.duration.inSeconds,
+                        );
+                  },
+                  icon: Icon(
+                    isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                    color: isLiked ? accentPrimary : textSecondary,
+                    size: metrics.iconSize,
                   ),
-                ],
-              ),
+                  padding: EdgeInsets.zero,
+                  constraints: BoxConstraints.tightFor(
+                    width: metrics.iconButtonSize,
+                    height: metrics.iconButtonSize,
+                  ),
+                  splashRadius: metrics.iconButtonSize / 2,
+                  tooltip: isLiked ? 'Remove from liked songs' : 'Add to liked songs',
+                ),
+              ],
             ),
-            IconButton(
-              onPressed: () async {
-                await ref.read(libraryProvider.notifier).toggleLike(
-                      videoId: track.videoId,
-                      videoUrl: track.videoUrl,
-                      title: track.title,
-                      artist: track.artist,
-                      thumbnailUrl: track.thumbnailUrl,
-                      durationSeconds: track.duration.inSeconds,
-                    );
-              },
-              icon: Icon(
-                isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                color: isLiked ? accentPrimary : textSecondary,
-                size: metrics.iconSize,
-              ),
-              padding: EdgeInsets.zero,
-              constraints: BoxConstraints.tightFor(
-                width: metrics.iconButtonSize,
-                height: metrics.iconButtonSize,
-              ),
-              splashRadius: metrics.iconButtonSize / 2,
-              tooltip: isLiked ? 'Remove from liked songs' : 'Add to liked songs',
-            ),
-          ],
+          ),
         ),
       ),
+    );
+  }
+}
+
+class _QueueSwipeWrapper extends StatefulWidget {
+  const _QueueSwipeWrapper({
+    required this.track,
+    required this.metrics,
+    required this.onQueued,
+    required this.child,
+  });
+
+  final SearchResult track;
+  final _TrackListItemMetrics metrics;
+  final VoidCallback onQueued;
+  final Widget child;
+
+  @override
+  State<_QueueSwipeWrapper> createState() => _QueueSwipeWrapperState();
+}
+
+class _QueueSwipeWrapperState extends State<_QueueSwipeWrapper> {
+  double _dragOffset = 0;
+  bool _queueTriggered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final maxReveal = screenWidth * 0.46;
+    final triggerThreshold = maxReveal * 0.62;
+    final revealWidth = _dragOffset.clamp(0.0, maxReveal).toDouble();
+    final actionReady = revealWidth >= triggerThreshold;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              width: revealWidth,
+              color: actionReady ? accentPrimary : bgDivider,
+              alignment: Alignment.center,
+              child: Opacity(
+                opacity: revealWidth <= 8 ? 0 : 1,
+                child: Icon(
+                  Icons.playlist_add_rounded,
+                  color: actionReady ? Colors.black : textPrimary,
+                  size: widget.metrics.iconSize + 4,
+                ),
+              ),
+            ),
+          ),
+        ),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          transform: Matrix4.translationValues(revealWidth, 0, 0),
+          curve: Curves.easeOut,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragStart: (_) {
+              _queueTriggered = false;
+            },
+            onHorizontalDragUpdate: (details) {
+              setState(() {
+                _dragOffset =
+                    (_dragOffset + details.delta.dx).clamp(0.0, maxReveal).toDouble();
+              });
+            },
+            onHorizontalDragEnd: (_) {
+              final shouldQueue = _dragOffset >= triggerThreshold && !_queueTriggered;
+              if (shouldQueue) {
+                _queueTriggered = true;
+                widget.onQueued();
+              }
+              setState(() {
+                _dragOffset = 0;
+              });
+            },
+            onHorizontalDragCancel: () {
+              setState(() {
+                _dragOffset = 0;
+              });
+            },
+            child: widget.child,
+          ),
+        ),
+      ],
     );
   }
 }

@@ -1,6 +1,7 @@
 package com.akeno.audiodockr
 
 import android.content.Intent
+import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -67,7 +68,7 @@ class MainActivity : FlutterActivity() {
                             artist,
                             artworkUrl,
                         )
-                        startService(intent)
+                        ContextCompat.startForegroundService(this, intent)
                         result.success(null)
                     }
                     "pause" -> {
@@ -75,7 +76,10 @@ class MainActivity : FlutterActivity() {
                         result.success(null)
                     }
                     "resume" -> {
-                        startService(PlaybackService.buildResumeIntent(this))
+                        ContextCompat.startForegroundService(
+                            this,
+                            PlaybackService.buildResumeIntent(this),
+                        )
                         result.success(null)
                     }
                     "seekTo" -> {

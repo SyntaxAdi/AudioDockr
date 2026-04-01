@@ -215,6 +215,68 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
     return added;
   }
 
+  Future<Set<String>> fetchSavedPlaylistIds(String videoId) async {
+    if (videoId.isEmpty) {
+      return <String>{};
+    }
+    return _databaseHelper.fetchPlaylistIdsForTrack(videoId);
+  }
+
+  Future<bool> setPlaylistMembership({
+    required String playlistId,
+    required bool shouldSave,
+    required String videoId,
+    required String videoUrl,
+    required String title,
+    required String artist,
+    required String thumbnailUrl,
+    int durationSeconds = 0,
+  }) async {
+    if (playlistId == likedPlaylistId) {
+      await _setReaction(
+        videoId: videoId,
+        videoUrl: videoUrl,
+        title: title,
+        artist: artist,
+        thumbnailUrl: thumbnailUrl,
+        durationSeconds: durationSeconds,
+        reaction: shouldSave ? 'liked' : 'neutral',
+      );
+      return shouldSave;
+    }
+
+    if (shouldSave) {
+      await _databaseHelper.addTrackToPlaylist(
+        playlistId: playlistId,
+        videoId: videoId,
+        videoUrl: videoUrl,
+        title: title,
+        artist: artist,
+        thumbnailUrl: thumbnailUrl,
+        durationSeconds: durationSeconds,
+      );
+    } else {
+      await _databaseHelper.removeTrackFromPlaylist(
+        playlistId: playlistId,
+        videoId: videoId,
+      );
+    }
+
+    final results = await Future.wait([
+      _databaseHelper.fetchAllTracks(),
+      _databaseHelper.fetchLikedTracks(),
+      _databaseHelper.fetchPlaylists(),
+      _databaseHelper.fetchRecentlyPlayed(),
+    ]);
+    state = state.copyWith(
+      allTracks: _mapTracks(results[0] as List<StoredTrack>),
+      likedTracks: _mapTracks(results[1] as List<StoredTrack>),
+      playlists: _mapPlaylists(results[2] as List<StoredPlaylist>),
+      recentTracks: _mapTracks(results[3] as List<StoredTrack>),
+    );
+    return shouldSave;
+  }
+
   Future<List<LibraryTrack>> fetchPlaylistTracks(String playlistId) async {
     final tracks = await _databaseHelper.fetchPlaylistTracks(playlistId);
     return tracks.map(LibraryTrack.fromStoredTrack).toList();

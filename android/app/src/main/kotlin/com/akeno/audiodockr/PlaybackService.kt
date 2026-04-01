@@ -2,6 +2,7 @@ package com.akeno.audiodockr
 
 import android.app.Notification
 import android.app.NotificationChannel
+import android.app.ForegroundServiceStartNotAllowedException
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
@@ -252,6 +253,7 @@ class PlaybackService : MediaSessionService() {
             repeatOnePendingReplay = true
         }
         player.setMediaSource(mediaSourceFactory.createMediaSource(mediaItem))
+        player.playWhenReady = true
         player.prepare()
         player.play()
         notificationManager.invalidate()
@@ -502,7 +504,13 @@ class PlaybackService : MediaSessionService() {
                         ongoing: Boolean,
                     ) {
                         if (ongoing) {
-                            startForeground(notificationId, notification)
+                            try {
+                                startForeground(notificationId, notification)
+                            } catch (error: ForegroundServiceStartNotAllowedException) {
+                                if (BuildConfig.DEBUG) {
+                                    Log.w(TAG, "Foreground start not allowed", error)
+                                }
+                            }
                         } else {
                             stopForeground(STOP_FOREGROUND_DETACH)
                         }

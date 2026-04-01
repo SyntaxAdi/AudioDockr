@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,6 +47,22 @@ class RecentlyPlayedTrack {
   final String thumbnailUrl;
 }
 
+class QueuedTrack {
+  const QueuedTrack({
+    required this.videoId,
+    required this.videoUrl,
+    required this.title,
+    required this.artist,
+    required this.thumbnailUrl,
+  });
+
+  final String videoId;
+  final String videoUrl;
+  final String title;
+  final String artist;
+  final String thumbnailUrl;
+}
+
 enum PlaybackRepeatMode {
   off,
   one,
@@ -65,8 +82,10 @@ class PlaybackState {
   final PlaybackRepeatMode? _repeatMode;
   final String? lastError;
   final List<RecentlyPlayedTrack>? _recentlyPlayed;
+  final List<QueuedTrack>? _queue;
 
   List<RecentlyPlayedTrack> get recentlyPlayed => _recentlyPlayed ?? const [];
+  List<QueuedTrack> get queue => _queue ?? const [];
   PlaybackRepeatMode get repeatMode => _repeatMode ?? PlaybackRepeatMode.off;
 
   PlaybackState({
@@ -82,8 +101,10 @@ class PlaybackState {
     PlaybackRepeatMode? repeatMode,
     this.lastError,
     List<RecentlyPlayedTrack>? recentlyPlayed,
+    List<QueuedTrack>? queue,
   })  : _repeatMode = repeatMode,
-        _recentlyPlayed = recentlyPlayed;
+        _recentlyPlayed = recentlyPlayed,
+        _queue = queue;
   
   PlaybackState copyWith({
     String? currentTrackId,
@@ -97,6 +118,7 @@ class PlaybackState {
     Duration? duration,
     PlaybackRepeatMode? repeatMode,
     List<RecentlyPlayedTrack>? recentlyPlayed,
+    List<QueuedTrack>? queue,
     Object? lastError = _playbackStateNoChange,
   }) {
     return PlaybackState(
@@ -111,6 +133,7 @@ class PlaybackState {
       duration: duration ?? this.duration,
       repeatMode: repeatMode ?? this.repeatMode,
       recentlyPlayed: recentlyPlayed ?? this.recentlyPlayed,
+      queue: queue ?? this.queue,
       lastError: identical(lastError, _playbackStateNoChange)
           ? this.lastError
           : lastError as String?,
@@ -127,6 +150,8 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   final YoutubeService _youtubeService;
   final LibraryNotifier _libraryNotifier;
   StreamSubscription<Map<String, dynamic>>? _playerEventsSubscription;
+  bool _isAdvancingQueue = false;
+  final List<QueuedTrack> _history = [];
 
   PlaybackNotifier(this._nativePlayerService, this._youtubeService, this._libraryNotifier)
       : super(PlaybackState()) {
@@ -136,6 +161,26 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }
 
   Future<void> playTrack(String videoId, String videoUrl, String title, String artist, String thumbnailUrl) async {
+    final current = _currentTrackSnapshot();
+    if (current != null && current.videoId != videoId) {
+      _history.add(current);
+    }
+    await _playTrackInternal(
+      videoId: videoId,
+      videoUrl: videoUrl,
+      title: title,
+      artist: artist,
+      thumbnailUrl: thumbnailUrl,
+    );
+  }
+
+  Future<void> _playTrackInternal({
+    required String videoId,
+    required String videoUrl,
+    required String title,
+    required String artist,
+    required String thumbnailUrl,
+  }) async {
     await _ensurePlaybackPermissions();
     try {
       state = state.copyWith(
@@ -166,6 +211,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         artist: artist,
         thumbnailUrl: thumbnailUrl,
       );
+      await _nativePlayerService.resume();
       unawaited(
         _libraryNotifier.recordTrack(
           videoId: videoId,
@@ -184,6 +230,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         position: Duration.zero,
         duration: Duration.zero,
         isPreparing: false,
+        isPlaying: true,
         recentlyPlayed: _updatedRecentlyPlayed(
           videoId: videoId,
           videoUrl: videoUrl,
@@ -200,6 +247,21 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         e.toString(),
       );
     }
+  }
+
+  QueuedTrack? _currentTrackSnapshot() {
+    final currentTrackId = state.currentTrackId;
+    if (currentTrackId == null) {
+      return null;
+    }
+
+    return QueuedTrack(
+      videoId: currentTrackId,
+      videoUrl: state.currentVideoUrl ?? '',
+      title: state.currentTitle ?? 'Unknown track',
+      artist: state.currentArtist ?? 'Unknown artist',
+      thumbnailUrl: state.currentThumbnailUrl ?? '',
+    );
   }
 
   List<RecentlyPlayedTrack> _updatedRecentlyPlayed({
@@ -224,15 +286,31 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }
 
   void _handleNativePlayerEvent(Map<String, dynamic> event) {
+    final isPlaying = event['isPlaying'] as bool? ?? state.isPlaying;
+    final position = Duration(
+      milliseconds: (event['position'] as num?)?.toInt() ?? state.position.inMilliseconds,
+    );
+    final duration = Duration(
+      milliseconds: (event['duration'] as num?)?.toInt() ?? state.duration.inMilliseconds,
+    );
     final error = event['error'] as String?;
     state = state.copyWith(
       isPreparing: false,
-      isPlaying: event['isPlaying'] as bool? ?? state.isPlaying,
-      position: Duration(milliseconds: (event['position'] as num?)?.toInt() ?? state.position.inMilliseconds),
-      duration: Duration(milliseconds: (event['duration'] as num?)?.toInt() ?? state.duration.inMilliseconds),
+      isPlaying: isPlaying,
+      position: position,
+      duration: duration,
       repeatMode: _repeatModeFromNative(event['repeatMode'] as String?),
       lastError: error,
     );
+
+    if (!isPlaying &&
+        !_isAdvancingQueue &&
+        state.repeatMode == PlaybackRepeatMode.off &&
+        state.queue.isNotEmpty &&
+        duration > Duration.zero &&
+        position >= duration) {
+      unawaited(_playNextQueuedTrack());
+    }
   }
 
   PlaybackRepeatMode _repeatModeFromNative(String? mode) {
@@ -357,6 +435,110 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     );
 
     state = state.copyWith(repeatMode: nextMode);
+  }
+
+  bool addToQueue({
+    required String videoId,
+    required String videoUrl,
+    required String title,
+    required String artist,
+    required String thumbnailUrl,
+  }) {
+    if (state.currentTrackId == videoId || state.queue.any((track) => track.videoId == videoId)) {
+      return false;
+    }
+
+    state = state.copyWith(
+      queue: [
+        ...state.queue,
+        QueuedTrack(
+          videoId: videoId,
+          videoUrl: videoUrl,
+          title: title,
+          artist: artist,
+          thumbnailUrl: thumbnailUrl,
+        ),
+      ],
+    );
+    return true;
+  }
+
+  Future<void> nextTrack() async {
+    if (state.queue.isEmpty) {
+      return;
+    }
+
+    final current = _currentTrackSnapshot();
+    if (current != null) {
+      _history.add(current);
+    }
+
+    final nextTrack = state.queue.first;
+    state = state.copyWith(
+      queue: state.queue.skip(1).toList(growable: false),
+    );
+
+    await _playTrackInternal(
+      videoId: nextTrack.videoId,
+      videoUrl: nextTrack.videoUrl,
+      title: nextTrack.title,
+      artist: nextTrack.artist,
+      thumbnailUrl: nextTrack.thumbnailUrl,
+    );
+  }
+
+  Future<void> previousTrack() async {
+    if (_history.isEmpty) {
+      await seek(Duration.zero);
+      return;
+    }
+
+    final current = _currentTrackSnapshot();
+    final previous = _history.removeLast();
+    final updatedQueue = [
+      if (current != null) current,
+      ...state.queue,
+    ];
+    state = state.copyWith(queue: updatedQueue);
+
+    await _playTrackInternal(
+      videoId: previous.videoId,
+      videoUrl: previous.videoUrl,
+      title: previous.title,
+      artist: previous.artist,
+      thumbnailUrl: previous.thumbnailUrl,
+    );
+  }
+
+  void toggleShuffleQueue() {
+    if (state.queue.length < 2) {
+      return;
+    }
+
+    final shuffledQueue = List<QueuedTrack>.from(state.queue)..shuffle(Random());
+    state = state.copyWith(queue: shuffledQueue);
+  }
+
+  Future<void> _playNextQueuedTrack() async {
+    if (_isAdvancingQueue || state.queue.isEmpty) {
+      return;
+    }
+
+    _isAdvancingQueue = true;
+    final nextTrack = state.queue.first;
+    state = state.copyWith(queue: state.queue.skip(1).toList(growable: false));
+
+    try {
+      await _playTrackInternal(
+        videoId: nextTrack.videoId,
+        videoUrl: nextTrack.videoUrl,
+        title: nextTrack.title,
+        artist: nextTrack.artist,
+        thumbnailUrl: nextTrack.thumbnailUrl,
+      );
+    } finally {
+      _isAdvancingQueue = false;
+    }
   }
 
   @override
