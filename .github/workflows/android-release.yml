@@ -1,4 +1,4 @@
-name: Android Release APK
+name: Android Sideload APK
 
 on:
   push:
@@ -12,8 +12,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout (push)
         uses: actions/checkout@v4
+        if: github.event_name == 'push'
+        with:
+          fetch-depth: 2
+
+      - name: Checkout (manual)
+        uses: actions/checkout@v4
+        if: github.event_name == 'workflow_dispatch'
         with:
           fetch-depth: 0
 
@@ -50,13 +57,12 @@ jobs:
         id: metadata
         run: |
           SHORT_SHA="$(git rev-parse --short HEAD)"
-          VERSION_CODE="$(date -u +%y%j%H%M)"
+          VERSION_CODE="${{ github.run_number }}"
           APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
           APK_SIZE="$(du -h "$APK_PATH" | cut -f1)"
           BUILD_TIME_UTC="$(date -u +"%Y-%m-%d %H:%M UTC")"
           {
             echo "short_sha=$SHORT_SHA"
-            echo "version_name=$SHORT_SHA"
             echo "version_code=$VERSION_CODE"
             echo "apk_size=$APK_SIZE"
             echo "build_time_utc=$BUILD_TIME_UTC"
@@ -66,7 +72,10 @@ jobs:
         id: changelog
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "push" ] && [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+          if [ "${{ github.event_name }}" = "push" ] \
+            && [ -n "${{ github.event.before }}" ] \
+            && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ] \
+            && git cat-file -e "${{ github.event.before }}"^{commit} 2>/dev/null; then
             CHANGE_RANGE="${{ github.event.before }}..${{ github.sha }}"
             CHANGELOG="$(git log "$CHANGE_RANGE" --pretty=format:'- %s (%h)')"
           else
@@ -87,18 +96,21 @@ jobs:
         uses: ncipollo/release-action@v1
         with:
           tag: continuous
-          name: Continuous Build
+          name: Continuous Sideload Build
           commit: ${{ github.sha }}
           prerelease: true
           allowUpdates: true
-          replacesArtifacts: true
           removeArtifacts: true
           artifactErrorsFailBuild: true
           artifacts: build/app/outputs/flutter-apk/app-release.apk
           body: |
-            Automated Android release build for AudioDockr.
+            Automated Android sideload build for AudioDockr.
 
-            - Version: `${{ steps.metadata.outputs.version_name }}`
+            Note:
+            - This workflow currently builds the repo's existing release APK configuration.
+            - Until a real release keystore is configured in GitHub secrets, treat this as a sideload build rather than a store-ready production release.
+
+            - Version: `${{ steps.metadata.outputs.short_sha }}`
             - Version code: `${{ steps.metadata.outputs.version_code }}`
             - Commit: `${{ github.sha }}`
             - Short SHA: `${{ steps.metadata.outputs.short_sha }}`

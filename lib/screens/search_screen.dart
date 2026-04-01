@@ -304,7 +304,7 @@ class _SearchEntryScreenState extends ConsumerState<SearchEntryScreen> {
                               itemBuilder: (context, index) {
                                 final track = results[index];
                                 return SizedBox(
-                                  height: 72,
+                                  height: _TrackListItemMetrics.of(context).rowHeight,
                                   child: TrackListItem(
                                     track: track,
                                     onTap: () async {
@@ -415,8 +415,9 @@ class TrackListItem extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final metrics = _TrackListItemMetrics.of(context);
     final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
-    final artworkCacheSize = (56 * devicePixelRatio).round();
+    final artworkCacheSize = (metrics.artworkSize * devicePixelRatio).round();
     final isLiked = ref.watch(
       libraryProvider.select(
         (state) => state.allTracks.any(
@@ -429,13 +430,13 @@ class TrackListItem extends ConsumerWidget {
     return InkWell(
       onTap: onTap,
       child: Container(
-        height: 72,
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
+        height: metrics.rowHeight,
+        padding: EdgeInsets.symmetric(horizontal: metrics.horizontalPadding),
         child: Row(
           children: [
             Container(
-              width: 56,
-              height: 56,
+              width: metrics.artworkSize,
+              height: metrics.artworkSize,
               color: bgDivider,
               child: track.thumbnailUrl.isEmpty
                   ? const Center(
@@ -463,7 +464,7 @@ class TrackListItem extends ConsumerWidget {
                       ),
                     ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: metrics.gap),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -471,16 +472,20 @@ class TrackListItem extends ConsumerWidget {
                 children: [
                   Text(
                     track.title,
-                    style: Theme.of(context).textTheme.bodyLarge,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontSize: metrics.titleFontSize,
+                        ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: metrics.subtitleGap),
                   Text(
                     track.duration > Duration.zero
                         ? '${track.artist} • ${_formatDuration(track.duration)}'
                         : track.artist,
-                    style: Theme.of(context).textTheme.labelSmall,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          fontSize: metrics.subtitleFontSize,
+                        ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
@@ -501,13 +506,60 @@ class TrackListItem extends ConsumerWidget {
               icon: Icon(
                 isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
                 color: isLiked ? accentPrimary : textSecondary,
+                size: metrics.iconSize,
               ),
-              splashRadius: 20,
+              padding: EdgeInsets.zero,
+              constraints: BoxConstraints.tightFor(
+                width: metrics.iconButtonSize,
+                height: metrics.iconButtonSize,
+              ),
+              splashRadius: metrics.iconButtonSize / 2,
               tooltip: isLiked ? 'Remove from liked songs' : 'Add to liked songs',
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _TrackListItemMetrics {
+  const _TrackListItemMetrics({
+    required this.rowHeight,
+    required this.artworkSize,
+    required this.horizontalPadding,
+    required this.gap,
+    required this.titleFontSize,
+    required this.subtitleFontSize,
+    required this.subtitleGap,
+    required this.iconSize,
+    required this.iconButtonSize,
+  });
+
+  final double rowHeight;
+  final double artworkSize;
+  final double horizontalPadding;
+  final double gap;
+  final double titleFontSize;
+  final double subtitleFontSize;
+  final double subtitleGap;
+  final double iconSize;
+  final double iconButtonSize;
+
+  factory _TrackListItemMetrics.of(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final compact = screenHeight < 760;
+
+    return _TrackListItemMetrics(
+      rowHeight: compact ? 56 : 60,
+      artworkSize: compact ? 40 : 44,
+      horizontalPadding: compact ? 12 : 14,
+      gap: compact ? 10 : 12,
+      titleFontSize: compact ? 14 : 15,
+      subtitleFontSize: compact ? 11 : 12,
+      subtitleGap: compact ? 2 : 3,
+      iconSize: compact ? 20 : 22,
+      iconButtonSize: compact ? 34 : 36,
     );
   }
 }
