@@ -456,7 +456,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     required String artist,
     required String thumbnailUrl,
   }) {
-    if (state.currentTrackId == videoId || state.queue.any((track) => track.videoId == videoId)) {
+    if (state.queue.any((track) => track.videoId == videoId)) {
       return false;
     }
 

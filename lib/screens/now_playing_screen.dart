@@ -646,6 +646,386 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     );
   }
 
+  Future<void> _showTrackOptionsSheet(
+    BuildContext context,
+    LibraryState libraryState,
+    PlaybackState playbackState,
+  ) async {
+    final videoId = playbackState.currentTrackId ?? '';
+    if (videoId.isEmpty) {
+      return;
+    }
+
+    final savedPlaylistIds =
+        await ref.read(libraryProvider.notifier).fetchSavedPlaylistIds(videoId);
+    final savedPlaylists = libraryState.playlists
+        .where((playlist) => savedPlaylistIds.contains(playlist.id))
+        .toList(growable: false);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return FractionallySizedBox(
+          heightFactor: 0.62,
+          child: Container(
+            decoration: BoxDecoration(
+              color: bgSurface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border.all(
+                color: accentPrimary.withValues(alpha: 0.16),
+              ),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x33000000),
+                  blurRadius: 28,
+                  offset: Offset(0, -10),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 1,
+                    color: accentPrimary.withValues(alpha: 0.22),
+                  ),
+                ),
+                Positioned(
+                  top: 0,
+                  left: 20,
+                  width: 96,
+                  child: Container(
+                    height: 2,
+                    color: accentCyan.withValues(alpha: 0.28),
+                  ),
+                ),
+                SafeArea(
+                  top: false,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 4,
+                        margin: const EdgeInsets.only(top: 12, bottom: 18),
+                        decoration: BoxDecoration(
+                          color: bgDivider,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: bgCard,
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: accentPrimary.withValues(alpha: 0.14),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: bgSurface,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: accentPrimary.withValues(alpha: 0.12),
+                                  ),
+                                ),
+                                child: (playbackState.currentThumbnailUrl ?? '').isEmpty
+                                    ? const Icon(
+                                        Icons.music_note_rounded,
+                                        color: textSecondary,
+                                      )
+                                    : ClipRRect(
+                                        borderRadius: BorderRadius.circular(14),
+                                        child: CachedNetworkImage(
+                                          imageUrl: playbackState.currentThumbnailUrl!,
+                                          fit: BoxFit.cover,
+                                          memCacheWidth: 168,
+                                          memCacheHeight: 168,
+                                        ),
+                                      ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      playbackState.currentTitle ?? 'Unknown track',
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      playbackState.currentArtist ?? 'Unknown artist',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .labelSmall
+                                          ?.copyWith(
+                                            color: textSecondary,
+                                            letterSpacing: 0.4,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                          children: [
+                        _TrackOptionTile(
+                          icon: Icons.playlist_add_rounded,
+                          label: 'Add to playlist',
+                          onTap: () async {
+                            Navigator.of(sheetContext).pop();
+                            await Future<void>.delayed(
+                              const Duration(milliseconds: 160),
+                            );
+                            if (!mounted || !context.mounted) {
+                              return;
+                            }
+                            await _showAddToPlaylistSheet(
+                              context,
+                              ref.read(libraryProvider),
+                              ref.read(playbackNotifierProvider),
+                            );
+                          },
+                        ),
+                        if (savedPlaylists.isNotEmpty)
+                          _TrackOptionTile(
+                            icon: Icons.remove_circle_outline_rounded,
+                            label: 'Remove from playlist',
+                            destructive: true,
+                            onTap: () async {
+                              Navigator.of(sheetContext).pop();
+                              await Future<void>.delayed(
+                                const Duration(milliseconds: 160),
+                              );
+                              if (!mounted || !context.mounted) {
+                                return;
+                              }
+                              await _showRemoveFromPlaylistSheet(
+                                context,
+                                playbackState,
+                                savedPlaylists,
+                              );
+                            },
+                          ),
+                        _TrackOptionTile(
+                          icon: Icons.queue_music_rounded,
+                          label: 'Add to queue',
+                          onTap: () {
+                            final added = ref
+                                .read(playbackNotifierProvider.notifier)
+                                .addToQueue(
+                                  videoId: videoId,
+                                  videoUrl: playbackState.currentVideoUrl ?? '',
+                                  title: playbackState.currentTitle ?? 'Unknown track',
+                                  artist:
+                                      playbackState.currentArtist ?? 'Unknown artist',
+                                  thumbnailUrl:
+                                      playbackState.currentThumbnailUrl ?? '',
+                                );
+                            Navigator.of(sheetContext).pop();
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  added
+                                      ? 'Added to queue'
+                                      : 'Already in queue',
+                                ),
+                                duration: const Duration(milliseconds: 1200),
+                              ),
+                            );
+                          },
+                        ),
+                        _TrackOptionTile(
+                          icon: Icons.format_list_bulleted_rounded,
+                          label: 'Go to queue',
+                          onTap: () async {
+                            Navigator.of(sheetContext).pop();
+                            await Future<void>.delayed(
+                              const Duration(milliseconds: 160),
+                            );
+                            if (!mounted || !context.mounted) {
+                              return;
+                            }
+                            await _showQueueSheet(
+                              context,
+                              ref.read(playbackNotifierProvider),
+                            );
+                          },
+                        ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showRemoveFromPlaylistSheet(
+    BuildContext context,
+    PlaybackState playbackState,
+    List<LibraryPlaylist> savedPlaylists,
+  ) async {
+    final videoId = playbackState.currentTrackId ?? '';
+    if (videoId.isEmpty || savedPlaylists.isEmpty) {
+      return;
+    }
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return FractionallySizedBox(
+          heightFactor: 0.5,
+          child: Container(
+            decoration: BoxDecoration(
+              color: bgSurface,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+              border: Border.all(
+                color: accentPrimary.withValues(alpha: 0.16),
+              ),
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 1,
+                    color: accentRed.withValues(alpha: 0.24),
+                  ),
+                ),
+                Positioned(
+                  top: 0,
+                  left: 20,
+                  width: 88,
+                  child: Container(
+                    height: 2,
+                    color: accentPrimary.withValues(alpha: 0.22),
+                  ),
+                ),
+                SafeArea(
+                  top: false,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 4,
+                        margin: const EdgeInsets.only(top: 12, bottom: 18),
+                        decoration: BoxDecoration(
+                          color: bgDivider,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Remove from playlist',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleLarge
+                                  ?.copyWith(
+                                    color: textPrimary,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+                        child: Align(
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            'Select where to remove this track from.',
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: textSecondary,
+                                  letterSpacing: 0.3,
+                                ),
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                          itemCount: savedPlaylists.length,
+                          itemBuilder: (context, index) {
+                            final playlist = savedPlaylists[index];
+                            return _TrackOptionTile(
+                              icon: Icons.remove_circle_outline_rounded,
+                              label: playlist.id == likedPlaylistId
+                                  ? 'Liked Songs'
+                                  : playlist.name,
+                              destructive: true,
+                              onTap: () async {
+                                await ref
+                                    .read(libraryProvider.notifier)
+                                    .setPlaylistMembership(
+                                      playlistId: playlist.id,
+                                      shouldSave: false,
+                                      videoId: videoId,
+                                      videoUrl: playbackState.currentVideoUrl ?? '',
+                                      title: playbackState.currentTitle ?? 'Unknown track',
+                                      artist:
+                                          playbackState.currentArtist ?? 'Unknown artist',
+                                      thumbnailUrl:
+                                          playbackState.currentThumbnailUrl ?? '',
+                                      durationSeconds: playbackState.duration.inSeconds,
+                                    );
+                                if (!sheetContext.mounted) {
+                                  return;
+                                }
+                                Navigator.of(sheetContext).pop();
+                              },
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
     _seekPreviewMs.dispose();
@@ -789,11 +1169,11 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                             ],
                           ),
                         ),
-                        IconButton(
-                          onPressed: () => _showAddToPlaylistSheet(
-                            context,
-                            ref.read(libraryProvider),
-                            ref.read(playbackNotifierProvider),
+                    IconButton(
+                      onPressed: () => _showTrackOptionsSheet(
+                        context,
+                        ref.read(libraryProvider),
+                        ref.read(playbackNotifierProvider),
                           ),
                           icon: const Icon(Icons.more_vert_rounded),
                         ),
@@ -873,6 +1253,87 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
               },
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TrackOptionTile extends StatelessWidget {
+  const _TrackOptionTile({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.destructive = false,
+  });
+
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool destructive;
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = destructive ? accentRed : textPrimary;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.centerLeft,
+              end: Alignment.centerRight,
+              colors: destructive
+                  ? [
+                      accentRed.withValues(alpha: 0.08),
+                      bgCard,
+                    ]
+                  : [
+                      accentPrimary.withValues(alpha: 0.05),
+                      bgCard,
+                    ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: destructive
+                  ? accentRed.withValues(alpha: 0.22)
+                  : accentPrimary.withValues(alpha: 0.14),
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: destructive
+                      ? accentRed.withValues(alpha: 0.08)
+                      : accentPrimary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(icon, color: foreground, size: 18),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Text(
+                  label,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: foreground,
+                        fontWeight: FontWeight.w700,
+                      ),
+                ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: destructive ? accentRed : textSecondary,
+                size: 18,
+              ),
+            ],
+          ),
         ),
       ),
     );
