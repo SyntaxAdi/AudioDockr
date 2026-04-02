@@ -306,6 +306,7 @@ class _SearchEntryScreenState extends ConsumerState<SearchEntryScreen> {
                                 return SizedBox(
                                   height: _TrackListItemMetrics.of(context).rowHeight,
                                   child: TrackListItem(
+                                    searchQuery: query,
                                     track: track,
                                     onTap: () async {
                                       try {
@@ -402,8 +403,14 @@ class _SearchHistoryList extends StatelessWidget {
 }
 
 class TrackListItem extends ConsumerWidget {
-  const TrackListItem({super.key, required this.track, required this.onTap});
+  const TrackListItem({
+    super.key,
+    required this.searchQuery,
+    required this.track,
+    required this.onTap,
+  });
 
+  final String searchQuery;
   final SearchResult track;
   final VoidCallback onTap;
 
@@ -432,6 +439,9 @@ class TrackListItem extends ConsumerWidget {
         track: track,
         metrics: metrics,
         onQueued: () {
+          unawaited(
+            ref.read(searchHistoryProvider.notifier).addQuery(searchQuery),
+          );
           final added = ref.read(playbackNotifierProvider.notifier).addToQueue(
                 videoId: track.videoId,
                 videoUrl: track.videoUrl,
