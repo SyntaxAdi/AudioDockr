@@ -602,9 +602,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     );
 
     if (currentTrackId == null) {
-      return Container(
-        color: bgBase,
-        child: const SafeArea(
+      return const Scaffold(
+        backgroundColor: bgBase,
+        body: SafeArea(
           child: Center(
             child: Text(
               'NOTHING IS PLAYING',
@@ -619,142 +619,145 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
       );
     }
 
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF123B68),
-            Color(0xFF0E2744),
-            bgBase,
-          ],
+    return Scaffold(
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF123B68),
+              Color(0xFF0E2744),
+              bgBase,
+            ],
+          ),
         ),
-      ),
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-              child: Row(
+        child: Builder(
+          builder: (context) {
+            final windowMediaQuery = MediaQueryData.fromView(View.of(context));
+            final topInset = windowMediaQuery.padding.top > 0
+                ? windowMediaQuery.padding.top + 8
+                : 48.0;
+
+            return Padding(
+              padding: EdgeInsets.only(
+                top: topInset,
+                bottom: windowMediaQuery.padding.bottom,
+              ),
+              child: Column(
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded),
-                  ),
-                  Expanded(
-                    child: Column(
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+                    child: Row(
                       children: [
-                        Text(
-                          ref.watch(
-                                    playbackNotifierProvider.select(
-                                      (state) => state.queue.length,
-                                    ),
-                                  ) >
-                                  0
-                              ? 'PLAYING FROM QUEUE'
-                              : 'NOW PLAYING',
-                          style:
-                              Theme.of(context).textTheme.labelSmall?.copyWith(
-                                    color: textSecondary,
-                                  ),
+                        IconButton(
+                          onPressed: () => Navigator.of(context).maybePop(),
+                          icon: const Icon(Icons.keyboard_arrow_down_rounded),
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          (ref.watch(
-                                    playbackNotifierProvider.select(
-                                      (state) => state.currentTitle,
+                        Expanded(
+                          child: Column(
+                            children: [
+                              Text(
+                                ref.watch(
+                                          playbackNotifierProvider.select(
+                                            (state) => state.queue.length,
+                                          ),
+                                        ) >
+                                        0
+                                    ? 'PLAYING FROM QUEUE'
+                                    : 'NOW PLAYING',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(
+                                      color: textSecondary,
                                     ),
-                                  ) ??
-                                  'Unknown track')
-                              .toUpperCase(),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () => _showAddToPlaylistSheet(
+                            context,
+                            ref.read(libraryProvider),
+                            ref.read(playbackNotifierProvider),
+                          ),
+                          icon: const Icon(Icons.more_vert_rounded),
                         ),
                       ],
                     ),
                   ),
-                  IconButton(
-                    onPressed: () => _showAddToPlaylistSheet(
-                      context,
-                      ref.read(libraryProvider),
-                      ref.read(playbackNotifierProvider),
+                  const Expanded(
+                    child: Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      child: Center(
+                        child: _NowPlayingArtwork(),
+                      ),
                     ),
-                    icon: const Icon(Icons.more_vert_rounded),
                   ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: _NowPlayingMetadata(
+                      onHeartTap: () async {
+                        final playbackState = ref.read(playbackNotifierProvider);
+                        final currentTrackId = playbackState.currentTrackId;
+                        if (currentTrackId == null) {
+                          return;
+                        }
+
+                        final isLiked = ref
+                                .read(libraryProvider.notifier)
+                                .trackById(currentTrackId)
+                                ?.isLiked ??
+                            false;
+
+                        if (!isLiked) {
+                          await ref.read(libraryProvider.notifier).toggleLike(
+                                videoId: currentTrackId,
+                                videoUrl: playbackState.currentVideoUrl ?? '',
+                                title: playbackState.currentTitle ?? 'Unknown track',
+                                artist:
+                                    playbackState.currentArtist ?? 'Unknown artist',
+                                thumbnailUrl:
+                                    playbackState.currentThumbnailUrl ?? '',
+                                durationSeconds: playbackState.duration.inSeconds,
+                              );
+                          return;
+                        }
+
+                        await _showSavedInSheet(
+                          context,
+                          ref.read(libraryProvider),
+                          playbackState,
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: _NowPlayingSeekSection(seekPreviewMs: _seekPreviewMs),
+                  ),
+                  const SizedBox(height: 24),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: _NowPlayingControls(),
+                  ),
+                  const SizedBox(height: 24),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: _NowPlayingUtilityRow(
+                      onShowQueue: () => _showQueueSheet(
+                        context,
+                        ref.read(playbackNotifierProvider),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
                 ],
               ),
-            ),
-            const SizedBox(height: 10),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24),
-              child: _NowPlayingArtwork(),
-            ),
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: _NowPlayingMetadata(
-                onHeartTap: () async {
-                  final playbackState = ref.read(playbackNotifierProvider);
-                  final currentTrackId = playbackState.currentTrackId;
-                  if (currentTrackId == null) {
-                    return;
-                  }
-
-                  final isLiked = ref
-                          .read(libraryProvider.notifier)
-                          .trackById(currentTrackId)
-                          ?.isLiked ??
-                      false;
-
-                  if (!isLiked) {
-                    await ref.read(libraryProvider.notifier).toggleLike(
-                          videoId: currentTrackId,
-                          videoUrl: playbackState.currentVideoUrl ?? '',
-                          title: playbackState.currentTitle ?? 'Unknown track',
-                          artist:
-                              playbackState.currentArtist ?? 'Unknown artist',
-                          thumbnailUrl:
-                              playbackState.currentThumbnailUrl ?? '',
-                          durationSeconds: playbackState.duration.inSeconds,
-                        );
-                    return;
-                  }
-
-                  await _showSavedInSheet(
-                    context,
-                    ref.read(libraryProvider),
-                    playbackState,
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 20),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _NowPlayingSeekSection(seekPreviewMs: _seekPreviewMs),
-            ),
-            const SizedBox(height: 22),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 12),
-              child: _NowPlayingControls(),
-            ),
-            const SizedBox(height: 18),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: _NowPlayingUtilityRow(
-                onShowQueue: () => _showQueueSheet(
-                  context,
-                  ref.read(playbackNotifierProvider),
-                ),
-              ),
-            ),
-            const Spacer(),
-          ],
+            );
+          },
         ),
       ),
     );
