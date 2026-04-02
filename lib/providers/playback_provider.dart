@@ -183,6 +183,11 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }) async {
     await _ensurePlaybackPermissions();
     try {
+      await _nativePlayerService.pause();
+    } catch (_) {
+      // Ignore pause failures while transitioning to a new track.
+    }
+    try {
       state = state.copyWith(
         currentTrackId: videoId,
         currentTitle: title,
@@ -211,7 +216,6 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         artist: artist,
         thumbnailUrl: thumbnailUrl,
       );
-      await _nativePlayerService.resume();
       unawaited(
         _libraryNotifier.recordTrack(
           videoId: videoId,
@@ -286,6 +290,10 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }
 
   void _handleNativePlayerEvent(Map<String, dynamic> event) {
+    if (state.isPreparing) {
+      return;
+    }
+
     final isPlaying = event['isPlaying'] as bool? ?? state.isPlaying;
     final position = Duration(
       milliseconds: (event['position'] as num?)?.toInt() ?? state.position.inMilliseconds,
@@ -408,6 +416,10 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }
 
   Future<void> togglePlayPause() async {
+    if (state.isPreparing) {
+      return;
+    }
+
     if (state.isPlaying) {
       await _nativePlayerService.pause();
     } else {
@@ -525,6 +537,10 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     }
 
     _isAdvancingQueue = true;
+    final current = _currentTrackSnapshot();
+    if (current != null) {
+      _history.add(current);
+    }
     final nextTrack = state.queue.first;
     state = state.copyWith(queue: state.queue.skip(1).toList(growable: false));
 
