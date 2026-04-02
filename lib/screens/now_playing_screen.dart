@@ -626,14 +626,69 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF123B68),
-              Color(0xFF0E2744),
-              bgBase,
+              Color(0xFF151010),
+              Color(0xFF0E1118),
+              Color(0xFF090B10),
             ],
+            stops: [0.0, 0.52, 1.0],
           ),
         ),
-        child: Builder(
-          builder: (context) {
+        child: Stack(
+          children: [
+            Positioned(
+              top: -40,
+              left: -30,
+              child: Container(
+                width: 220,
+                height: 220,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      accentPrimary.withValues(alpha: 0.15),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 120,
+              right: -80,
+              child: Container(
+                width: 240,
+                height: 240,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      accentCyan.withValues(alpha: 0.15),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 88,
+              left: 0,
+              right: 0,
+              child: Container(
+                height: 1,
+                color: accentPrimary.withValues(alpha: 0.16),
+              ),
+            ),
+            Positioned(
+              top: 92,
+              left: 24,
+              right: 24,
+              child: Container(
+                height: 1,
+                color: accentCyan.withValues(alpha: 0.12),
+              ),
+            ),
+            Builder(
+              builder: (context) {
             final windowMediaQuery = MediaQueryData.fromView(View.of(context));
             final topInset = windowMediaQuery.padding.top > 0
                 ? windowMediaQuery.padding.top + 8
@@ -670,7 +725,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                     .textTheme
                                     .labelSmall
                                     ?.copyWith(
-                                      color: textSecondary,
+                                      color: textPrimary,
+                                      fontWeight: FontWeight.bold,
                                     ),
                               ),
                             ],
@@ -757,7 +813,9 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                 ],
               ),
             );
-          },
+              },
+            ),
+          ],
         ),
       ),
     );
@@ -777,38 +835,111 @@ class _NowPlayingArtwork extends ConsumerWidget {
             .round();
 
     return AspectRatio(
-      aspectRatio: 1,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: (thumbnailUrl ?? '').isEmpty
-            ? Container(
-                color: bgCard,
-                child: const Center(
-                  child: Icon(
-                    Icons.music_video,
-                    size: 64,
-                    color: textSecondary,
-                  ),
-                ),
-              )
-            : CachedNetworkImage(
-                imageUrl: thumbnailUrl!,
-                memCacheWidth: artworkCacheSize,
-                memCacheHeight: artworkCacheSize,
-                maxWidthDiskCache: artworkCacheSize,
-                maxHeightDiskCache: artworkCacheSize,
-                fit: BoxFit.cover,
-                errorWidget: (_, __, ___) => Container(
-                  color: bgCard,
-                  child: const Center(
-                    child: Icon(
-                      Icons.music_video,
-                      size: 64,
-                      color: textSecondary,
+      aspectRatio: 0.9,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          color: bgCard,
+          border: Border.all(
+            color: accentPrimary.withValues(alpha: 0.2),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: accentPrimary.withValues(alpha: 0.15),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Container(
+                      height: 2,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            accentPrimary.withValues(alpha: 0.5),
+                            Colors.transparent,
+                          ],
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                  const SizedBox(width: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: accentPrimary.withValues(alpha: 0.12),
+                      border: Border.all(
+                        color: accentPrimary.withValues(alpha: 0.45),
+                      ),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Theme(
+                      data: Theme.of(context).copyWith(
+                        textTheme: Theme.of(context).textTheme,
+                      ),
+                      child: Text(
+                        'AUDIO',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: accentPrimary,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                            ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
+            ),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: (thumbnailUrl ?? '').isEmpty
+                    ? Container(
+                        width: double.infinity,
+                        color: bgSurface,
+                        child: const Center(
+                          child: Icon(
+                            Icons.music_video,
+                            size: 64,
+                            color: textSecondary,
+                          ),
+                        ),
+                      )
+                    : CachedNetworkImage(
+                        imageUrl: thumbnailUrl!,
+                        memCacheWidth: artworkCacheSize,
+                        memCacheHeight: artworkCacheSize,
+                        maxWidthDiskCache: artworkCacheSize,
+                        maxHeightDiskCache: artworkCacheSize,
+                        width: double.infinity,
+                        fit: BoxFit.cover,
+                        errorWidget: (_, __, ___) => Container(
+                          color: bgSurface,
+                          child: const Center(
+                            child: Icon(
+                              Icons.music_video,
+                              size: 64,
+                              color: textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1000,43 +1131,53 @@ class _NowPlayingControls extends ConsumerWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        IconButton(
-          icon: Icon(
-            Icons.shuffle_rounded,
-            color: shuffleEnabled ? accentPrimary : textSecondary,
-          ),
-          onPressed: shuffleEnabled ? notifier.toggleShuffleQueue : null,
+        _PlayerControlButton(
+          icon: Icons.shuffle_rounded,
+          active: shuffleEnabled,
+          onTap: shuffleEnabled ? notifier.toggleShuffleQueue : null,
         ),
-        IconButton(
-          icon: const Icon(Icons.skip_previous_rounded, color: textPrimary),
-          onPressed: () => notifier.previousTrack(),
+        _PlayerControlButton(
+          icon: Icons.skip_previous_rounded,
+          active: true,
+          onTap: () => notifier.previousTrack(),
         ),
         GestureDetector(
           onTap: () => notifier.togglePlayPause(),
-          child: Container(
-            width: 74,
-            height: 74,
-            decoration: const BoxDecoration(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOut,
+            width: 76,
+            height: 76,
+            decoration: BoxDecoration(
+              color: accentPrimary,
               shape: BoxShape.circle,
-              color: textPrimary,
+              boxShadow: [
+                BoxShadow(
+                  color: accentPrimary.withValues(alpha: 0.35),
+                  blurRadius: 18,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+              border: Border.all(
+                color: accentPrimary.withValues(alpha: 0.55),
+              ),
             ),
             child: Icon(
               isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
               size: 40,
-              color: const Color(0xFF103155),
+              color: bgBase,
             ),
           ),
         ),
-        IconButton(
-          icon: Icon(
-            Icons.skip_next_rounded,
-            color: nextEnabled ? textPrimary : textSecondary,
-          ),
-          onPressed: nextEnabled ? () => notifier.nextTrack() : null,
+        _PlayerControlButton(
+          icon: Icons.skip_next_rounded,
+          active: nextEnabled,
+          onTap: nextEnabled ? () => notifier.nextTrack() : null,
         ),
-        IconButton(
-          icon: _buildRepeatIcon(repeatMode),
-          onPressed: () => notifier.cycleRepeatMode(),
+        _PlayerControlButton(
+          customIcon: _buildRepeatIcon(repeatMode),
+          active: repeatMode != PlaybackRepeatMode.off,
+          onTap: () => notifier.cycleRepeatMode(),
         ),
       ],
     );
@@ -1059,28 +1200,22 @@ class _NowPlayingUtilityRow extends ConsumerWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        IconButton(
-          icon: const Icon(
-            Icons.file_download_outlined,
-            color: textPrimary,
-          ),
-          onPressed: () {},
+        const _PlayerUtilityButton(
+          icon: Icons.file_download_outlined,
         ),
         const SizedBox(width: 20),
         Stack(
           clipBehavior: Clip.none,
           children: [
-            IconButton(
-              icon: const Icon(
-                Icons.queue_music_rounded,
-                color: textPrimary,
-              ),
-              onPressed: onShowQueue,
+            _PlayerUtilityButton(
+              icon: Icons.queue_music_rounded,
+              highlighted: queueLength > 0,
+              onTap: onShowQueue,
             ),
             if (queueLength > 0)
               Positioned(
-                right: 2,
-                top: 2,
+                right: -2,
+                top: -2,
                 child: Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 5,
@@ -1103,6 +1238,91 @@ class _NowPlayingUtilityRow extends ConsumerWidget {
           ],
         ),
       ],
+    );
+  }
+}
+
+class _PlayerControlButton extends StatelessWidget {
+  const _PlayerControlButton({
+    this.icon,
+    this.customIcon,
+    required this.active,
+    this.onTap,
+  });
+
+  final IconData? icon;
+  final Widget? customIcon;
+  final bool active;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        width: 52,
+        height: 52,
+        decoration: BoxDecoration(
+          color: active ? bgCard : bgSurface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: active
+                ? accentPrimary.withValues(alpha: 0.32)
+                : bgDivider,
+          ),
+        ),
+        child: Center(
+          child: customIcon ??
+              Icon(
+                icon,
+                color: active ? accentPrimary : textSecondary,
+                size: 24,
+              ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlayerUtilityButton extends StatelessWidget {
+  const _PlayerUtilityButton({
+    required this.icon,
+    this.highlighted = false,
+    this.onTap,
+  });
+
+  final IconData icon;
+  final bool highlighted;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeOut,
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: highlighted ? accentPrimary.withValues(alpha: 0.12) : bgSurface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: highlighted
+                ? accentPrimary.withValues(alpha: 0.36)
+                : bgDivider,
+          ),
+        ),
+        child: Icon(
+          icon,
+          color: highlighted ? accentPrimary : textPrimary,
+          size: 22,
+        ),
+      ),
     );
   }
 }
