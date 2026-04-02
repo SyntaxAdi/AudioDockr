@@ -531,6 +531,14 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     state = state.copyWith(queue: shuffledQueue);
   }
 
+  void clearQueue() {
+    if (state.queue.isEmpty) {
+      return;
+    }
+
+    state = state.copyWith(queue: const []);
+  }
+
   Future<void> _playNextQueuedTrack() async {
     if (_isAdvancingQueue || state.queue.isEmpty) {
       return;

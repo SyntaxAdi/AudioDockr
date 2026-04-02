@@ -521,11 +521,68 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                   ),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text(
-                      'Queue',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: textPrimary,
+                    child: Row(
+                      children: [
+                        Text(
+                          'Queue',
+                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                color: textPrimary,
+                              ),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: queue.isEmpty
+                              ? null
+                              : () {
+                                  ref
+                                      .read(playbackNotifierProvider.notifier)
+                                      .clearQueue();
+                                  Navigator.of(sheetContext).pop();
+                                },
+                          style: TextButton.styleFrom(
+                            minimumSize: Size.zero,
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            backgroundColor: queue.isEmpty
+                                ? bgCard
+                                : accentPrimary.withValues(alpha: 0.1),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                              side: BorderSide(
+                                color: queue.isEmpty
+                                    ? bgDivider
+                                    : accentPrimary.withValues(alpha: 0.45),
+                              ),
+                            ),
                           ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.clear_all_rounded,
+                                size: 16,
+                                color: queue.isEmpty
+                                    ? textSecondary
+                                    : accentPrimary,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Clear',
+                                style: TextStyle(
+                                  color: queue.isEmpty
+                                      ? textSecondary
+                                      : accentPrimary,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.4,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 16),
