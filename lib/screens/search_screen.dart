@@ -425,6 +425,9 @@ class TrackListItem extends ConsumerWidget {
     final metrics = _TrackListItemMetrics.of(context);
     final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
     final artworkCacheSize = (metrics.artworkSize * devicePixelRatio).round();
+    final currentTrackId = ref.watch(
+      playbackNotifierProvider.select((state) => state.currentTrackId),
+    );
     final isLiked = ref.watch(
       libraryProvider.select(
         (state) => state.allTracks.any(
@@ -438,10 +441,39 @@ class TrackListItem extends ConsumerWidget {
       child: _QueueSwipeWrapper(
         track: track,
         metrics: metrics,
-        onQueued: () {
+        onQueued: () async {
           unawaited(
             ref.read(searchHistoryProvider.notifier).addQuery(searchQuery),
           );
+          if (currentTrackId == null) {
+            try {
+              await ref.read(playbackNotifierProvider.notifier).playTrack(
+                    track.videoId,
+                    track.videoUrl,
+                    track.title,
+                    track.artist,
+                    track.thumbnailUrl,
+                  );
+              if (!context.mounted) {
+                return;
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Playing "${track.title}"'),
+                  duration: const Duration(milliseconds: 1200),
+                ),
+              );
+            } on PlaybackFailure catch (error) {
+              if (!context.mounted) {
+                return;
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(error.message)),
+              );
+            }
+            return;
+          }
+
           final added = ref.read(playbackNotifierProvider.notifier).addToQueue(
                 videoId: track.videoId,
                 videoUrl: track.videoUrl,
@@ -449,6 +481,9 @@ class TrackListItem extends ConsumerWidget {
                 artist: track.artist,
                 thumbnailUrl: track.thumbnailUrl,
               );
+          if (!context.mounted) {
+            return;
+          }
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
@@ -568,7 +603,7 @@ class _QueueSwipeWrapper extends StatefulWidget {
 
   final SearchResult track;
   final _TrackListItemMetrics metrics;
-  final VoidCallback onQueued;
+  final Future<void> Function() onQueued;
   final Widget child;
 
   @override
@@ -627,7 +662,7 @@ class _QueueSwipeWrapperState extends State<_QueueSwipeWrapper> {
               final shouldQueue = _dragOffset >= triggerThreshold && !_queueTriggered;
               if (shouldQueue) {
                 _queueTriggered = true;
-                widget.onQueued();
+                unawaited(widget.onQueued());
               }
               setState(() {
                 _dragOffset = 0;
