@@ -1,7 +1,7 @@
 <div id="top">
 
 <!-- HEADER STYLE: COMPACT -->
-<img src="readmeai/assets/logos/purple.svg" width="30%" align="left" style="margin-right: 15px">
+<img src="LOGO_1.jpeg" width="40%" align="left" style="margin-right: 15px">
 
 # <code>❯ AudioDockr</code>
 <em>Local-first Flutter music player with Android-native playback, persistent library data, and automated APK releases on GitHub.</em>
