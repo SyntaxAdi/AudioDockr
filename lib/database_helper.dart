@@ -335,6 +335,32 @@ class DatabaseHelper {
     );
   }
 
+  Future<void> deletePlaylist(String playlistId) async {
+    if (playlistId == likedPlaylistId) {
+      return;
+    }
+
+    final db = await database;
+    await db.transaction((txn) async {
+      await txn.delete(
+        'playlist_tracks',
+        where: 'playlist_id = ?',
+        whereArgs: [playlistId],
+      );
+      await txn.delete(
+        'playlists',
+        where: 'id = ?',
+        whereArgs: [playlistId],
+      );
+      await txn.delete(
+        'tracks',
+        where:
+            "video_id NOT IN (SELECT DISTINCT video_id FROM playlist_tracks) "
+            "AND state = 'neutral' AND last_played_at = 0",
+      );
+    });
+  }
+
   Future<Set<String>> fetchPlaylistIdsForTrack(String videoId) async {
     final db = await database;
     final result = await db.query(

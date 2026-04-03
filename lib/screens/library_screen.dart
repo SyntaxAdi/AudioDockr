@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -178,7 +179,7 @@ class LibraryScreen extends ConsumerWidget {
                     const SizedBox(height: 12),
                     _PlaylistCard(
                       title: playlist.name,
-                      subtitle: '${playlist.trackCount} tracks',
+                      subtitle: '',
                       icon: Icons.queue_music_rounded,
                       onTap: () {
                         Navigator.of(context).push(
@@ -314,6 +315,30 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
         ref.read(libraryProvider.notifier).fetchPlaylistTracks(widget.playlistId!);
   }
 
+  Future<void> _playPlaylistTracks(
+    BuildContext context,
+    List<LibraryTrack> tracks, {
+    bool shuffle = false,
+  }) async {
+    if (tracks.isEmpty) {
+      return;
+    }
+
+    try {
+      await ref.read(playbackNotifierProvider.notifier).playTracks(
+            tracks,
+            shuffle: shuffle,
+          );
+    } on PlaybackFailure catch (error) {
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(error.message)),
+      );
+    }
+  }
+
   void _handleBottomNavigation(BuildContext context, int index) {
     if (index == 2) {
       Navigator.of(context).pop();
@@ -328,6 +353,11 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
     BuildContext context,
     WidgetRef ref,
     LibraryPlaylist playlist,
+    {
+    bool allowCoverArt = true,
+    String title = 'Edit Playlist',
+    String submitLabel = 'Save',
+  }
   ) async {
     await showModalBottomSheet<void>(
       context: context,
@@ -335,11 +365,14 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => _EditPlaylistSheet(
         playlist: playlist,
-        onSave: (trimmedName) async {
+        title: title,
+        submitLabel: submitLabel,
+        allowCoverArt: allowCoverArt,
+        onSave: (trimmedName, coverImagePath) async {
           await ref.read(libraryProvider.notifier).updatePlaylist(
                 playlistId: playlist.id,
                 name: trimmedName,
-                coverImagePath: playlist.coverImagePath,
+                coverImagePath: coverImagePath,
               );
         },
       ),
@@ -348,6 +381,104 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
     setState(() {
       _refreshPlaylistTracksFuture();
     });
+  }
+
+  Future<void> _renamePlaylist(
+    BuildContext context,
+    LibraryPlaylist playlist,
+  ) async {
+    await _showEditPlaylistSheet(
+      context,
+      ref,
+      playlist,
+      allowCoverArt: false,
+      title: 'Rename Playlist',
+      submitLabel: 'Rename',
+    );
+  }
+
+  Future<void> _changePlaylistCoverArt(
+    BuildContext context,
+    LibraryPlaylist playlist,
+  ) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+    );
+    final selectedPath = result?.files.single.path;
+    if (selectedPath == null || selectedPath.isEmpty) {
+      return;
+    }
+
+    await ref.read(libraryProvider.notifier).updatePlaylist(
+          playlistId: playlist.id,
+          name: playlist.name,
+          coverImagePath: selectedPath,
+        );
+
+    setState(() {
+      _refreshPlaylistTracksFuture();
+    });
+  }
+
+  Future<void> _deletePlaylist(
+    BuildContext context,
+    LibraryPlaylist playlist,
+  ) async {
+    final shouldDelete = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            backgroundColor: bgSurface,
+            title: const Text('Delete playlist'),
+            content: Text(
+              'Delete "${playlist.name}"? This removes the playlist and its saved order.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('Cancel'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('Delete'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!shouldDelete) {
+      return;
+    }
+
+    await ref.read(libraryProvider.notifier).deletePlaylist(playlist.id);
+    if (!context.mounted) {
+      return;
+    }
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('Deleted ${playlist.name}')),
+    );
+  }
+
+  Future<void> _handlePlaylistMenuAction(
+    BuildContext context,
+    _PlaylistMenuAction action,
+    LibraryPlaylist playlist,
+  ) async {
+    switch (action) {
+      case _PlaylistMenuAction.modify:
+        await _showEditPlaylistSheet(context, ref, playlist);
+        return;
+      case _PlaylistMenuAction.rename:
+        await _renamePlaylist(context, playlist);
+        return;
+      case _PlaylistMenuAction.changeCoverArt:
+        await _changePlaylistCoverArt(context, playlist);
+        return;
+      case _PlaylistMenuAction.delete:
+        await _deletePlaylist(context, playlist);
+        return;
+    }
   }
 
   @override
@@ -399,9 +530,19 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                     children: [
                       _EditablePlaylistHeader(
                         playlist: editablePlaylist,
-                        onChangePressed: () => _showEditPlaylistSheet(
+                        tracks: playlistTracks,
+                        onPlayPressed: () => _playPlaylistTracks(
                           context,
-                          ref,
+                          playlistTracks,
+                        ),
+                        onShufflePressed: () => _playPlaylistTracks(
+                          context,
+                          playlistTracks,
+                          shuffle: true,
+                        ),
+                        onMenuSelected: (action) => _handlePlaylistMenuAction(
+                          context,
+                          action,
                           editablePlaylist,
                         ),
                       ),
@@ -421,19 +562,22 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                         children: [
                           _EditablePlaylistHeader(
                             playlist: editablePlaylist,
-                            onChangePressed: () => _showEditPlaylistSheet(
+                            tracks: playlistTracks,
+                            onPlayPressed: () => _playPlaylistTracks(
                               context,
-                              ref,
+                              playlistTracks,
+                            ),
+                            onShufflePressed: () => _playPlaylistTracks(
+                              context,
+                              playlistTracks,
+                              shuffle: true,
+                            ),
+                            onMenuSelected: (action) =>
+                                _handlePlaylistMenuAction(
+                              context,
+                              action,
                               editablePlaylist,
                             ),
-                          ),
-                          const SizedBox(height: 28),
-                          Text(
-                            'Songs',
-                            style: Theme.of(context)
-                                .textTheme
-                                .titleLarge
-                                ?.copyWith(color: textPrimary),
                           ),
                           const SizedBox(height: 12),
                         ],
@@ -472,14 +616,22 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
 class _EditablePlaylistHeader extends StatelessWidget {
   const _EditablePlaylistHeader({
     required this.playlist,
-    required this.onChangePressed,
+    required this.tracks,
+    required this.onPlayPressed,
+    required this.onShufflePressed,
+    required this.onMenuSelected,
   });
 
   final LibraryPlaylist playlist;
-  final VoidCallback onChangePressed;
+  final List<LibraryTrack> tracks;
+  final VoidCallback onPlayPressed;
+  final VoidCallback onShufflePressed;
+  final ValueChanged<_PlaylistMenuAction> onMenuSelected;
 
   @override
   Widget build(BuildContext context) {
+    final hasTracks = tracks.isNotEmpty;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -492,36 +644,128 @@ class _EditablePlaylistHeader extends StatelessWidget {
         Expanded(
           child: Padding(
             padding: const EdgeInsets.only(top: 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final shouldStack = constraints.maxWidth < 230;
+                final title = Text(
                   playlist.name,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontSize: 32,
                         color: textPrimary,
                       ),
-                ),
-                const SizedBox(height: 10),
-                FilledButton(
-                  onPressed: onChangePressed,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: accentPrimary,
-                    foregroundColor: bgBase,
-                  ),
-                  child: const Text('Edit name'),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  '${playlist.trackCount} tracks',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: textSecondary,
-                        letterSpacing: 0,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                );
+                final actions = _PlaylistHeaderActions(
+                  hasTracks: hasTracks,
+                  onPlayPressed: onPlayPressed,
+                  onShufflePressed: onShufflePressed,
+                  onMenuSelected: onMenuSelected,
+                );
+
+                if (shouldStack) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      title,
+                      const SizedBox(height: 10),
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: actions,
+                        ),
                       ),
-                ),
-              ],
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Flexible(child: title),
+                    const SizedBox(width: 8),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: actions,
+                    ),
+                  ],
+                );
+              },
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PlaylistHeaderActions extends StatelessWidget {
+  const _PlaylistHeaderActions({
+    required this.hasTracks,
+    required this.onPlayPressed,
+    required this.onShufflePressed,
+    required this.onMenuSelected,
+  });
+
+  final bool hasTracks;
+  final VoidCallback onPlayPressed;
+  final VoidCallback onShufflePressed;
+  final ValueChanged<_PlaylistMenuAction> onMenuSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        PopupMenuButton<_PlaylistMenuAction>(
+          tooltip: 'Playlist options',
+          color: bgSurface,
+          icon: const Icon(
+            Icons.more_vert_rounded,
+            color: textPrimary,
+          ),
+          onSelected: onMenuSelected,
+          itemBuilder: (context) => const [
+            PopupMenuItem(
+              value: _PlaylistMenuAction.modify,
+              child: Text('Modify playlist'),
+            ),
+            PopupMenuItem(
+              value: _PlaylistMenuAction.rename,
+              child: Text('Rename playlist'),
+            ),
+            PopupMenuItem(
+              value: _PlaylistMenuAction.changeCoverArt,
+              child: Text('Change cover art'),
+            ),
+            PopupMenuItem(
+              value: _PlaylistMenuAction.delete,
+              child: Text('Delete playlist'),
+            ),
+          ],
+        ),
+        const SizedBox(width: 10),
+        OutlinedButton(
+          onPressed: hasTracks ? onShufflePressed : null,
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size(44, 44),
+            padding: EdgeInsets.zero,
+            shape: const CircleBorder(),
+          ),
+          child: const Icon(Icons.shuffle_rounded),
+        ),
+        const SizedBox(width: 10),
+        FilledButton(
+          onPressed: hasTracks ? onPlayPressed : null,
+          style: FilledButton.styleFrom(
+            backgroundColor: accentPrimary,
+            foregroundColor: bgBase,
+            minimumSize: const Size(52, 52),
+            padding: EdgeInsets.zero,
+            shape: const CircleBorder(),
+          ),
+          child: const Icon(Icons.play_arrow_rounded, size: 28),
         ),
       ],
     );
@@ -551,7 +795,7 @@ class _EmptyPlaylistState extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Add songs from the player using the add to playlist button, or update the cover art and name now.',
+            'Add songs from the player using the add to playlist button, then use the actions above to rename it, change cover art, or tidy it up.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: textSecondary,
                 ),
@@ -560,6 +804,13 @@ class _EmptyPlaylistState extends StatelessWidget {
       ),
     );
   }
+}
+
+enum _PlaylistMenuAction {
+  modify,
+  rename,
+  changeCoverArt,
+  delete,
 }
 
 class _PlaylistCoverArt extends StatelessWidget {
@@ -631,11 +882,17 @@ class _PlaylistCoverArt extends StatelessWidget {
 class _EditPlaylistSheet extends StatefulWidget {
   const _EditPlaylistSheet({
     required this.playlist,
+    required this.title,
+    required this.submitLabel,
+    required this.allowCoverArt,
     required this.onSave,
   });
 
   final LibraryPlaylist playlist;
-  final Future<void> Function(String name) onSave;
+  final String title;
+  final String submitLabel;
+  final bool allowCoverArt;
+  final Future<void> Function(String name, String coverImagePath) onSave;
 
   @override
   State<_EditPlaylistSheet> createState() => _EditPlaylistSheetState();
@@ -644,11 +901,13 @@ class _EditPlaylistSheet extends StatefulWidget {
 class _EditPlaylistSheetState extends State<_EditPlaylistSheet> {
   late final TextEditingController _nameController;
   final FocusNode _focusNode = FocusNode();
+  late String _coverImagePath;
 
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController(text: widget.playlist.name);
+    _coverImagePath = widget.playlist.coverImagePath;
     Future.delayed(const Duration(milliseconds: 300), () {
       if (mounted) {
         _focusNode.requestFocus();
@@ -661,6 +920,18 @@ class _EditPlaylistSheetState extends State<_EditPlaylistSheet> {
     _nameController.dispose();
     _focusNode.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickCoverArt() async {
+    final result = await FilePicker.platform.pickFiles(type: FileType.image);
+    final selectedPath = result?.files.single.path;
+    if (selectedPath == null || selectedPath.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _coverImagePath = selectedPath;
+    });
   }
 
   @override
@@ -704,13 +975,41 @@ class _EditPlaylistSheetState extends State<_EditPlaylistSheet> {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'Edit Playlist',
+                    widget.title,
                     style: Theme.of(context)
                         .textTheme
                         .titleLarge
                         ?.copyWith(color: textPrimary),
                   ),
                   const SizedBox(height: 20),
+                  if (widget.allowCoverArt) ...[
+                    Text(
+                      'Cover art',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: textSecondary,
+                            letterSpacing: 0,
+                          ),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        _PlaylistCoverArt(
+                          imagePath: _coverImagePath,
+                          imageUrl: '',
+                          size: 72,
+                        ),
+                        const SizedBox(width: 14),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: _pickCoverArt,
+                            icon: const Icon(Icons.image_outlined),
+                            label: const Text('Change cover art'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                  ],
                   Text(
                     'Playlist name',
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(
@@ -747,12 +1046,12 @@ class _EditPlaylistSheetState extends State<_EditPlaylistSheet> {
                               return;
                             }
 
-                            await widget.onSave(trimmedName);
+                            await widget.onSave(trimmedName, _coverImagePath);
                             if (context.mounted) {
                               Navigator.of(context).pop();
                             }
                           },
-                          child: const Text('Save'),
+                          child: Text(widget.submitLabel),
                         ),
                       ),
                     ],
@@ -847,11 +1146,13 @@ class _PlaylistCard extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle.toUpperCase(),
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
+                  if (subtitle.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle.toUpperCase(),
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                  ],
                 ],
               ),
             ),

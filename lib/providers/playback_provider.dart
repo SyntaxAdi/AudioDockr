@@ -530,6 +530,45 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     return true;
   }
 
+  Future<void> playTracks(
+    List<LibraryTrack> tracks, {
+    bool shuffle = false,
+  }) async {
+    if (tracks.isEmpty) {
+      return;
+    }
+
+    final orderedTracks = List<LibraryTrack>.from(tracks);
+    if (shuffle) {
+      orderedTracks.shuffle(Random());
+    }
+
+    final firstTrack = orderedTracks.first;
+    _history.clear();
+    state = state.copyWith(
+      queue: orderedTracks
+          .skip(1)
+          .map(
+            (track) => QueuedTrack(
+              videoId: track.videoId,
+              videoUrl: track.videoUrl,
+              title: track.title,
+              artist: track.artist,
+              thumbnailUrl: track.thumbnailUrl,
+            ),
+          )
+          .toList(growable: false),
+    );
+
+    await playTrack(
+      firstTrack.videoId,
+      firstTrack.videoUrl,
+      firstTrack.title,
+      firstTrack.artist,
+      firstTrack.thumbnailUrl,
+    );
+  }
+
   Future<void> nextTrack() async {
     if (state.queue.isEmpty) {
       return;

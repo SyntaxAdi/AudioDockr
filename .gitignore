@@ -30,7 +30,8 @@ migrate_working_dir/
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
 xcuserdata/
-
+/.codex
+Whisk_160eebc40f6d6768e334b399288b96e3dr.png
 # ── Flutter / Dart / Pub ──────────────────────
 **/doc/api/
 **/ios/Flutter/.last_build_id

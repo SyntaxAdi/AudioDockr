@@ -185,6 +185,22 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
     );
   }
 
+  Future<void> deletePlaylist(String playlistId) async {
+    await _databaseHelper.deletePlaylist(playlistId);
+    final results = await Future.wait([
+      _databaseHelper.fetchAllTracks(),
+      _databaseHelper.fetchLikedTracks(),
+      _databaseHelper.fetchPlaylists(),
+      _databaseHelper.fetchRecentlyPlayed(),
+    ]);
+    state = state.copyWith(
+      allTracks: _mapTracks(results[0] as List<StoredTrack>),
+      likedTracks: _mapTracks(results[1] as List<StoredTrack>),
+      playlists: _mapPlaylists(results[2] as List<StoredPlaylist>),
+      recentTracks: _mapTracks(results[3] as List<StoredTrack>),
+    );
+  }
+
   Future<bool> addTrackToPlaylist({
     required String playlistId,
     required String videoId,
