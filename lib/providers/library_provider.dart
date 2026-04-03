@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database_helper.dart';
+import '../services/spotify_import_service.dart';
 
 class LibraryTrack {
   const LibraryTrack({
@@ -282,6 +283,74 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
     return tracks.map(LibraryTrack.fromStoredTrack).toList();
   }
 
+  Future<String> importSpotifyPlaylist(
+    List<SpotifyImportTrack> tracks,
+  ) async {
+    if (tracks.isEmpty) {
+      return '';
+    }
+
+    final playlistNumber = _nextSpotifyPlaylistNumber();
+    final playlistName = 'Spotify Playlist $playlistNumber';
+    final playlistId = await _databaseHelper.createPlaylist(playlistName);
+
+    final importedTracks = <TrackWriteData>[];
+    final importSeed = DateTime.now().millisecondsSinceEpoch;
+    for (var index = 0; index < tracks.length; index++) {
+      final track = tracks[index];
+      importedTracks.add(
+        TrackWriteData(
+          videoId: 'spotify_import_${importSeed}_$index',
+          videoUrl: '',
+          title: track.songName,
+          artist: track.artistName,
+          durationSeconds: 0,
+          thumbnailUrl: track.thumbnailUrl,
+          lastPlayedAt: 0,
+        ),
+      );
+    }
+
+    await _databaseHelper.addTracksToPlaylistBulk(
+      playlistId: playlistId,
+      tracks: importedTracks,
+    );
+
+    final results = await Future.wait([
+      _databaseHelper.fetchAllTracks(),
+      _databaseHelper.fetchLikedTracks(),
+      _databaseHelper.fetchPlaylists(),
+      _databaseHelper.fetchRecentlyPlayed(),
+    ]);
+    state = state.copyWith(
+      allTracks: _mapTracks(results[0] as List<StoredTrack>),
+      likedTracks: _mapTracks(results[1] as List<StoredTrack>),
+      playlists: _mapPlaylists(results[2] as List<StoredPlaylist>),
+      recentTracks: _mapTracks(results[3] as List<StoredTrack>),
+    );
+    return playlistName;
+  }
+
+  Future<void> updateTrackVideoUrl({
+    required String videoId,
+    required String videoUrl,
+  }) async {
+    await _databaseHelper.updateTrackVideoUrl(
+      videoId: videoId,
+      videoUrl: videoUrl,
+    );
+    final results = await Future.wait([
+      _databaseHelper.fetchAllTracks(),
+      _databaseHelper.fetchLikedTracks(),
+      _databaseHelper.fetchRecentlyPlayed(),
+    ]);
+    state = state.copyWith(
+      allTracks: _mapTracks(results[0] as List<StoredTrack>),
+      likedTracks: _mapTracks(results[1] as List<StoredTrack>),
+      recentTracks: _mapTracks(results[2] as List<StoredTrack>),
+    );
+  }
+
   Future<void> toggleLike({
     required String videoId,
     required String videoUrl,
@@ -381,5 +450,18 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
       }
     }
     return null;
+  }
+
+  int _nextSpotifyPlaylistNumber() {
+    final pattern = RegExp(r'^Spotify Playlist (\d+)$');
+    var maxNumber = 0;
+    for (final playlist in state.userPlaylists) {
+      final match = pattern.firstMatch(playlist.name);
+      final number = int.tryParse(match?.group(1) ?? '');
+      if (number != null && number > maxNumber) {
+        maxNumber = number;
+      }
+    }
+    return maxNumber + 1;
   }
 }

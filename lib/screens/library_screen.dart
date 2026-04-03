@@ -6,9 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/library_provider.dart';
 import '../providers/playback_provider.dart';
+import '../providers/spotify_import_provider.dart';
 import '../theme.dart';
-import '../widgets/playlist_sheets.dart';
 import '../widgets/app_bottom_bar.dart';
+import '../widgets/playlist_sheets.dart';
 
 class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({
@@ -70,9 +71,31 @@ class LibraryScreen extends ConsumerWidget {
                   _PlaylistOptionTile(
                     icon: Icons.queue_music_rounded,
                     title: 'Import Playlist from Spotify',
-                    subtitle: 'Coming next',
-                    onTap: () {
+                    subtitle: 'Paste a Spotify playlist URL',
+                    onTap: () async {
                       Navigator.of(sheetContext).pop();
+                      final spotifyUrl =
+                          await showSpotifyPlaylistImportSheet(parentContext);
+                      if (spotifyUrl == null || !parentContext.mounted) {
+                        return;
+                      }
+                      await ref
+                          .read(spotifyImportProvider.notifier)
+                          .importPlaylist(spotifyUrl);
+                      if (!parentContext.mounted) {
+                        return;
+                      }
+                      final importState = ref.read(spotifyImportProvider);
+                      final message = importState.errorMessage ??
+                          (importState.importedPlaylistName == null
+                              ? null
+                              : 'Imported into ${importState.importedPlaylistName}');
+                      if (message == null) {
+                        return;
+                      }
+                      ScaffoldMessenger.of(parentContext).showSnackBar(
+                        SnackBar(content: Text(message)),
+                      );
                     },
                   ),
                 ],

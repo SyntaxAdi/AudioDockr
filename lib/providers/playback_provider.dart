@@ -182,6 +182,12 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     required String thumbnailUrl,
   }) async {
     await _ensurePlaybackPermissions();
+    final resolvedVideoUrl = await _resolveVideoUrlIfNeeded(
+      videoId: videoId,
+      videoUrl: videoUrl,
+      title: title,
+      artist: artist,
+    );
     try {
       await _nativePlayerService.pause();
     } catch (_) {
@@ -193,13 +199,13 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         currentTitle: title,
         currentArtist: artist,
         currentThumbnailUrl: thumbnailUrl,
-        currentVideoUrl: videoUrl,
+        currentVideoUrl: resolvedVideoUrl,
         position: Duration.zero,
         duration: Duration.zero,
         isPreparing: true,
         lastError: null,
       );
-      final audioUrl = await _extractTrackUrl(videoId, videoUrl);
+      final audioUrl = await _extractTrackUrl(videoId, resolvedVideoUrl);
 
       if (audioUrl == null || audioUrl.isEmpty) {
         state = state.copyWith(isPreparing: false);
@@ -219,7 +225,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       unawaited(
         _libraryNotifier.recordTrack(
           videoId: videoId,
-          videoUrl: videoUrl,
+          videoUrl: resolvedVideoUrl,
           title: title,
           artist: artist,
           thumbnailUrl: thumbnailUrl,
@@ -230,14 +236,14 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         currentTitle: title,
         currentArtist: artist,
         currentThumbnailUrl: thumbnailUrl,
-        currentVideoUrl: videoUrl,
+        currentVideoUrl: resolvedVideoUrl,
         position: Duration.zero,
         duration: Duration.zero,
         isPreparing: false,
         isPlaying: true,
         recentlyPlayed: _updatedRecentlyPlayed(
           videoId: videoId,
-          videoUrl: videoUrl,
+          videoUrl: resolvedVideoUrl,
           title: title,
           artist: artist,
           thumbnailUrl: thumbnailUrl,
@@ -382,6 +388,55 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       );
     } on YoutubeServiceException catch (error) {
       throw _mapExtractError(error);
+    }
+  }
+
+  Future<String> _resolveVideoUrlIfNeeded({
+    required String videoId,
+    required String videoUrl,
+    required String title,
+    required String artist,
+  }) async {
+    if (videoUrl.isNotEmpty) {
+      return videoUrl;
+    }
+
+    try {
+      final query = '$title $artist'.trim();
+      final results = await _youtubeService.search(query);
+      final resolvedVideoUrl = results.first.url;
+      await _libraryNotifier.updateTrackVideoUrl(
+        videoId: videoId,
+        videoUrl: resolvedVideoUrl,
+      );
+      return resolvedVideoUrl;
+    } on YoutubeServiceException catch (error) {
+      throw _mapSearchError(error);
+    }
+  }
+
+  PlaybackFailure _mapSearchError(YoutubeServiceException error) {
+    switch (error.code) {
+      case 'no_results':
+        return const PlaybackFailure(
+          'no_results',
+          'No YouTube result was found for this imported Spotify track.',
+        );
+      case 'temporary_unavailable':
+        return const PlaybackFailure(
+          'temporary_unavailable',
+          'YouTube is temporarily unavailable. Please try again in a moment.',
+        );
+      case 'rate_limited':
+        return const PlaybackFailure(
+          'rate_limited',
+          'YouTube is rate limiting search requests right now. Try again soon.',
+        );
+      default:
+        return PlaybackFailure(
+          error.code,
+          error.message,
+        );
     }
   }
 

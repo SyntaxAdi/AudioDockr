@@ -55,6 +55,26 @@ class StoredPlaylist {
   final String coverImagePath;
 }
 
+class TrackWriteData {
+  const TrackWriteData({
+    required this.videoId,
+    required this.videoUrl,
+    required this.title,
+    required this.artist,
+    required this.durationSeconds,
+    required this.thumbnailUrl,
+    this.lastPlayedAt = 0,
+  });
+
+  final String videoId;
+  final String videoUrl;
+  final String title;
+  final String artist;
+  final int durationSeconds;
+  final String thumbnailUrl;
+  final int lastPlayedAt;
+}
+
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
@@ -209,24 +229,26 @@ class DatabaseHelper {
     );
   }
 
-  Future<void> createPlaylist(String name) async {
+  Future<String> createPlaylist(String name) async {
     final trimmedName = name.trim();
     if (trimmedName.isEmpty) {
-      return;
+      return '';
     }
 
     final db = await database;
     final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final playlistId = 'playlist_$timestamp';
     await db.insert(
       'playlists',
       {
-        'id': 'playlist_$timestamp',
+        'id': playlistId,
         'name': trimmedName,
         'cover_image_path': '',
         'created_at': timestamp,
       },
       conflictAlgorithm: ConflictAlgorithm.abort,
     );
+    return playlistId;
   }
 
   Future<void> updatePlaylist({
@@ -336,37 +358,66 @@ class DatabaseHelper {
     required int durationSeconds,
   }) async {
     final db = await database;
-    final lastPlayedAt = DateTime.now().millisecondsSinceEpoch;
-    await db.rawInsert(
-      '''
-      INSERT INTO tracks (
-        video_id,
-        video_url,
-        title,
-        artist,
-        duration,
-        thumbnail_url,
-        liked,
-        state,
-        last_played_at
-      ) VALUES (?, ?, ?, ?, ?, ?, 0, 'neutral', ?)
-      ON CONFLICT(video_id) DO UPDATE SET
-        video_url = excluded.video_url,
-        title = excluded.title,
-        artist = excluded.artist,
-        duration = excluded.duration,
-        thumbnail_url = excluded.thumbnail_url,
-        last_played_at = excluded.last_played_at
-      ''',
-      [
-        videoId,
-        videoUrl,
-        title,
-        artist,
-        durationSeconds,
-        thumbnailUrl,
-        lastPlayedAt,
-      ],
+    await _upsertTrack(
+      db,
+      TrackWriteData(
+        videoId: videoId,
+        videoUrl: videoUrl,
+        title: title,
+        artist: artist,
+        durationSeconds: durationSeconds,
+        thumbnailUrl: thumbnailUrl,
+        lastPlayedAt: DateTime.now().millisecondsSinceEpoch,
+      ),
+    );
+  }
+
+  Future<void> addTracksToPlaylistBulk({
+    required String playlistId,
+    required List<TrackWriteData> tracks,
+  }) async {
+    if (tracks.isEmpty) {
+      return;
+    }
+
+    final db = await database;
+    await db.transaction((txn) async {
+      final maxPositionResult = await txn.rawQuery(
+        'SELECT COALESCE(MAX(position), -1) AS max_position '
+        'FROM playlist_tracks WHERE playlist_id = ?',
+        [playlistId],
+      );
+      var nextPosition =
+          ((maxPositionResult.first['max_position'] as int?) ?? -1) + 1;
+
+      for (final track in tracks) {
+        await _upsertTrack(txn, track);
+        await txn.insert(
+          'playlist_tracks',
+          {
+            'playlist_id': playlistId,
+            'video_id': track.videoId,
+            'position': nextPosition,
+          },
+          conflictAlgorithm: ConflictAlgorithm.ignore,
+        );
+        nextPosition++;
+      }
+    });
+  }
+
+  Future<void> updateTrackVideoUrl({
+    required String videoId,
+    required String videoUrl,
+  }) async {
+    final db = await database;
+    await db.update(
+      'tracks',
+      {
+        'video_url': videoUrl,
+      },
+      where: 'video_id = ?',
+      whereArgs: [videoId],
     );
   }
 
@@ -522,5 +573,42 @@ class DatabaseHelper {
         .map((row) => (row['query'] as String?) ?? '')
         .where((query) => query.isNotEmpty)
         .toList();
+  }
+
+  Future<void> _upsertTrack(
+    DatabaseExecutor db,
+    TrackWriteData track,
+  ) async {
+    await db.rawInsert(
+      '''
+      INSERT INTO tracks (
+        video_id,
+        video_url,
+        title,
+        artist,
+        duration,
+        thumbnail_url,
+        liked,
+        state,
+        last_played_at
+      ) VALUES (?, ?, ?, ?, ?, ?, 0, 'neutral', ?)
+      ON CONFLICT(video_id) DO UPDATE SET
+        video_url = excluded.video_url,
+        title = excluded.title,
+        artist = excluded.artist,
+        duration = excluded.duration,
+        thumbnail_url = excluded.thumbnail_url,
+        last_played_at = excluded.last_played_at
+      ''',
+      [
+        track.videoId,
+        track.videoUrl,
+        track.title,
+        track.artist,
+        track.durationSeconds,
+        track.thumbnailUrl,
+        track.lastPlayedAt,
+      ],
+    );
   }
 }
