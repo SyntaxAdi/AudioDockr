@@ -1639,11 +1639,13 @@ class _NowPlayingControls extends ConsumerWidget {
     final repeatMode = ref.watch(
       playbackNotifierProvider.select((state) => state.repeatMode),
     );
+    final shuffleEnabled = ref.watch(
+      playbackNotifierProvider.select((state) => state.shuffleEnabled),
+    );
     final queueLength = ref.watch(
       playbackNotifierProvider.select((state) => state.queue.length),
     );
     final notifier = ref.read(playbackNotifierProvider.notifier);
-    final shuffleEnabled = queueLength > 1;
     final nextEnabled = queueLength > 0;
 
     return Row(
@@ -1652,7 +1654,7 @@ class _NowPlayingControls extends ConsumerWidget {
         _PlayerControlButton(
           icon: Icons.shuffle_rounded,
           active: shuffleEnabled,
-          onTap: shuffleEnabled ? notifier.toggleShuffleQueue : null,
+          onTap: notifier.toggleShuffleQueue,
         ),
         _PlayerControlButton(
           icon: Icons.skip_previous_rounded,

@@ -146,6 +146,9 @@ class LibraryScreen extends ConsumerWidget {
                   title: 'Liked Songs',
                   subtitle: '${libraryState.likedTracks.length} tracks',
                   icon: Icons.favorite,
+                  leading: const _CyberpunkPlaylistBadge(
+                    variant: _CyberpunkPlaylistBadgeVariant.liked,
+                  ),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -163,6 +166,9 @@ class LibraryScreen extends ConsumerWidget {
                   title: 'Recents',
                   subtitle: '${libraryState.recentTracks.length} tracks',
                   icon: Icons.history,
+                  leading: const _CyberpunkPlaylistBadge(
+                    variant: _CyberpunkPlaylistBadgeVariant.recents,
+                  ),
                   onTap: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
@@ -181,6 +187,12 @@ class LibraryScreen extends ConsumerWidget {
                       title: playlist.name,
                       subtitle: '',
                       icon: Icons.queue_music_rounded,
+                      leading: _PlaylistCoverArt(
+                        imagePath: playlist.coverImagePath,
+                        imageUrl: '',
+                        size: 56,
+                        borderRadius: 12,
+                      ),
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
@@ -317,9 +329,8 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
 
   Future<void> _playPlaylistTracks(
     BuildContext context,
-    List<LibraryTrack> tracks, {
-    bool shuffle = false,
-  }) async {
+    List<LibraryTrack> tracks,
+  ) async {
     if (tracks.isEmpty) {
       return;
     }
@@ -327,7 +338,6 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
     try {
       await ref.read(playbackNotifierProvider.notifier).playTracks(
             tracks,
-            shuffle: shuffle,
           );
     } on PlaybackFailure catch (error) {
       if (!context.mounted) {
@@ -481,8 +491,78 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
     }
   }
 
+  Future<void> _showPlaylistActionSheet(
+    BuildContext context,
+    LibraryPlaylist playlist,
+  ) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        Future<void> handleAction(_PlaylistMenuAction action) async {
+          Navigator.of(sheetContext).pop();
+          await _handlePlaylistMenuAction(context, action, playlist);
+        }
+
+        return SafeArea(
+          top: false,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: bgSurface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    width: 44,
+                    height: 4,
+                    margin: const EdgeInsets.only(top: 12, bottom: 20),
+                    decoration: BoxDecoration(
+                      color: bgDivider,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                ),
+                _PlaylistOptionTile(
+                  icon: Icons.tune_rounded,
+                  title: 'Modify playlist',
+                  subtitle: 'Update the name and cover art',
+                  onTap: () => handleAction(_PlaylistMenuAction.modify),
+                ),
+                _PlaylistOptionTile(
+                  icon: Icons.drive_file_rename_outline_rounded,
+                  title: 'Rename playlist',
+                  subtitle: 'Change the playlist name only',
+                  onTap: () => handleAction(_PlaylistMenuAction.rename),
+                ),
+                _PlaylistOptionTile(
+                  icon: Icons.image_outlined,
+                  title: 'Change cover art',
+                  subtitle: 'Pick a new image for this playlist',
+                  onTap: () => handleAction(_PlaylistMenuAction.changeCoverArt),
+                ),
+                _PlaylistOptionTile(
+                  icon: Icons.delete_outline_rounded,
+                  title: 'Delete playlist',
+                  subtitle: 'Remove this playlist and its saved order',
+                  onTap: () => handleAction(_PlaylistMenuAction.delete),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final shuffleEnabled = ref.watch(
+      playbackNotifierProvider.select((state) => state.shuffleEnabled),
+    );
     final screenWidth = MediaQuery.of(context).size.width;
     final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
           fontSize: screenWidth < 360 ? 22 : 26,
@@ -531,20 +611,16 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                       _EditablePlaylistHeader(
                         playlist: editablePlaylist,
                         tracks: playlistTracks,
+                        shuffleEnabled: shuffleEnabled,
                         onPlayPressed: () => _playPlaylistTracks(
                           context,
                           playlistTracks,
                         ),
-                        onShufflePressed: () => _playPlaylistTracks(
-                          context,
-                          playlistTracks,
-                          shuffle: true,
-                        ),
-                        onMenuSelected: (action) => _handlePlaylistMenuAction(
-                          context,
-                          action,
-                          editablePlaylist,
-                        ),
+                        onShufflePressed: () => ref
+                            .read(playbackNotifierProvider.notifier)
+                            .setShuffleEnabled(!shuffleEnabled),
+                        onMenuPressed: () =>
+                            _showPlaylistActionSheet(context, editablePlaylist),
                       ),
                       const SizedBox(height: 28),
                       const _EmptyPlaylistState(),
@@ -563,19 +639,16 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                           _EditablePlaylistHeader(
                             playlist: editablePlaylist,
                             tracks: playlistTracks,
+                            shuffleEnabled: shuffleEnabled,
                             onPlayPressed: () => _playPlaylistTracks(
                               context,
                               playlistTracks,
                             ),
-                            onShufflePressed: () => _playPlaylistTracks(
+                            onShufflePressed: () => ref
+                                .read(playbackNotifierProvider.notifier)
+                                .setShuffleEnabled(!shuffleEnabled),
+                            onMenuPressed: () => _showPlaylistActionSheet(
                               context,
-                              playlistTracks,
-                              shuffle: true,
-                            ),
-                            onMenuSelected: (action) =>
-                                _handlePlaylistMenuAction(
-                              context,
-                              action,
                               editablePlaylist,
                             ),
                           ),
@@ -617,16 +690,18 @@ class _EditablePlaylistHeader extends StatelessWidget {
   const _EditablePlaylistHeader({
     required this.playlist,
     required this.tracks,
+    required this.shuffleEnabled,
     required this.onPlayPressed,
     required this.onShufflePressed,
-    required this.onMenuSelected,
+    required this.onMenuPressed,
   });
 
   final LibraryPlaylist playlist;
   final List<LibraryTrack> tracks;
+  final bool shuffleEnabled;
   final VoidCallback onPlayPressed;
   final VoidCallback onShufflePressed;
-  final ValueChanged<_PlaylistMenuAction> onMenuSelected;
+  final VoidCallback onMenuPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -658,9 +733,10 @@ class _EditablePlaylistHeader extends StatelessWidget {
                 );
                 final actions = _PlaylistHeaderActions(
                   hasTracks: hasTracks,
+                  shuffleEnabled: shuffleEnabled,
                   onPlayPressed: onPlayPressed,
                   onShufflePressed: onShufflePressed,
-                  onMenuSelected: onMenuSelected,
+                  onMenuPressed: onMenuPressed,
                 );
 
                 if (shouldStack) {
@@ -703,57 +779,45 @@ class _EditablePlaylistHeader extends StatelessWidget {
 class _PlaylistHeaderActions extends StatelessWidget {
   const _PlaylistHeaderActions({
     required this.hasTracks,
+    required this.shuffleEnabled,
     required this.onPlayPressed,
     required this.onShufflePressed,
-    required this.onMenuSelected,
+    required this.onMenuPressed,
   });
 
   final bool hasTracks;
+  final bool shuffleEnabled;
   final VoidCallback onPlayPressed;
   final VoidCallback onShufflePressed;
-  final ValueChanged<_PlaylistMenuAction> onMenuSelected;
+  final VoidCallback onMenuPressed;
 
   @override
   Widget build(BuildContext context) {
+    final buttonStyle = IconButton.styleFrom(
+      minimumSize: const Size(52, 52),
+      fixedSize: const Size(52, 52),
+      padding: EdgeInsets.zero,
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        PopupMenuButton<_PlaylistMenuAction>(
+        IconButton(
           tooltip: 'Playlist options',
-          color: bgSurface,
-          icon: const Icon(
-            Icons.more_vert_rounded,
-            color: textPrimary,
-          ),
-          onSelected: onMenuSelected,
-          itemBuilder: (context) => const [
-            PopupMenuItem(
-              value: _PlaylistMenuAction.modify,
-              child: Text('Modify playlist'),
-            ),
-            PopupMenuItem(
-              value: _PlaylistMenuAction.rename,
-              child: Text('Rename playlist'),
-            ),
-            PopupMenuItem(
-              value: _PlaylistMenuAction.changeCoverArt,
-              child: Text('Change cover art'),
-            ),
-            PopupMenuItem(
-              value: _PlaylistMenuAction.delete,
-              child: Text('Delete playlist'),
-            ),
-          ],
+          onPressed: onMenuPressed,
+          style: buttonStyle,
+          iconSize: 28,
+          color: textPrimary,
+          icon: const Icon(Icons.more_vert_rounded),
         ),
         const SizedBox(width: 10),
-        OutlinedButton(
+        IconButton(
           onPressed: hasTracks ? onShufflePressed : null,
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size(44, 44),
-            padding: EdgeInsets.zero,
-            shape: const CircleBorder(),
-          ),
-          child: const Icon(Icons.shuffle_rounded),
+          style: buttonStyle,
+          iconSize: 28,
+          color: shuffleEnabled ? accentPrimary : textPrimary,
+          icon: const Icon(Icons.shuffle_rounded),
         ),
         const SizedBox(width: 10),
         FilledButton(
@@ -818,15 +882,17 @@ class _PlaylistCoverArt extends StatelessWidget {
     required this.imagePath,
     required this.imageUrl,
     required this.size,
+    this.borderRadius = 18,
   });
 
   final String imagePath;
   final String imageUrl;
   final double size;
+  final double borderRadius;
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(18);
+    final radius = BorderRadius.circular(borderRadius);
     final targetCacheSize = (size * MediaQuery.of(context).devicePixelRatio).round();
     Widget child;
 
@@ -866,13 +932,17 @@ class _PlaylistCoverArt extends StatelessWidget {
   }
 
   Widget _playlistFallbackArt() {
-    return Container(
-      color: bgCard,
-      child: const Center(
-        child: Icon(
-          Icons.music_note_rounded,
-          color: textSecondary,
-          size: 42,
+    return Image.asset(
+      'lib/assets/app_icon.png',
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => Container(
+        color: bgCard,
+        child: const Center(
+          child: Icon(
+            Icons.music_note_rounded,
+            color: textSecondary,
+            size: 42,
+          ),
         ),
       ),
     );
@@ -1102,12 +1172,14 @@ class _PlaylistCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.icon,
+    this.leading,
     required this.onTap,
   });
 
   final String title;
   final String subtitle;
   final IconData icon;
+  final Widget? leading;
   final VoidCallback onTap;
 
   @override
@@ -1125,15 +1197,16 @@ class _PlaylistCard extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: accentPrimary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(icon, color: accentPrimary),
-            ),
+            leading ??
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: accentPrimary.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(icon, color: accentPrimary),
+                ),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -1159,6 +1232,89 @@ class _PlaylistCard extends StatelessWidget {
             const Icon(Icons.chevron_right, color: accentPrimary),
           ],
         ),
+      ),
+    );
+  }
+}
+
+enum _CyberpunkPlaylistBadgeVariant {
+  liked,
+  recents,
+}
+
+class _CyberpunkPlaylistBadge extends StatelessWidget {
+  const _CyberpunkPlaylistBadge({
+    required this.variant,
+  });
+
+  final _CyberpunkPlaylistBadgeVariant variant;
+
+  @override
+  Widget build(BuildContext context) {
+    final isLiked = variant == _CyberpunkPlaylistBadgeVariant.liked;
+    final frameColor = isLiked ? accentRed : accentCyan;
+    final glowColor = isLiked ? accentPrimary : accentCyan;
+    final icon = isLiked ? Icons.favorite_rounded : Icons.bolt_rounded;
+
+    return Container(
+      width: 56,
+      height: 56,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(12),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            glowColor.withValues(alpha: 0.22),
+            bgSurface,
+          ],
+        ),
+        border: Border.all(
+          color: frameColor.withValues(alpha: 0.9),
+          width: 1.2,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: frameColor.withValues(alpha: 0.18),
+            blurRadius: 14,
+            spreadRadius: 1,
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: 7,
+            left: 7,
+            right: 7,
+            child: Container(
+              height: 2,
+              decoration: BoxDecoration(
+                color: accentPrimary.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: 8,
+            left: 8,
+            child: Container(
+              width: 14,
+              height: 2,
+              decoration: BoxDecoration(
+                color: frameColor.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(99),
+              ),
+            ),
+          ),
+          Center(
+            child: Icon(
+              icon,
+              color: frameColor,
+              size: 24,
+            ),
+          ),
+        ],
       ),
     );
   }

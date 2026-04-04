@@ -538,7 +538,7 @@ class DatabaseHelper {
     return result.map(StoredTrack.fromMap).toList();
   }
 
-  Future<List<StoredTrack>> fetchRecentlyPlayed({int limit = 8}) async {
+  Future<List<StoredTrack>> fetchRecentlyPlayed({int? limit}) async {
     final db = await database;
     final result = await db.query(
       'tracks',

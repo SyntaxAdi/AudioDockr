@@ -80,6 +80,7 @@ class PlaybackState {
   final Duration position;
   final Duration duration;
   final PlaybackRepeatMode? _repeatMode;
+  final bool? _shuffleEnabled;
   final String? lastError;
   final List<RecentlyPlayedTrack>? _recentlyPlayed;
   final List<QueuedTrack>? _queue;
@@ -87,6 +88,7 @@ class PlaybackState {
   List<RecentlyPlayedTrack> get recentlyPlayed => _recentlyPlayed ?? const [];
   List<QueuedTrack> get queue => _queue ?? const [];
   PlaybackRepeatMode get repeatMode => _repeatMode ?? PlaybackRepeatMode.off;
+  bool get shuffleEnabled => _shuffleEnabled ?? false;
 
   PlaybackState({
     this.currentTrackId,
@@ -99,10 +101,12 @@ class PlaybackState {
     this.position = Duration.zero,
     this.duration = Duration.zero,
     PlaybackRepeatMode? repeatMode,
+    bool? shuffleEnabled,
     this.lastError,
     List<RecentlyPlayedTrack>? recentlyPlayed,
     List<QueuedTrack>? queue,
   })  : _repeatMode = repeatMode,
+        _shuffleEnabled = shuffleEnabled,
         _recentlyPlayed = recentlyPlayed,
         _queue = queue;
   
@@ -117,6 +121,7 @@ class PlaybackState {
     Duration? position,
     Duration? duration,
     PlaybackRepeatMode? repeatMode,
+    bool? shuffleEnabled,
     List<RecentlyPlayedTrack>? recentlyPlayed,
     List<QueuedTrack>? queue,
     Object? lastError = _playbackStateNoChange,
@@ -132,6 +137,7 @@ class PlaybackState {
       position: position ?? this.position,
       duration: duration ?? this.duration,
       repeatMode: repeatMode ?? this.repeatMode,
+      shuffleEnabled: shuffleEnabled ?? this.shuffleEnabled,
       recentlyPlayed: recentlyPlayed ?? this.recentlyPlayed,
       queue: queue ?? this.queue,
       lastError: identical(lastError, _playbackStateNoChange)
@@ -532,20 +538,22 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
 
   Future<void> playTracks(
     List<LibraryTrack> tracks, {
-    bool shuffle = false,
+    bool? shuffle,
   }) async {
     if (tracks.isEmpty) {
       return;
     }
 
+    final shouldShuffle = shuffle ?? state.shuffleEnabled;
     final orderedTracks = List<LibraryTrack>.from(tracks);
-    if (shuffle) {
+    if (shouldShuffle) {
       orderedTracks.shuffle(Random());
     }
 
     final firstTrack = orderedTracks.first;
     _history.clear();
     state = state.copyWith(
+      shuffleEnabled: shouldShuffle,
       queue: orderedTracks
           .skip(1)
           .map(
@@ -567,6 +575,14 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       firstTrack.artist,
       firstTrack.thumbnailUrl,
     );
+  }
+
+  void setShuffleEnabled(bool enabled) {
+    if (state.shuffleEnabled == enabled) {
+      return;
+    }
+
+    state = state.copyWith(shuffleEnabled: enabled);
   }
 
   Future<void> nextTrack() async {
@@ -617,12 +633,16 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   }
 
   void toggleShuffleQueue() {
-    if (state.queue.length < 2) {
-      return;
+    final nextValue = !state.shuffleEnabled;
+    final updatedQueue = List<QueuedTrack>.from(state.queue);
+    if (nextValue && updatedQueue.length > 1) {
+      updatedQueue.shuffle(Random());
     }
 
-    final shuffledQueue = List<QueuedTrack>.from(state.queue)..shuffle(Random());
-    state = state.copyWith(queue: shuffledQueue);
+    state = state.copyWith(
+      shuffleEnabled: nextValue,
+      queue: updatedQueue,
+    );
   }
 
   void clearQueue() {

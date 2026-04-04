@@ -17,7 +17,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final libraryState = ref.watch(libraryProvider);
-    final recentlyPlayed = libraryState.recentTracks.take(20).toList();
+    final recentlyPlayed = libraryState.recentTracks.take(10).toList();
     final screenWidth = MediaQuery.of(context).size.width;
     final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
           color: accentPrimary,
