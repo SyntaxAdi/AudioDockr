@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -1654,7 +1655,9 @@ class _NowPlayingControls extends ConsumerWidget {
         _PlayerControlButton(
           icon: Icons.shuffle_rounded,
           active: shuffleEnabled,
-          onTap: notifier.toggleShuffleQueue,
+          onTap: () {
+            unawaited(notifier.toggleShuffleQueue());
+          },
         ),
         _PlayerControlButton(
           icon: Icons.skip_previous_rounded,

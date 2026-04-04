@@ -161,7 +161,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final libraryState = ref.watch(libraryProvider);
     final screenWidth = MediaQuery.of(context).size.width;
     final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(

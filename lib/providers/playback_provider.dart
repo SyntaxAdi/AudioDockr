@@ -632,11 +632,27 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     );
   }
 
-  void toggleShuffleQueue() {
+  Future<void> toggleShuffleQueue() async {
     final nextValue = !state.shuffleEnabled;
-    final updatedQueue = List<QueuedTrack>.from(state.queue);
+    var updatedQueue = List<QueuedTrack>.from(state.queue);
+
+    if (nextValue && state.currentTrackId != null && state.isPlaying) {
+      updatedQueue = _libraryNotifier.state.likedTracks
+          .where((track) => track.videoId != state.currentTrackId)
+          .map(
+            (track) => QueuedTrack(
+              videoId: track.videoId,
+              videoUrl: track.videoUrl,
+              title: track.title,
+              artist: track.artist,
+              thumbnailUrl: track.thumbnailUrl,
+            ),
+          )
+          .toList(growable: false);
+    }
+
     if (nextValue && updatedQueue.length > 1) {
-      updatedQueue.shuffle(Random());
+      updatedQueue = List<QueuedTrack>.from(updatedQueue)..shuffle(Random());
     }
 
     state = state.copyWith(
