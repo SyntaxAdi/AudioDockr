@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../providers/library_provider.dart';
 import '../providers/playback_provider.dart';
+import 'library_screen.dart';
 import '../theme.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -18,6 +19,7 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final libraryState = ref.watch(libraryProvider);
     final recentlyPlayed = libraryState.recentTracks.take(10).toList();
+    final playlists = libraryState.userPlaylists;
     final screenWidth = MediaQuery.of(context).size.width;
     final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
           color: accentPrimary,
@@ -43,17 +45,18 @@ class HomeScreen extends ConsumerWidget {
                   child: CircularProgressIndicator(color: accentPrimary),
                 ),
               )
-            else if (recentlyPlayed.isEmpty)
-              SizedBox(
-                height: MediaQuery.of(context).size.height * 0.45,
-                child: Center(
-                  child: Text(
-                    'PLAY SOMETHING TO SEE IT HERE',
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
-                ),
-              )
             else ...[
+              if (recentlyPlayed.isEmpty && playlists.isEmpty)
+                SizedBox(
+                  height: MediaQuery.of(context).size.height * 0.45,
+                  child: Center(
+                    child: Text(
+                      'PLAY SOMETHING TO SEE IT HERE',
+                      style: Theme.of(context).textTheme.labelSmall,
+                    ),
+                  ),
+                )
+              else ...[
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                 child: Row(
@@ -86,43 +89,170 @@ class HomeScreen extends ConsumerWidget {
                   ],
                 ),
               ),
-              SizedBox(
-                height: 208,
-                child: ListView.separated(
+              if (recentlyPlayed.isEmpty)
+                Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
-                  scrollDirection: Axis.horizontal,
-                  itemCount: recentlyPlayed.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final track = recentlyPlayed[index];
-                    return _RecentlyPlayedCard(
-                      track: track,
-                      onTap: () async {
-                        try {
-                          await ref.read(playbackNotifierProvider.notifier).playTrack(
-                                track.videoId,
-                                track.videoUrl,
-                                track.title,
-                                track.artist,
-                                track.thumbnailUrl,
-                              );
-                        } on PlaybackFailure catch (error) {
-                          if (!context.mounted) {
-                            return;
-                          }
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(error.message)),
-                          );
-                        }
-                      },
-                    );
-                  },
+                  child: Text(
+                    'No recent tracks yet',
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
                 ),
-              ),
+              if (recentlyPlayed.isNotEmpty)
+                SizedBox(
+                  height: 208,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: recentlyPlayed.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      final track = recentlyPlayed[index];
+                      return _RecentlyPlayedCard(
+                        track: track,
+                        onTap: () async {
+                          try {
+                            await ref.read(playbackNotifierProvider.notifier).playTrack(
+                                  track.videoId,
+                                  track.videoUrl,
+                                  track.title,
+                                  track.artist,
+                                  track.thumbnailUrl,
+                                );
+                          } on PlaybackFailure catch (error) {
+                            if (!context.mounted) {
+                              return;
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(error.message)),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+              for (final playlist in playlists)
+                _PlaylistPreviewSection(playlist: playlist),
+            ],
             ],
           ],
         ),
       ),
+    );
+  }
+}
+
+class _PlaylistPreviewSection extends ConsumerWidget {
+  const _PlaylistPreviewSection({
+    required this.playlist,
+  });
+
+  final LibraryPlaylist playlist;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return FutureBuilder<List<LibraryTrack>>(
+      future: ref.read(libraryProvider.notifier).fetchPlaylistTracks(playlist.id),
+      builder: (context, snapshot) {
+        final tracks = snapshot.data?.take(10).toList() ?? const <LibraryTrack>[];
+
+        return Padding(
+          padding: const EdgeInsets.only(top: 18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  playlist.name,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: accentPrimary,
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (snapshot.connectionState != ConnectionState.done)
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                  child: Center(
+                    child: CircularProgressIndicator(color: accentPrimary),
+                  ),
+                )
+              else if (tracks.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    'No songs in this playlist yet',
+                    style: Theme.of(context).textTheme.labelSmall,
+                  ),
+                )
+              else
+                SizedBox(
+                  height: 208,
+                  child: ListView.separated(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    scrollDirection: Axis.horizontal,
+                    itemCount: tracks.length,
+                    separatorBuilder: (_, __) => const SizedBox(width: 12),
+                    itemBuilder: (context, index) {
+                      final track = tracks[index];
+                      return _RecentlyPlayedCard(
+                        track: track,
+                        onTap: () async {
+                          try {
+                            await ref.read(playbackNotifierProvider.notifier).playTrack(
+                                  track.videoId,
+                                  track.videoUrl,
+                                  track.title,
+                                  track.artist,
+                                  track.thumbnailUrl,
+                                );
+                          } on PlaybackFailure catch (error) {
+                            if (!context.mounted) {
+                              return;
+                            }
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(error.message)),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  ),
+                ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PlaylistDetailsScreen(
+                          title: playlist.name,
+                          playlistId: playlist.id,
+                        ),
+                      ),
+                    );
+                  },
+                  style: TextButton.styleFrom(
+                    minimumSize: Size.zero,
+                    padding: EdgeInsets.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    side: BorderSide.none,
+                  ),
+                  child: Text(
+                    'Show playlist',
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: accentPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
