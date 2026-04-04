@@ -12,13 +12,65 @@ import '../theme.dart';
 import '../widgets/app_bottom_bar.dart';
 import '../widgets/playlist_sheets.dart';
 
-class LibraryScreen extends ConsumerWidget {
+class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({
     super.key,
     this.onNavigateToTab,
+    this.openRecentsToken = 0,
   });
 
   final ValueChanged<int>? onNavigateToTab;
+  final int openRecentsToken;
+
+  @override
+  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
+}
+
+class _LibraryScreenState extends ConsumerState<LibraryScreen> {
+  int? _lastHandledOpenRecentsToken;
+
+  @override
+  void initState() {
+    super.initState();
+    _scheduleOpenRecentsIfNeeded();
+  }
+
+  @override
+  void didUpdateWidget(covariant LibraryScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.openRecentsToken != widget.openRecentsToken) {
+      _scheduleOpenRecentsIfNeeded();
+    }
+  }
+
+  void _scheduleOpenRecentsIfNeeded() {
+    if (widget.openRecentsToken == 0 ||
+        _lastHandledOpenRecentsToken == widget.openRecentsToken) {
+      return;
+    }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          _lastHandledOpenRecentsToken == widget.openRecentsToken) {
+        return;
+      }
+      _lastHandledOpenRecentsToken = widget.openRecentsToken;
+      _openRecents();
+    });
+  }
+
+  void _openRecents() {
+    final libraryState = ref.read(libraryProvider);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => PlaylistDetailsScreen(
+          title: 'Recents',
+          tracks: libraryState.recentTracks,
+          onNavigateToTab: widget.onNavigateToTab,
+        ),
+      ),
+    );
+  }
 
   void _showPlaylistOptions(BuildContext context, WidgetRef ref) {
     final parentContext = context;
@@ -155,7 +207,7 @@ class LibraryScreen extends ConsumerWidget {
                         builder: (_) => PlaylistDetailsScreen(
                           title: 'Liked Songs',
                           tracks: libraryState.likedTracks,
-                          onNavigateToTab: onNavigateToTab,
+                          onNavigateToTab: widget.onNavigateToTab,
                         ),
                       ),
                     );
@@ -170,15 +222,7 @@ class LibraryScreen extends ConsumerWidget {
                     variant: _CyberpunkPlaylistBadgeVariant.recents,
                   ),
                   onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => PlaylistDetailsScreen(
-                          title: 'Recents',
-                          tracks: libraryState.recentTracks,
-                          onNavigateToTab: onNavigateToTab,
-                        ),
-                      ),
-                    );
+                    _openRecents();
                   },
                 ),
                 for (final playlist in libraryState.userPlaylists) ...[
@@ -199,7 +243,7 @@ class LibraryScreen extends ConsumerWidget {
                             builder: (_) => PlaylistDetailsScreen(
                               title: playlist.name,
                               playlistId: playlist.id,
-                              onNavigateToTab: onNavigateToTab,
+                              onNavigateToTab: widget.onNavigateToTab,
                             ),
                           ),
                         );
@@ -445,10 +489,24 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(false),
+                style: TextButton.styleFrom(
+                  foregroundColor: accentPrimary,
+                  side: BorderSide.none,
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 child: const Text('Cancel'),
               ),
-              FilledButton(
+              TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(true),
+                style: TextButton.styleFrom(
+                  foregroundColor: accentPrimary,
+                  side: BorderSide.none,
+                  minimumSize: Size.zero,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
                 child: const Text('Delete'),
               ),
             ],

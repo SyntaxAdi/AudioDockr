@@ -24,6 +24,7 @@ class AppShell extends ConsumerStatefulWidget {
 class _AppShellState extends ConsumerState<AppShell> {
   late int _currentIndex;
   int _libraryResetToken = 0;
+  int _openRecentsToken = 0;
 
   @override
   void initState() {
@@ -40,6 +41,7 @@ class _AppShellState extends ConsumerState<AppShell> {
   void _openLibraryTracks() {
     setState(() {
       _libraryResetToken++;
+      _openRecentsToken++;
       _currentIndex = 2;
     });
   }
@@ -52,6 +54,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       LibraryScreen(
         key: ValueKey('library-$_libraryResetToken'),
         onNavigateToTab: _onTabTapped,
+        openRecentsToken: _openRecentsToken,
       ),
       const DownloadsScreen(),
       const SettingsScreen(),
