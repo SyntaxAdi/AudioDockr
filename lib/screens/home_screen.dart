@@ -163,12 +163,43 @@ class _PlaylistPreviewSection extends ConsumerWidget {
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Text(
-                  playlist.name,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: accentPrimary,
-                        fontWeight: FontWeight.bold,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        playlist.name,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              color: accentPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
+                    ),
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => PlaylistDetailsScreen(
+                              title: playlist.name,
+                              playlistId: playlist.id,
+                            ),
+                          ),
+                        );
+                      },
+                      style: TextButton.styleFrom(
+                        minimumSize: Size.zero,
+                        padding: EdgeInsets.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: BorderSide.none,
+                      ),
+                      child: Text(
+                        'Show playlist',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: accentPrimary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: 12),
@@ -221,34 +252,6 @@ class _PlaylistPreviewSection extends ConsumerWidget {
                     },
                   ),
                 ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => PlaylistDetailsScreen(
-                          title: playlist.name,
-                          playlistId: playlist.id,
-                        ),
-                      ),
-                    );
-                  },
-                  style: TextButton.styleFrom(
-                    minimumSize: Size.zero,
-                    padding: EdgeInsets.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    side: BorderSide.none,
-                  ),
-                  child: Text(
-                    'Show playlist',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: accentPrimary,
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                ),
-              ),
             ],
           ),
         );

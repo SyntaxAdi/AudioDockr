@@ -12,7 +12,7 @@ import '../theme.dart';
 import '../widgets/app_bottom_bar.dart';
 import '../widgets/playlist_sheets.dart';
 
-class LibraryScreen extends ConsumerStatefulWidget {
+class LibraryScreen extends ConsumerWidget {
   const LibraryScreen({
     super.key,
     this.onNavigateToTab,
@@ -23,10 +23,29 @@ class LibraryScreen extends ConsumerStatefulWidget {
   final int openRecentsToken;
 
   @override
-  ConsumerState<LibraryScreen> createState() => _LibraryScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _LibraryScreenContent(
+      onNavigateToTab: onNavigateToTab,
+      openRecentsToken: openRecentsToken,
+    );
+  }
 }
 
-class _LibraryScreenState extends ConsumerState<LibraryScreen> {
+class _LibraryScreenContent extends ConsumerStatefulWidget {
+  const _LibraryScreenContent({
+    this.onNavigateToTab,
+    this.openRecentsToken = 0,
+  });
+
+  final ValueChanged<int>? onNavigateToTab;
+  final int openRecentsToken;
+
+  @override
+  ConsumerState<_LibraryScreenContent> createState() =>
+      _LibraryScreenContentState();
+}
+
+class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
   int? _lastHandledOpenRecentsToken;
 
   @override
@@ -36,7 +55,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   @override
-  void didUpdateWidget(covariant LibraryScreen oldWidget) {
+  void didUpdateWidget(covariant _LibraryScreenContent oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.openRecentsToken != widget.openRecentsToken) {
       _scheduleOpenRecentsIfNeeded();
