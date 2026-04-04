@@ -24,7 +24,8 @@ final nativePlayerServiceProvider = Provider<NativePlayerService>((ref) {
   return NativePlayerService();
 });
 
-final playbackNotifierProvider = StateNotifierProvider<PlaybackNotifier, PlaybackState>((ref) {
+final playbackNotifierProvider =
+    StateNotifierProvider<PlaybackNotifier, PlaybackState>((ref) {
   final youtubeService = ref.read(youtubeServiceProvider);
   final nativePlayerService = ref.read(nativePlayerServiceProvider);
   final libraryNotifier = ref.read(libraryProvider.notifier);
@@ -61,6 +62,22 @@ class QueuedTrack {
   final String title;
   final String artist;
   final String thumbnailUrl;
+
+  QueuedTrack copyWith({
+    String? videoId,
+    String? videoUrl,
+    String? title,
+    String? artist,
+    String? thumbnailUrl,
+  }) {
+    return QueuedTrack(
+      videoId: videoId ?? this.videoId,
+      videoUrl: videoUrl ?? this.videoUrl,
+      title: title ?? this.title,
+      artist: artist ?? this.artist,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+    );
+  }
 }
 
 enum PlaybackRepeatMode {
@@ -109,7 +126,7 @@ class PlaybackState {
         _shuffleEnabled = shuffleEnabled,
         _recentlyPlayed = recentlyPlayed,
         _queue = queue;
-  
+
   PlaybackState copyWith({
     String? currentTrackId,
     String? currentTitle,
@@ -150,7 +167,8 @@ class PlaybackState {
 const Object _playbackStateNoChange = Object();
 
 class PlaybackNotifier extends StateNotifier<PlaybackState> {
-  static const MethodChannel _extractChannel = MethodChannel('audiodockr/extract');
+  static const MethodChannel _extractChannel =
+      MethodChannel('audiodockr/extract');
 
   final NativePlayerService _nativePlayerService;
   final YoutubeService _youtubeService;
@@ -159,14 +177,16 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   bool _isAdvancingQueue = false;
   final List<QueuedTrack> _history = [];
 
-  PlaybackNotifier(this._nativePlayerService, this._youtubeService, this._libraryNotifier)
+  PlaybackNotifier(
+      this._nativePlayerService, this._youtubeService, this._libraryNotifier)
       : super(PlaybackState()) {
     _playerEventsSubscription = _nativePlayerService.playerStateStream.listen(
       _handleNativePlayerEvent,
     );
   }
 
-  Future<void> playTrack(String videoId, String videoUrl, String title, String artist, String thumbnailUrl) async {
+  Future<void> playTrack(String videoId, String videoUrl, String title,
+      String artist, String thumbnailUrl) async {
     final current = _currentTrackSnapshot();
     if (current != null && current.videoId != videoId) {
       _history.add(current);
@@ -229,13 +249,15 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         thumbnailUrl: thumbnailUrl,
       );
       unawaited(
-        _libraryNotifier.recordTrack(
-          videoId: videoId,
-          videoUrl: resolvedVideoUrl,
-          title: title,
-          artist: artist,
-          thumbnailUrl: thumbnailUrl,
-        ).catchError((_) {}),
+        _libraryNotifier
+            .recordTrack(
+              videoId: videoId,
+              videoUrl: resolvedVideoUrl,
+              title: title,
+              artist: artist,
+              thumbnailUrl: thumbnailUrl,
+            )
+            .catchError((_) {}),
       );
       state = state.copyWith(
         currentTrackId: videoId,
@@ -295,9 +317,8 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       thumbnailUrl: thumbnailUrl,
     );
 
-    final filtered = state.recentlyPlayed
-        .where((item) => item.videoId != videoId)
-        .toList();
+    final filtered =
+        state.recentlyPlayed.where((item) => item.videoId != videoId).toList();
     return [track, ...filtered].take(8).toList(growable: false);
   }
 
@@ -308,10 +329,12 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
 
     final isPlaying = event['isPlaying'] as bool? ?? state.isPlaying;
     final position = Duration(
-      milliseconds: (event['position'] as num?)?.toInt() ?? state.position.inMilliseconds,
+      milliseconds:
+          (event['position'] as num?)?.toInt() ?? state.position.inMilliseconds,
     );
     final duration = Duration(
-      milliseconds: (event['duration'] as num?)?.toInt() ?? state.duration.inMilliseconds,
+      milliseconds:
+          (event['duration'] as num?)?.toInt() ?? state.duration.inMilliseconds,
     );
     final error = event['error'] as String?;
     state = state.copyWith(
@@ -346,7 +369,8 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
 
   Map<String, String> _buildPlaybackHeaders() {
     return const {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
+      'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36',
       'Referer': 'https://music.youtube.com/',
       'Origin': 'https://music.youtube.com',
       'Accept-Language': 'en-US,en;q=0.9',
@@ -419,6 +443,32 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     } on YoutubeServiceException catch (error) {
       throw _mapSearchError(error);
     }
+  }
+
+  Future<QueuedTrack> _resolveQueuedTrackIfNeeded(QueuedTrack track) async {
+    var resolvedVideoUrl = track.videoUrl;
+
+    if (resolvedVideoUrl.isEmpty) {
+      final storedTrack = _libraryNotifier.trackById(track.videoId);
+      if (storedTrack != null && storedTrack.videoUrl.isNotEmpty) {
+        resolvedVideoUrl = storedTrack.videoUrl;
+      }
+    }
+
+    if (resolvedVideoUrl.isEmpty) {
+      resolvedVideoUrl = await _resolveVideoUrlIfNeeded(
+        videoId: track.videoId,
+        videoUrl: resolvedVideoUrl,
+        title: track.title,
+        artist: track.artist,
+      );
+    }
+
+    if (resolvedVideoUrl == track.videoUrl) {
+      return track;
+    }
+
+    return track.copyWith(videoUrl: resolvedVideoUrl);
   }
 
   PlaybackFailure _mapSearchError(YoutubeServiceException error) {
@@ -595,18 +645,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       _history.add(current);
     }
 
-    final nextTrack = state.queue.first;
-    state = state.copyWith(
-      queue: state.queue.skip(1).toList(growable: false),
-    );
-
-    await _playTrackInternal(
-      videoId: nextTrack.videoId,
-      videoUrl: nextTrack.videoUrl,
-      title: nextTrack.title,
-      artist: nextTrack.artist,
-      thumbnailUrl: nextTrack.thumbnailUrl,
-    );
+    await _advanceQueue();
   }
 
   Future<void> previousTrack() async {
@@ -679,19 +718,43 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     if (current != null) {
       _history.add(current);
     }
-    final nextTrack = state.queue.first;
-    state = state.copyWith(queue: state.queue.skip(1).toList(growable: false));
 
     try {
-      await _playTrackInternal(
-        videoId: nextTrack.videoId,
-        videoUrl: nextTrack.videoUrl,
-        title: nextTrack.title,
-        artist: nextTrack.artist,
-        thumbnailUrl: nextTrack.thumbnailUrl,
-      );
+      await _advanceQueue();
+    } on PlaybackFailure catch (error) {
+      state = state.copyWith(lastError: error.message);
     } finally {
       _isAdvancingQueue = false;
+    }
+  }
+
+  Future<void> _advanceQueue() async {
+    PlaybackFailure? lastFailure;
+
+    while (state.queue.isNotEmpty) {
+      final queuedTrack = state.queue.first;
+      state = state.copyWith(
+        queue: state.queue.skip(1).toList(growable: false),
+      );
+
+      try {
+        final playableTrack = await _resolveQueuedTrackIfNeeded(queuedTrack);
+        await _playTrackInternal(
+          videoId: playableTrack.videoId,
+          videoUrl: playableTrack.videoUrl,
+          title: playableTrack.title,
+          artist: playableTrack.artist,
+          thumbnailUrl: playableTrack.thumbnailUrl,
+        );
+        return;
+      } on PlaybackFailure catch (error) {
+        lastFailure = error;
+        state = state.copyWith(lastError: error.message);
+      }
+    }
+
+    if (lastFailure != null) {
+      throw lastFailure;
     }
   }
 

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -69,8 +70,7 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted ||
-          _lastHandledOpenRecentsToken == widget.openRecentsToken) {
+      if (!mounted || _lastHandledOpenRecentsToken == widget.openRecentsToken) {
         return;
       }
       _lastHandledOpenRecentsToken = widget.openRecentsToken;
@@ -245,30 +245,30 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
                   },
                 ),
                 for (final playlist in libraryState.userPlaylists) ...[
-                    const SizedBox(height: 12),
-                    _PlaylistCard(
-                      title: playlist.name,
-                      subtitle: '',
-                      icon: Icons.queue_music_rounded,
-                      leading: _PlaylistCoverArt(
-                        imagePath: playlist.coverImagePath,
-                        imageUrl: '',
-                        size: 56,
-                        borderRadius: 12,
-                      ),
-                      onTap: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => PlaylistDetailsScreen(
-                              title: playlist.name,
-                              playlistId: playlist.id,
-                              onNavigateToTab: widget.onNavigateToTab,
-                            ),
-                          ),
-                        );
-                      },
+                  const SizedBox(height: 12),
+                  _PlaylistCard(
+                    title: playlist.name,
+                    subtitle: '',
+                    icon: Icons.queue_music_rounded,
+                    leading: _PlaylistCoverArt(
+                      imagePath: playlist.coverImagePath,
+                      imageUrl: '',
+                      size: 56,
+                      borderRadius: 12,
                     ),
-                  ],
+                    onTap: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => PlaylistDetailsScreen(
+                            title: playlist.name,
+                            playlistId: playlist.id,
+                            onNavigateToTab: widget.onNavigateToTab,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
               ],
             ),
     );
@@ -386,8 +386,9 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
       _playlistTracksFuture = null;
       return;
     }
-    _playlistTracksFuture =
-        ref.read(libraryProvider.notifier).fetchPlaylistTracks(widget.playlistId!);
+    _playlistTracksFuture = ref
+        .read(libraryProvider.notifier)
+        .fetchPlaylistTracks(widget.playlistId!);
   }
 
   Future<void> _playPlaylistTracks(
@@ -425,13 +426,11 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
   Future<void> _showEditPlaylistSheet(
     BuildContext context,
     WidgetRef ref,
-    LibraryPlaylist playlist,
-    {
+    LibraryPlaylist playlist, {
     bool allowCoverArt = true,
     String title = 'Edit Playlist',
     String submitLabel = 'Save',
-  }
-  ) async {
+  }) async {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -512,7 +511,8 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                   foregroundColor: accentPrimary,
                   side: BorderSide.none,
                   minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 child: const Text('Cancel'),
@@ -523,7 +523,8 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                   foregroundColor: accentPrimary,
                   side: BorderSide.none,
                   minimumSize: Size.zero,
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
                 child: const Text('Delete'),
@@ -666,7 +667,10 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
               ),
       ),
       body: widget.playlistId == null
-          ? _PlaylistTrackList(tracks: widget.tracks ?? const [])
+          ? _PlaylistTrackList(
+              tracks: widget.tracks ?? const [],
+              enableQueueActions: true,
+            )
           : FutureBuilder<List<LibraryTrack>>(
               future: _playlistTracksFuture,
               builder: (context, snapshot) {
@@ -744,7 +748,10 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                       child: Column(
                         children: [
                           Expanded(
-                            child: _LibraryTrackRow(track: track),
+                            child: _LibraryTrackRow(
+                              track: track,
+                              enableQueueActions: true,
+                            ),
                           ),
                           if (index != playlistTracks.length)
                             const Divider(height: 1, color: bgDivider),
@@ -970,7 +977,8 @@ class _PlaylistCoverArt extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final radius = BorderRadius.circular(borderRadius);
-    final targetCacheSize = (size * MediaQuery.of(context).devicePixelRatio).round();
+    final targetCacheSize =
+        (size * MediaQuery.of(context).devicePixelRatio).round();
     Widget child;
 
     if (imagePath.isNotEmpty) {
@@ -1216,9 +1224,11 @@ class _EditPlaylistSheetState extends State<_EditPlaylistSheet> {
 class _PlaylistTrackList extends StatelessWidget {
   const _PlaylistTrackList({
     required this.tracks,
+    this.enableQueueActions = false,
   });
 
   final List<LibraryTrack> tracks;
+  final bool enableQueueActions;
 
   @override
   Widget build(BuildContext context) {
@@ -1237,7 +1247,10 @@ class _PlaylistTrackList extends StatelessWidget {
         final track = tracks[index];
         return SizedBox(
           height: 76,
-          child: _LibraryTrackRow(track: track),
+          child: _LibraryTrackRow(
+            track: track,
+            enableQueueActions: enableQueueActions,
+          ),
         );
       },
     );
@@ -1400,15 +1413,40 @@ class _CyberpunkPlaylistBadge extends StatelessWidget {
 class _LibraryTrackRow extends ConsumerWidget {
   const _LibraryTrackRow({
     required this.track,
+    this.enableQueueActions = false,
   });
 
   final LibraryTrack track;
+  final bool enableQueueActions;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
     final artworkCacheSize = (56 * devicePixelRatio).round();
-    return InkWell(
+    Future<void> queueTrack() async {
+      final added = ref.read(playbackNotifierProvider.notifier).addToQueue(
+            videoId: track.videoId,
+            videoUrl: track.videoUrl,
+            title: track.title,
+            artist: track.artist,
+            thumbnailUrl: track.thumbnailUrl,
+          );
+      if (!context.mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            added
+                ? 'Added "${track.title}" to queue'
+                : '"${track.title}" is already in queue',
+          ),
+          duration: const Duration(milliseconds: 1200),
+        ),
+      );
+    }
+
+    final row = InkWell(
       onTap: () async {
         try {
           await ref.read(playbackNotifierProvider.notifier).playTrack(
@@ -1477,11 +1515,116 @@ class _LibraryTrackRow extends ConsumerWidget {
                 ],
               ),
             ),
+            if (enableQueueActions)
+              IconButton(
+                onPressed: queueTrack,
+                tooltip: 'Add to queue',
+                icon: const Icon(
+                  Icons.queue_music_rounded,
+                  color: accentPrimary,
+                ),
+              ),
             if (track.isLiked)
               const Icon(Icons.favorite, color: accentPrimary, size: 20),
           ],
         ),
       ),
+    );
+
+    if (!enableQueueActions) {
+      return row;
+    }
+
+    return _LibraryQueueSwipeWrapper(
+      onQueued: queueTrack,
+      child: row,
+    );
+  }
+}
+
+class _LibraryQueueSwipeWrapper extends StatefulWidget {
+  const _LibraryQueueSwipeWrapper({
+    required this.onQueued,
+    required this.child,
+  });
+
+  final Future<void> Function() onQueued;
+  final Widget child;
+
+  @override
+  State<_LibraryQueueSwipeWrapper> createState() =>
+      _LibraryQueueSwipeWrapperState();
+}
+
+class _LibraryQueueSwipeWrapperState extends State<_LibraryQueueSwipeWrapper> {
+  double _dragOffset = 0;
+  bool _queueTriggered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final maxReveal = screenWidth * 0.46;
+    final triggerThreshold = maxReveal * 0.62;
+    final revealWidth = _dragOffset.clamp(0.0, maxReveal).toDouble();
+    final actionReady = revealWidth >= triggerThreshold;
+
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Align(
+            alignment: Alignment.centerLeft,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 120),
+              width: revealWidth,
+              color: actionReady ? accentPrimary : bgDivider,
+              alignment: Alignment.center,
+              child: Opacity(
+                opacity: revealWidth <= 8 ? 0 : 1,
+                child: Icon(
+                  Icons.playlist_add_rounded,
+                  color: actionReady ? Colors.black : textPrimary,
+                  size: 28,
+                ),
+              ),
+            ),
+          ),
+        ),
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          transform: Matrix4.translationValues(revealWidth, 0, 0),
+          curve: Curves.easeOut,
+          child: GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onHorizontalDragStart: (_) {
+              _queueTriggered = false;
+            },
+            onHorizontalDragUpdate: (details) {
+              setState(() {
+                _dragOffset = (_dragOffset + details.delta.dx)
+                    .clamp(0.0, maxReveal)
+                    .toDouble();
+              });
+            },
+            onHorizontalDragEnd: (_) {
+              final shouldQueue =
+                  _dragOffset >= triggerThreshold && !_queueTriggered;
+              if (shouldQueue) {
+                _queueTriggered = true;
+                unawaited(widget.onQueued());
+              }
+              setState(() {
+                _dragOffset = 0;
+              });
+            },
+            onHorizontalDragCancel: () {
+              setState(() {
+                _dragOffset = 0;
+              });
+            },
+            child: widget.child,
+          ),
+        ),
+      ],
     );
   }
 }
