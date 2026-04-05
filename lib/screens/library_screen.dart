@@ -281,15 +281,60 @@ class _PlaylistOptionTile extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.plain = false,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final bool plain;
 
   @override
   Widget build(BuildContext context) {
+    if (plain) {
+      return InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 14),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 28,
+                  child: Icon(icon, color: accentPrimary, size: 22),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodyLarge
+                            ?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        subtitle,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: textSecondary,
+                              letterSpacing: 0,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -395,13 +440,20 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
     BuildContext context,
     List<LibraryTrack> tracks,
   ) async {
-    if (tracks.isEmpty) {
+    final playableTracks =
+        tracks.where((track) => !track.hiddenInPlaylist).toList(growable: false);
+    if (playableTracks.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No visible songs available to play in this playlist'),
+        ),
+      );
       return;
     }
 
     try {
       await ref.read(playbackNotifierProvider.notifier).playTracks(
-            tracks,
+            playableTracks,
           );
     } on PlaybackFailure catch (error) {
       if (!context.mounted) {
@@ -411,6 +463,320 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
         SnackBar(content: Text(error.message)),
       );
     }
+  }
+
+  Future<void> _showQueueSheet(BuildContext context) async {
+    final queue = ref.read(playbackNotifierProvider).queue;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (sheetContext) {
+        return FractionallySizedBox(
+          heightFactor: 0.72,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: bgSurface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  Container(
+                    width: 44,
+                    height: 4,
+                    margin: const EdgeInsets.only(top: 12, bottom: 18),
+                    decoration: BoxDecoration(
+                      color: bgDivider,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Queue',
+                          style:
+                              Theme.of(context).textTheme.titleLarge?.copyWith(
+                                    color: textPrimary,
+                                  ),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: queue.isEmpty
+                              ? null
+                              : () {
+                                  ref
+                                      .read(playbackNotifierProvider.notifier)
+                                      .clearQueue();
+                                  Navigator.of(sheetContext).pop();
+                                },
+                          child: const Text('Clear'),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  if (queue.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          'NO SONGS IN QUEUE',
+                          style: Theme.of(context).textTheme.labelSmall,
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                        itemCount: queue.length,
+                        separatorBuilder: (_, __) =>
+                            const Divider(height: 1, color: bgDivider),
+                        itemBuilder: (context, index) {
+                          final queuedTrack = queue[index];
+                          return ListTile(
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 4),
+                            leading: Container(
+                              width: 44,
+                              height: 44,
+                              color: bgDivider,
+                              child: queuedTrack.thumbnailUrl.isEmpty
+                                  ? const Icon(
+                                      Icons.music_note,
+                                      color: textSecondary,
+                                    )
+                                  : CachedNetworkImage(
+                                      imageUrl: queuedTrack.thumbnailUrl,
+                                      fit: BoxFit.cover,
+                                      memCacheWidth: 132,
+                                      memCacheHeight: 132,
+                                    ),
+                            ),
+                            title: Text(
+                              queuedTrack.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              queuedTrack.artist,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showAddToAnotherPlaylistSheet(
+    BuildContext context, {
+    required String currentPlaylistId,
+    required LibraryTrack track,
+  }) async {
+    final userPlaylists = ref
+        .read(libraryProvider)
+        .userPlaylists
+        .where((playlist) => playlist.id != currentPlaylistId)
+        .toList(growable: false);
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return FractionallySizedBox(
+          heightFactor: 0.56,
+          child: Container(
+            decoration: const BoxDecoration(
+              color: bgSurface,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              top: false,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      margin: const EdgeInsets.only(top: 12, bottom: 20),
+                      decoration: BoxDecoration(
+                        color: bgDivider,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    child: Text(
+                      'Add to another playlist',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            color: textPrimary,
+                          ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  if (userPlaylists.isEmpty)
+                    Expanded(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 24),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                'NO OTHER PLAYLISTS YET',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(color: textSecondary),
+                              ),
+                              const SizedBox(height: 14),
+                              ElevatedButton(
+                                onPressed: () async {
+                                  Navigator.of(sheetContext).pop();
+                                  await showCreatePlaylistSheet(context, ref);
+                                  if (!mounted || !context.mounted) {
+                                    return;
+                                  }
+                                  await _showAddToAnotherPlaylistSheet(
+                                    context,
+                                    currentPlaylistId: currentPlaylistId,
+                                    track: track,
+                                  );
+                                },
+                                child: const Text('CREATE PLAYLIST'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                        itemCount: userPlaylists.length,
+                        separatorBuilder: (_, __) =>
+                            const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final playlist = userPlaylists[index];
+                          return InkWell(
+                            onTap: () async {
+                              final added = await ref
+                                  .read(libraryProvider.notifier)
+                                  .addTrackToPlaylist(
+                                    playlistId: playlist.id,
+                                    videoId: track.videoId,
+                                    videoUrl: track.videoUrl,
+                                    title: track.title,
+                                    artist: track.artist,
+                                    thumbnailUrl: track.thumbnailUrl,
+                                    durationSeconds: track.durationSeconds,
+                                  );
+                              if (!sheetContext.mounted) {
+                                return;
+                              }
+                              Navigator.of(sheetContext).pop();
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    added
+                                        ? 'Added "${track.title}" to ${playlist.name}'
+                                        : '"${track.title}" is already in ${playlist.name}',
+                                  ),
+                                ),
+                              );
+                            },
+                            borderRadius: BorderRadius.circular(16),
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: bgCard,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: bgDivider),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    width: 48,
+                                    height: 48,
+                                    decoration: BoxDecoration(
+                                      color:
+                                          accentPrimary.withValues(alpha: 0.12),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(
+                                      Icons.queue_music_rounded,
+                                      color: accentPrimary,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Text(
+                                      playlist.name,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.copyWith(color: textPrimary),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _toggleTrackHidden(
+    BuildContext context, {
+    required String playlistId,
+    required LibraryTrack track,
+  }) async {
+    final hidden = !track.hiddenInPlaylist;
+    await ref.read(libraryProvider.notifier).setTrackHiddenInPlaylist(
+          playlistId: playlistId,
+          videoId: track.videoId,
+          hidden: hidden,
+        );
+    setState(() {
+      _refreshPlaylistTracksFuture();
+    });
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          hidden
+              ? 'Hidden "${track.title}" in this playlist'
+              : 'Showing "${track.title}" in this playlist again',
+        ),
+        duration: const Duration(milliseconds: 1400),
+      ),
+    );
   }
 
   void _handleBottomNavigation(BuildContext context, int index) {
@@ -750,7 +1116,19 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                           Expanded(
                             child: _LibraryTrackRow(
                               track: track,
-                              enableQueueActions: true,
+                              playlistId: editablePlaylist.id,
+                              onAddToAnotherPlaylist: () =>
+                                  _showAddToAnotherPlaylistSheet(
+                                context,
+                                currentPlaylistId: editablePlaylist.id,
+                                track: track,
+                              ),
+                              onToggleHidden: () => _toggleTrackHidden(
+                                context,
+                                playlistId: editablePlaylist.id,
+                                track: track,
+                              ),
+                              onGoToQueue: () => _showQueueSheet(context),
                             ),
                           ),
                           if (index != playlistTracks.length)
@@ -1414,15 +1792,29 @@ class _LibraryTrackRow extends ConsumerWidget {
   const _LibraryTrackRow({
     required this.track,
     this.enableQueueActions = false,
+    this.playlistId,
+    this.onAddToAnotherPlaylist,
+    this.onToggleHidden,
+    this.onGoToQueue,
   });
 
   final LibraryTrack track;
   final bool enableQueueActions;
+  final String? playlistId;
+  final Future<void> Function()? onAddToAnotherPlaylist;
+  final Future<void> Function()? onToggleHidden;
+  final Future<void> Function()? onGoToQueue;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
     final artworkCacheSize = (56 * devicePixelRatio).round();
+    final isPlaylistTrack = playlistId != null;
+    final isHidden = track.hiddenInPlaylist;
+    final effectiveTextColor = isHidden ? textSecondary : textPrimary;
+    final effectiveSubtitleColor =
+        isHidden ? textSecondary.withValues(alpha: 0.72) : textSecondary;
+
     Future<void> queueTrack() async {
       final added = ref.read(playbackNotifierProvider.notifier).addToQueue(
             videoId: track.videoId,
@@ -1446,25 +1838,148 @@ class _LibraryTrackRow extends ConsumerWidget {
       );
     }
 
-    final row = InkWell(
-      onTap: () async {
-        try {
-          await ref.read(playbackNotifierProvider.notifier).playTrack(
-                track.videoId,
-                track.videoUrl,
-                track.title,
-                track.artist,
-                track.thumbnailUrl,
-              );
-        } on PlaybackFailure catch (error) {
-          if (!context.mounted) {
-            return;
-          }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(error.message)),
+    Future<void> toggleLiked() async {
+      await ref.read(libraryProvider.notifier).toggleLike(
+            videoId: track.videoId,
+            videoUrl: track.videoUrl,
+            title: track.title,
+            artist: track.artist,
+            thumbnailUrl: track.thumbnailUrl,
+            durationSeconds: track.durationSeconds,
           );
-        }
-      },
+    }
+
+    Future<void> showTrackOptionsSheet() async {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (sheetContext) {
+          Future<void> handleAction(_PlaylistTrackMenuAction action) async {
+            Navigator.of(sheetContext).pop();
+            switch (action) {
+              case _PlaylistTrackMenuAction.addToAnotherPlaylist:
+                await onAddToAnotherPlaylist?.call();
+                return;
+              case _PlaylistTrackMenuAction.toggleHidden:
+                await onToggleHidden?.call();
+                return;
+              case _PlaylistTrackMenuAction.addToQueue:
+                await queueTrack();
+                return;
+              case _PlaylistTrackMenuAction.goToQueue:
+                await onGoToQueue?.call();
+                return;
+            }
+          }
+
+          return SafeArea(
+            top: false,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final mediaQuery = MediaQuery.of(context);
+                final availableHeight =
+                    constraints.maxHeight.isFinite
+                        ? constraints.maxHeight
+                        : mediaQuery.size.height;
+
+                return ConstrainedBox(
+                  constraints: BoxConstraints(maxHeight: availableHeight),
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      color: bgSurface,
+                      borderRadius:
+                          BorderRadius.vertical(top: Radius.circular(24)),
+                    ),
+                    child: SingleChildScrollView(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Center(
+                            child: Container(
+                              width: 44,
+                              height: 4,
+                              margin: const EdgeInsets.only(top: 12, bottom: 20),
+                              decoration: BoxDecoration(
+                                color: bgDivider,
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                            ),
+                          ),
+                          _PlaylistOptionTile(
+                            icon: Icons.playlist_add_rounded,
+                            title: 'Add to another playlist',
+                            subtitle: 'Save this song to a different playlist',
+                            plain: true,
+                            onTap: () => handleAction(
+                              _PlaylistTrackMenuAction.addToAnotherPlaylist,
+                            ),
+                          ),
+                          _PlaylistOptionTile(
+                            icon: isHidden
+                                ? Icons.visibility_rounded
+                                : Icons.visibility_off_rounded,
+                            title: isHidden
+                                ? 'Show in this playlist'
+                                : 'Hide in this playlist',
+                            subtitle: isHidden
+                                ? 'Bring this song back into playlist playback'
+                                : 'Gray it out and skip it during playlist playback',
+                            plain: true,
+                            onTap: () => handleAction(
+                              _PlaylistTrackMenuAction.toggleHidden,
+                            ),
+                          ),
+                          _PlaylistOptionTile(
+                            icon: Icons.queue_music_rounded,
+                            title: 'Add to queue',
+                            subtitle: 'Play this song after the current queue',
+                            plain: true,
+                            onTap: () =>
+                                handleAction(_PlaylistTrackMenuAction.addToQueue),
+                          ),
+                          _PlaylistOptionTile(
+                            icon: Icons.format_list_bulleted_rounded,
+                            title: 'Go to queue',
+                            subtitle: 'Open the current playback queue',
+                            plain: true,
+                            onTap: () =>
+                                handleAction(_PlaylistTrackMenuAction.goToQueue),
+                          ),
+                          SizedBox(height: mediaQuery.viewPadding.bottom + 12),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        },
+      );
+    }
+
+    final row = InkWell(
+      onTap: isHidden
+          ? null
+          : () async {
+              try {
+                await ref.read(playbackNotifierProvider.notifier).playTrack(
+                      track.videoId,
+                      track.videoUrl,
+                      track.title,
+                      track.artist,
+                      track.thumbnailUrl,
+                    );
+              } on PlaybackFailure catch (error) {
+                if (!context.mounted) {
+                  return;
+                }
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(error.message)),
+                );
+              }
+            },
       child: Container(
         height: 76,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -1472,25 +1987,28 @@ class _LibraryTrackRow extends ConsumerWidget {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
-              child: Container(
-                width: 56,
-                height: 56,
-                color: bgDivider,
-                child: track.thumbnailUrl.isEmpty
-                    ? const Center(
-                        child: Icon(Icons.music_note, color: textSecondary),
-                      )
-                    : CachedNetworkImage(
-                        imageUrl: track.thumbnailUrl,
-                        memCacheWidth: artworkCacheSize,
-                        memCacheHeight: artworkCacheSize,
-                        maxWidthDiskCache: artworkCacheSize,
-                        maxHeightDiskCache: artworkCacheSize,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => const Center(
+              child: Opacity(
+                opacity: isHidden ? 0.42 : 1,
+                child: Container(
+                  width: 56,
+                  height: 56,
+                  color: bgDivider,
+                  child: track.thumbnailUrl.isEmpty
+                      ? const Center(
                           child: Icon(Icons.music_note, color: textSecondary),
+                        )
+                      : CachedNetworkImage(
+                          imageUrl: track.thumbnailUrl,
+                          memCacheWidth: artworkCacheSize,
+                          memCacheHeight: artworkCacheSize,
+                          maxWidthDiskCache: artworkCacheSize,
+                          maxHeightDiskCache: artworkCacheSize,
+                          fit: BoxFit.cover,
+                          errorWidget: (_, __, ___) => const Center(
+                            child: Icon(Icons.music_note, color: textSecondary),
+                          ),
                         ),
-                      ),
+                ),
               ),
             ),
             const SizedBox(width: 14),
@@ -1501,21 +2019,46 @@ class _LibraryTrackRow extends ConsumerWidget {
                 children: [
                   Text(
                     track.title,
-                    style: Theme.of(context).textTheme.bodyLarge,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: effectiveTextColor,
+                        ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    track.artist,
-                    style: Theme.of(context).textTheme.labelSmall,
+                    isHidden ? '${track.artist} • Hidden' : track.artist,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: effectiveSubtitleColor,
+                        ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ],
               ),
             ),
-            if (enableQueueActions)
+            if (isPlaylistTrack) ...[
+              IconButton(
+                onPressed: toggleLiked,
+                tooltip: track.isLiked
+                    ? 'Remove from liked songs'
+                    : 'Add to liked songs',
+                icon: Icon(
+                  track.isLiked
+                      ? Icons.favorite_rounded
+                      : Icons.favorite_border_rounded,
+                  color: track.isLiked ? accentPrimary : textSecondary,
+                ),
+              ),
+              IconButton(
+                onPressed: showTrackOptionsSheet,
+                tooltip: 'Track options',
+                icon: const Icon(
+                  Icons.more_vert_rounded,
+                  color: textPrimary,
+                ),
+              ),
+            ] else if (enableQueueActions)
               IconButton(
                 onPressed: queueTrack,
                 tooltip: 'Add to queue',
@@ -1524,7 +2067,7 @@ class _LibraryTrackRow extends ConsumerWidget {
                   color: accentPrimary,
                 ),
               ),
-            if (track.isLiked)
+            if (!isPlaylistTrack && track.isLiked)
               const Icon(Icons.favorite, color: accentPrimary, size: 20),
           ],
         ),
@@ -1540,6 +2083,13 @@ class _LibraryTrackRow extends ConsumerWidget {
       child: row,
     );
   }
+}
+
+enum _PlaylistTrackMenuAction {
+  addToAnotherPlaylist,
+  toggleHidden,
+  addToQueue,
+  goToQueue,
 }
 
 class _LibraryQueueSwipeWrapper extends StatefulWidget {

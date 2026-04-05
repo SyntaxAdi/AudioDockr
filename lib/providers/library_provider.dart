@@ -12,7 +12,8 @@ class LibraryTrack {
     required this.durationSeconds,
     required this.thumbnailUrl,
     required this.reaction,
-  });
+    bool? hiddenInPlaylist,
+  }) : _hiddenInPlaylist = hiddenInPlaylist;
 
   final String videoId;
   final String videoUrl;
@@ -21,6 +22,8 @@ class LibraryTrack {
   final int durationSeconds;
   final String thumbnailUrl;
   final String reaction;
+  final bool? _hiddenInPlaylist;
+  bool get hiddenInPlaylist => _hiddenInPlaylist ?? false;
 
   bool get isLiked => reaction == 'liked';
   bool get isDisliked => reaction == 'disliked';
@@ -34,6 +37,7 @@ class LibraryTrack {
       durationSeconds: track.durationSeconds,
       thumbnailUrl: track.thumbnailUrl,
       reaction: track.reaction,
+      hiddenInPlaylist: track.hiddenInPlaylist,
     );
   }
 }
@@ -297,6 +301,22 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
   Future<List<LibraryTrack>> fetchPlaylistTracks(String playlistId) async {
     final tracks = await _databaseHelper.fetchPlaylistTracks(playlistId);
     return tracks.map(LibraryTrack.fromStoredTrack).toList();
+  }
+
+  Future<void> setTrackHiddenInPlaylist({
+    required String playlistId,
+    required String videoId,
+    required bool hidden,
+  }) async {
+    await _databaseHelper.setTrackHiddenInPlaylist(
+      playlistId: playlistId,
+      videoId: videoId,
+      hidden: hidden,
+    );
+    final playlists = await _databaseHelper.fetchPlaylists();
+    state = state.copyWith(
+      playlists: _mapPlaylists(playlists),
+    );
   }
 
   Future<String> importSpotifyPlaylist(

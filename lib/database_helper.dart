@@ -13,7 +13,8 @@ class StoredTrack {
     required this.thumbnailUrl,
     required this.reaction,
     required this.lastPlayedAt,
-  });
+    bool? hiddenInPlaylist,
+  }) : _hiddenInPlaylist = hiddenInPlaylist;
 
   final String videoId;
   final String videoUrl;
@@ -23,6 +24,8 @@ class StoredTrack {
   final String thumbnailUrl;
   final String reaction;
   final int lastPlayedAt;
+  final bool? _hiddenInPlaylist;
+  bool get hiddenInPlaylist => _hiddenInPlaylist ?? false;
 
   bool get isLiked => reaction == 'liked';
   bool get isDisliked => reaction == 'disliked';
@@ -37,6 +40,7 @@ class StoredTrack {
       thumbnailUrl: (map['thumbnail_url'] as String?) ?? '',
       reaction: (map['state'] as String?) ?? 'neutral',
       lastPlayedAt: (map['last_played_at'] as int?) ?? 0,
+      hiddenInPlaylist: ((map['hidden_in_playlist'] as int?) ?? 0) == 1,
     );
   }
 }
@@ -83,10 +87,11 @@ class DatabaseHelper {
 
   Future<Database> get database async {
     if (_database != null) {
+      await _ensureDatabaseSchema(_database!);
       return _database!;
     }
     _database = await _initDB('audiodockr.db');
-    await _ensureBuiltinPlaylists(_database!);
+    await _ensureDatabaseSchema(_database!);
     return _database!;
   }
 
@@ -96,7 +101,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 6,
+      version: 7,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -131,6 +136,7 @@ class DatabaseHelper {
         playlist_id TEXT,
         video_id TEXT,
         position INTEGER,
+        hidden INTEGER DEFAULT 0,
         PRIMARY KEY(playlist_id, video_id)
       )
     ''');
@@ -201,6 +207,14 @@ class DatabaseHelper {
         'ON search_history(searched_at)',
       );
     }
+    if (oldVersion < 7) {
+      await _ensureColumn(
+        db,
+        'playlist_tracks',
+        'hidden',
+        'INTEGER DEFAULT 0',
+      );
+    }
   }
 
   Future<void> _ensureColumn(
@@ -226,6 +240,16 @@ class DatabaseHelper {
         'created_at': DateTime.now().millisecondsSinceEpoch,
       },
       conflictAlgorithm: ConflictAlgorithm.ignore,
+    );
+  }
+
+  Future<void> _ensureDatabaseSchema(Database db) async {
+    await _ensureBuiltinPlaylists(db);
+    await _ensureColumn(
+      db,
+      'playlist_tracks',
+      'hidden',
+      'INTEGER DEFAULT 0',
     );
   }
 
@@ -317,6 +341,7 @@ class DatabaseHelper {
         'playlist_id': playlistId,
         'video_id': videoId,
         'position': nextPosition,
+        'hidden': 0,
       },
       conflictAlgorithm: ConflictAlgorithm.ignore,
     );
@@ -330,6 +355,22 @@ class DatabaseHelper {
     final db = await database;
     await db.delete(
       'playlist_tracks',
+      where: 'playlist_id = ? AND video_id = ?',
+      whereArgs: [playlistId, videoId],
+    );
+  }
+
+  Future<void> setTrackHiddenInPlaylist({
+    required String playlistId,
+    required String videoId,
+    required bool hidden,
+  }) async {
+    final db = await database;
+    await db.update(
+      'playlist_tracks',
+      {
+        'hidden': hidden ? 1 : 0,
+      },
       where: 'playlist_id = ? AND video_id = ?',
       whereArgs: [playlistId, videoId],
     );
@@ -424,6 +465,7 @@ class DatabaseHelper {
             'playlist_id': playlistId,
             'video_id': track.videoId,
             'position': nextPosition,
+            'hidden': 0,
           },
           conflictAlgorithm: ConflictAlgorithm.ignore,
         );
@@ -491,6 +533,7 @@ class DatabaseHelper {
           'playlist_id': likedPlaylistId,
           'video_id': videoId,
           'position': nextPosition,
+          'hidden': 0,
         },
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
@@ -516,7 +559,7 @@ class DatabaseHelper {
     final db = await database;
     final result = await db.rawQuery('''
       SELECT t.video_id, t.video_url, t.title, t.artist, t.duration,
-             t.thumbnail_url, t.state
+             t.thumbnail_url, t.state, 0 AS hidden_in_playlist
       FROM playlist_tracks pt
       INNER JOIN tracks t ON t.video_id = pt.video_id
       WHERE pt.playlist_id = ?
@@ -529,7 +572,8 @@ class DatabaseHelper {
     final db = await database;
     final result = await db.rawQuery('''
       SELECT t.video_id, t.video_url, t.title, t.artist, t.duration,
-             t.thumbnail_url, t.state, t.last_played_at
+             t.thumbnail_url, t.state, t.last_played_at,
+             pt.hidden AS hidden_in_playlist
       FROM playlist_tracks pt
       INNER JOIN tracks t ON t.video_id = pt.video_id
       WHERE pt.playlist_id = ?
