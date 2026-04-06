@@ -20,6 +20,16 @@ class PlaybackFailure implements Exception {
   String toString() => message;
 }
 
+class _ResolvedMedia {
+  const _ResolvedMedia({
+    required this.realYoutubeId,
+    required this.videoUrl,
+  });
+
+  final String realYoutubeId;
+  final String videoUrl;
+}
+
 final nativePlayerServiceProvider = Provider<NativePlayerService>((ref) {
   return NativePlayerService();
 });
@@ -176,6 +186,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
   StreamSubscription<Map<String, dynamic>>? _playerEventsSubscription;
   bool _isAdvancingQueue = false;
   final List<QueuedTrack> _history = [];
+  DateTime? _lastTrackStart;
 
   PlaybackNotifier(
       this._nativePlayerService, this._youtubeService, this._libraryNotifier)
@@ -208,7 +219,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     required String thumbnailUrl,
   }) async {
     await _ensurePlaybackPermissions();
-    final resolvedVideoUrl = await _resolveVideoUrlIfNeeded(
+    final resolvedMedia = await _resolveVideoUrlIfNeeded(
       videoId: videoId,
       videoUrl: videoUrl,
       title: title,
@@ -225,13 +236,16 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         currentTitle: title,
         currentArtist: artist,
         currentThumbnailUrl: thumbnailUrl,
-        currentVideoUrl: resolvedVideoUrl,
+        currentVideoUrl: resolvedMedia.videoUrl,
         position: Duration.zero,
         duration: Duration.zero,
         isPreparing: true,
         lastError: null,
       );
-      final audioUrl = await _extractTrackUrl(videoId, resolvedVideoUrl);
+      final audioUrl = await _extractTrackUrl(
+        resolvedMedia.realYoutubeId,
+        resolvedMedia.videoUrl,
+      );
 
       if (audioUrl == null || audioUrl.isEmpty) {
         state = state.copyWith(isPreparing: false);
@@ -248,11 +262,12 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         artist: artist,
         thumbnailUrl: thumbnailUrl,
       );
+      _lastTrackStart = DateTime.now();
       unawaited(
         _libraryNotifier
             .recordTrack(
               videoId: videoId,
-              videoUrl: resolvedVideoUrl,
+              videoUrl: resolvedMedia.videoUrl,
               title: title,
               artist: artist,
               thumbnailUrl: thumbnailUrl,
@@ -264,14 +279,14 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         currentTitle: title,
         currentArtist: artist,
         currentThumbnailUrl: thumbnailUrl,
-        currentVideoUrl: resolvedVideoUrl,
+        currentVideoUrl: resolvedMedia.videoUrl,
         position: Duration.zero,
         duration: Duration.zero,
         isPreparing: false,
         isPlaying: true,
         recentlyPlayed: _updatedRecentlyPlayed(
           videoId: videoId,
-          videoUrl: resolvedVideoUrl,
+          videoUrl: resolvedMedia.videoUrl,
           title: title,
           artist: artist,
           thumbnailUrl: thumbnailUrl,
@@ -336,6 +351,13 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       milliseconds:
           (event['duration'] as num?)?.toInt() ?? state.duration.inMilliseconds,
     );
+    if (_lastTrackStart != null &&
+        DateTime.now().difference(_lastTrackStart!) <
+            const Duration(milliseconds: 1500) &&
+        position > const Duration(seconds: 3)) {
+      return;
+    }
+
     final error = event['error'] as String?;
     state = state.copyWith(
       isPreparing: false,
@@ -421,25 +443,50 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     }
   }
 
-  Future<String> _resolveVideoUrlIfNeeded({
+  String _extractRealYoutubeId(String originalId, String videoUrl) {
+    if (videoUrl.isEmpty) {
+      return originalId;
+    }
+
+    final uri = Uri.tryParse(videoUrl);
+    final queryId = uri?.queryParameters['v'];
+    if (queryId != null && queryId.isNotEmpty) {
+      return queryId;
+    }
+
+    final segments = uri?.pathSegments ?? const <String>[];
+    if (segments.isNotEmpty && uri?.host.contains('youtu.be') == true) {
+      return segments.first;
+    }
+
+    return originalId;
+  }
+
+  Future<_ResolvedMedia> _resolveVideoUrlIfNeeded({
     required String videoId,
     required String videoUrl,
     required String title,
     required String artist,
   }) async {
     if (videoUrl.isNotEmpty) {
-      return videoUrl;
+      return _ResolvedMedia(
+        realYoutubeId: _extractRealYoutubeId(videoId, videoUrl),
+        videoUrl: videoUrl,
+      );
     }
 
     try {
       final query = '$title $artist'.trim();
       final results = await _youtubeService.search(query);
-      final resolvedVideoUrl = results.first.url;
+      final match = results.first;
       await _libraryNotifier.updateTrackVideoUrl(
         videoId: videoId,
-        videoUrl: resolvedVideoUrl,
+        videoUrl: match.url,
       );
-      return resolvedVideoUrl;
+      return _ResolvedMedia(
+        realYoutubeId: match.id,
+        videoUrl: match.url,
+      );
     } on YoutubeServiceException catch (error) {
       throw _mapSearchError(error);
     }
@@ -455,20 +502,18 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       }
     }
 
-    if (resolvedVideoUrl.isEmpty) {
-      resolvedVideoUrl = await _resolveVideoUrlIfNeeded(
-        videoId: track.videoId,
-        videoUrl: resolvedVideoUrl,
-        title: track.title,
-        artist: track.artist,
-      );
-    }
+    final resolvedMedia = await _resolveVideoUrlIfNeeded(
+      videoId: track.videoId,
+      videoUrl: resolvedVideoUrl,
+      title: track.title,
+      artist: track.artist,
+    );
 
-    if (resolvedVideoUrl == track.videoUrl) {
+    if (resolvedMedia.videoUrl == track.videoUrl) {
       return track;
     }
 
-    return track.copyWith(videoUrl: resolvedVideoUrl);
+    return track.copyWith(videoUrl: resolvedMedia.videoUrl);
   }
 
   PlaybackFailure _mapSearchError(YoutubeServiceException error) {
@@ -750,6 +795,10 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
       } on PlaybackFailure catch (error) {
         lastFailure = error;
         state = state.copyWith(lastError: error.message);
+        if (error.code == 'rate_limited' ||
+            error.code == 'temporary_unavailable') {
+          break;
+        }
       }
     }
 
