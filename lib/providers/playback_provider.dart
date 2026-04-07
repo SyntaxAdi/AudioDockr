@@ -343,6 +343,8 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     }
 
     final isPlaying = event['isPlaying'] as bool? ?? state.isPlaying;
+    final playbackState =
+        _nativePlaybackStateFromEvent(event['playbackState'] as String?);
     final position = Duration(
       milliseconds:
           (event['position'] as num?)?.toInt() ?? state.position.inMilliseconds,
@@ -370,6 +372,7 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
 
     if (!isPlaying &&
         !_isAdvancingQueue &&
+        playbackState == _NativePlaybackState.ended &&
         state.repeatMode == PlaybackRepeatMode.off &&
         state.queue.isNotEmpty &&
         duration > Duration.zero &&
@@ -386,6 +389,20 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
         return PlaybackRepeatMode.all;
       default:
         return PlaybackRepeatMode.off;
+    }
+  }
+
+  _NativePlaybackState _nativePlaybackStateFromEvent(String? state) {
+    switch (state) {
+      case 'buffering':
+        return _NativePlaybackState.buffering;
+      case 'ready':
+        return _NativePlaybackState.ready;
+      case 'ended':
+        return _NativePlaybackState.ended;
+      case 'idle':
+      default:
+        return _NativePlaybackState.idle;
     }
   }
 
@@ -812,4 +829,11 @@ class PlaybackNotifier extends StateNotifier<PlaybackState> {
     _playerEventsSubscription?.cancel();
     super.dispose();
   }
+}
+
+enum _NativePlaybackState {
+  idle,
+  buffering,
+  ready,
+  ended,
 }

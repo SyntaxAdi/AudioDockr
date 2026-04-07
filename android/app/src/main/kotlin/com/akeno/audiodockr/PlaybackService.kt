@@ -58,6 +58,8 @@ class PlaybackService : MediaSessionService() {
     private lateinit var notificationManager: PlayerNotificationManager
     private var currentRepeatMode: String = "off"
     private var repeatOnePendingReplay = false
+    private var isForegroundActive = false
+    private var isSwitchingTrack = false
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val artworkHttpClient = OkHttpClient()
     private val artworkCache = object : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 16L).toInt()) {
@@ -104,6 +106,7 @@ class PlaybackService : MediaSessionService() {
                     object : Player.Listener {
                         override fun onIsPlayingChanged(isPlaying: Boolean) {
                             if (isPlaying) {
+                                isSwitchingTrack = false
                                 startProgressUpdates()
                             } else {
                                 stopProgressUpdates()
@@ -131,6 +134,7 @@ class PlaybackService : MediaSessionService() {
                                 currentRepeatMode = "off"
                             }
                             if (playbackState == Player.STATE_READY && player.isPlaying) {
+                                isSwitchingTrack = false
                                 startProgressUpdates()
                             } else if (playbackState == Player.STATE_ENDED ||
                                 playbackState == Player.STATE_IDLE
@@ -226,6 +230,7 @@ class PlaybackService : MediaSessionService() {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Starting playback for $url")
         }
+        isSwitchingTrack = true
         val dataSourceFactory = DefaultHttpDataSource.Factory()
             .setDefaultRequestProperties(headers)
             .setAllowCrossProtocolRedirects(true)
@@ -265,6 +270,7 @@ class PlaybackService : MediaSessionService() {
             "isPlaying" to player.isPlaying,
             "position" to player.currentPosition.coerceAtLeast(0L),
             "duration" to (player.duration.takeIf { it > 0 } ?: 0L),
+            "playbackState" to playbackStateName(player.playbackState),
             "repeatMode" to currentRepeatMode,
             "error" to error,
         )
@@ -273,6 +279,14 @@ class PlaybackService : MediaSessionService() {
         listeners.forEach { listener ->
             listener(state)
         }
+    }
+
+    private fun shouldKeepForeground(): Boolean {
+        return isSwitchingTrack ||
+            player.isPlaying ||
+            player.playWhenReady ||
+            player.playbackState == Player.STATE_BUFFERING ||
+            player.mediaItemCount > 0
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? {
@@ -339,6 +353,7 @@ class PlaybackService : MediaSessionService() {
             "isPlaying" to false,
             "position" to 0L,
             "duration" to 0L,
+            "playbackState" to "idle",
             "repeatMode" to "off",
             "error" to null,
         )
@@ -356,6 +371,18 @@ class PlaybackService : MediaSessionService() {
         }
 
         fun currentPlaybackState(): Map<String, Any?> = lastState
+
+        fun isRunning(): Boolean = instance != null
+
+        private fun playbackStateName(playbackState: Int): String {
+            return when (playbackState) {
+                Player.STATE_IDLE -> "idle"
+                Player.STATE_BUFFERING -> "buffering"
+                Player.STATE_READY -> "ready"
+                Player.STATE_ENDED -> "ended"
+                else -> "unknown"
+            }
+        }
 
         fun buildPlayIntent(
             context: Context,
@@ -503,21 +530,31 @@ class PlaybackService : MediaSessionService() {
                         notification: Notification,
                         ongoing: Boolean,
                     ) {
-                        if (ongoing) {
-                            try {
-                                startForeground(notificationId, notification)
-                            } catch (error: ForegroundServiceStartNotAllowedException) {
-                                if (BuildConfig.DEBUG) {
-                                    Log.w(TAG, "Foreground start not allowed", error)
+                        if (ongoing || shouldKeepForeground()) {
+                            if (!isForegroundActive) {
+                                try {
+                                    startForeground(notificationId, notification)
+                                    isForegroundActive = true
+                                } catch (error: ForegroundServiceStartNotAllowedException) {
+                                    if (BuildConfig.DEBUG) {
+                                        Log.w(TAG, "Foreground start not allowed", error)
+                                    }
                                 }
                             }
                         } else {
-                            stopForeground(STOP_FOREGROUND_DETACH)
+                            if (isForegroundActive) {
+                                stopForeground(STOP_FOREGROUND_DETACH)
+                                isForegroundActive = false
+                            }
                         }
                     }
 
                     override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
+                        if (shouldKeepForeground()) {
+                            return
+                        }
                         stopForeground(STOP_FOREGROUND_REMOVE)
+                        isForegroundActive = false
                     }
                 },
             )

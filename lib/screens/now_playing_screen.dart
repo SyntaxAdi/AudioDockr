@@ -1555,7 +1555,8 @@ class _NowPlayingSeekSection extends ConsumerWidget {
       ),
     );
     final notifier = ref.read(playbackNotifierProvider.notifier);
-    final durationMs = playbackState.duration.inMilliseconds > 0
+    final hasSeekRange = playbackState.duration.inMilliseconds > 0;
+    final durationMs = hasSeekRange
         ? playbackState.duration.inMilliseconds.toDouble()
         : 1.0;
     final currentPositionMs = playbackState.position.inMilliseconds
@@ -1574,39 +1575,51 @@ class _NowPlayingSeekSection extends ConsumerWidget {
           children: [
             SizedBox(
               height: 28,
-              child: SliderTheme(
-                data: SliderThemeData(
-                  trackHeight: 4,
-                  activeTrackColor: accentPrimary,
-                  inactiveTrackColor: bgDivider,
-                  thumbColor: accentPrimary,
-                  overlayColor: accentPrimary.withValues(alpha: 0.16),
-                  thumbShape: const RoundSliderThumbShape(
-                    enabledThumbRadius: 7,
-                    elevation: 0,
-                  ),
-                  overlayShape: const RoundSliderOverlayShape(
-                    overlayRadius: 16,
-                  ),
-                ),
-                child: Slider(
-                  min: 0,
-                  max: durationMs,
-                  value: clampedSliderValue,
-                  onChangeStart: (value) {
-                    seekPreviewMs.value = value;
-                  },
-                  onChanged: (value) {
-                    seekPreviewMs.value = value;
-                  },
-                  onChangeEnd: (value) {
-                    seekPreviewMs.value = null;
-                    notifier.seek(
-                      Duration(milliseconds: value.round()),
-                    );
-                  },
-                ),
-              ),
+              child: hasSeekRange
+                  ? SliderTheme(
+                      data: SliderThemeData(
+                        trackHeight: 4,
+                        activeTrackColor: accentPrimary,
+                        inactiveTrackColor: bgDivider,
+                        thumbColor: accentPrimary,
+                        overlayColor: accentPrimary.withValues(alpha: 0.16),
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 7,
+                          elevation: 0,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 16,
+                        ),
+                      ),
+                      child: Slider(
+                        min: 0,
+                        max: durationMs,
+                        value: clampedSliderValue,
+                        semanticFormatterCallback: (value) =>
+                            '${_formatDuration(Duration(milliseconds: value.round()))} of ${_formatDuration(playbackState.duration)}',
+                        onChangeStart: (value) {
+                          seekPreviewMs.value = value;
+                        },
+                        onChanged: (value) {
+                          seekPreviewMs.value = value;
+                        },
+                        onChangeEnd: (value) {
+                          seekPreviewMs.value = null;
+                          notifier.seek(
+                            Duration(milliseconds: value.round()),
+                          );
+                        },
+                      ),
+                    )
+                  : ExcludeSemantics(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: bgDivider,
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
             ),
             const SizedBox(height: 8),
             Row(

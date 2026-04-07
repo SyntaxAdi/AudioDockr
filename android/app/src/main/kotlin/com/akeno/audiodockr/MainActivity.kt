@@ -1,5 +1,6 @@
 package com.akeno.audiodockr
 
+import android.app.ForegroundServiceStartNotAllowedException
 import android.content.Intent
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
@@ -68,19 +69,45 @@ class MainActivity : FlutterActivity() {
                             artist,
                             artworkUrl,
                         )
-                        ContextCompat.startForegroundService(this, intent)
-                        result.success(null)
+                        runCatching {
+                            if (PlaybackService.isRunning()) {
+                                startService(intent)
+                            } else {
+                                ContextCompat.startForegroundService(this, intent)
+                            }
+                        }.onSuccess {
+                            result.success(null)
+                        }.onFailure { error ->
+                            val message = when (error) {
+                                is ForegroundServiceStartNotAllowedException ->
+                                    "Playback cannot be started while the app is in the background."
+                                else -> error.message ?: "Unable to start playback."
+                            }
+                            result.error("playback_failed", message, null)
+                        }
                     }
                     "pause" -> {
                         startService(PlaybackService.buildPauseIntent(this))
                         result.success(null)
                     }
                     "resume" -> {
-                        ContextCompat.startForegroundService(
-                            this,
-                            PlaybackService.buildResumeIntent(this),
-                        )
-                        result.success(null)
+                        val intent = PlaybackService.buildResumeIntent(this)
+                        runCatching {
+                            if (PlaybackService.isRunning()) {
+                                startService(intent)
+                            } else {
+                                ContextCompat.startForegroundService(this, intent)
+                            }
+                        }.onSuccess {
+                            result.success(null)
+                        }.onFailure { error ->
+                            val message = when (error) {
+                                is ForegroundServiceStartNotAllowedException ->
+                                    "Playback cannot be resumed while the app is in the background."
+                                else -> error.message ?: "Unable to resume playback."
+                            }
+                            result.error("playback_failed", message, null)
+                        }
                     }
                     "seekTo" -> {
                         val position = call.argument<Int>("position")?.toLong() ?: 0L
