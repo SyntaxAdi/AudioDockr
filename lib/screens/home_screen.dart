@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -20,26 +22,123 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final libraryState = ref.watch(libraryProvider);
-    final recentlyPlayed = libraryState.recentTracks.take(10).toList();
+    final recentlyPlayed = libraryState.recentTracks.take(3).toList();
     final playlists = libraryState.userPlaylists;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
-          color: accentPrimary,
-          fontSize: screenWidth < 360 ? 22 : 26,
-        );
+    final likedTracks = libraryState.likedTracks;
+    final mediaQuery = MediaQuery.of(context);
+    final hasContent = recentlyPlayed.isNotEmpty || playlists.isNotEmpty;
+    final shortcutItems = <_HomeShortcutData>[
+      _HomeShortcutData(
+        title: 'Liked Songs',
+        subtitle: '',
+        artworkUrl: likedTracks.isNotEmpty ? likedTracks.first.thumbnailUrl : null,
+        icon: Icons.favorite_rounded,
+        isLikedCollection: true,
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => PlaylistDetailsScreen(
+                title: 'Liked Songs',
+                tracks: likedTracks,
+              ),
+            ),
+          );
+        },
+      ),
+      _HomeShortcutData(
+        title: 'Recents',
+        subtitle: '${libraryState.recentTracks.length} tracks',
+        artworkUrl: libraryState.recentTracks.isNotEmpty
+            ? libraryState.recentTracks.first.thumbnailUrl
+            : null,
+        icon: Icons.history_rounded,
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => PlaylistDetailsScreen(
+                title: 'Recents',
+                tracks: libraryState.recentTracks,
+              ),
+            ),
+          );
+        },
+      ),
+      _HomeShortcutData(
+        title: 'Playlists',
+        subtitle: '',
+        icon: Icons.library_music_rounded,
+        onTap: onViewMore,
+      ),
+    ];
+
+    final remainingSlots = 8 - shortcutItems.length;
+    final playlistShortcutCount =
+        playlists.length >= remainingSlots ? remainingSlots : playlists.length;
+
+    shortcutItems.addAll([
+      for (final playlist in playlists.take(playlistShortcutCount))
+        _HomeShortcutData(
+          title: playlist.name,
+          subtitle: '${playlist.trackCount} tracks',
+          localArtworkPath: playlist.coverImagePath,
+          icon: Icons.queue_music_rounded,
+          usesAppLogoFallback: true,
+          onTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => PlaylistDetailsScreen(
+                  title: playlist.name,
+                  playlistId: playlist.id,
+                ),
+              ),
+            );
+          },
+        ),
+    ]);
+
+    final remainingSongSlots = 8 - shortcutItems.length;
+    shortcutItems.addAll([
+      for (final track in libraryState.recentTracks.take(remainingSongSlots))
+        _HomeShortcutData(
+          title: track.title,
+          subtitle: track.artist,
+          artworkUrl: track.thumbnailUrl,
+          icon: Icons.music_note_rounded,
+          onTap: () async {
+            try {
+              await ref.read(playbackNotifierProvider.notifier).playTrack(
+                    track.videoId,
+                    track.videoUrl,
+                    track.title,
+                    track.artist,
+                    track.thumbnailUrl,
+                  );
+            } on PlaybackFailure catch (error) {
+              if (!context.mounted) {
+                return;
+              }
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(error.message)),
+              );
+            }
+          },
+          onLongPress: () => _showTrackActionsSheet(context, ref, track),
+        ),
+    ]);
 
     return Scaffold(
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.only(bottom: 16),
+          padding: const EdgeInsets.only(bottom: 24),
           children: [
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                'AUDIO DOCKR',
-                style: titleStyle,
+            const _HomeTopBar(),
+            if (shortcutItems.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: _HomeCollectionGrid(items: shortcutItems),
               ),
-            ),
+            ],
             if (libraryState.isLoading)
               const Padding(
                 padding: EdgeInsets.only(top: 80),
@@ -48,100 +147,589 @@ class HomeScreen extends ConsumerWidget {
                 ),
               )
             else ...[
-              if (recentlyPlayed.isEmpty && playlists.isEmpty)
+              if (!hasContent)
                 SizedBox(
-                  height: MediaQuery.of(context).size.height * 0.45,
-                  child: Center(
-                    child: Text(
-                      'PLAY SOMETHING TO SEE IT HERE',
-                      style: Theme.of(context).textTheme.labelSmall,
-                    ),
-                  ),
+                  height: mediaQuery.size.height * 0.42,
+                  child: const _HomeEmptyState(),
                 )
               else ...[
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                child: Row(
+                const SizedBox(height: 28),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: _HomeSectionHeader(
+                    eyebrow: 'Jump back in',
+                    title: 'Recent songs played',
+                  ),
+                ),
+                const SizedBox(height: 14),
+                if (recentlyPlayed.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: _InlineInfoCard(
+                      icon: Icons.history_rounded,
+                      title: 'No recent tracks yet',
+                      subtitle:
+                          'Start a song and it will appear here for quick access.',
+                    ),
+                  )
+                else
+                  SizedBox(
+                    height: 208,
+                    child: ListView.separated(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      scrollDirection: Axis.horizontal,
+                      itemCount: recentlyPlayed.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 12),
+                      itemBuilder: (context, index) {
+                        final track = recentlyPlayed[index];
+                        return _RecentlyPlayedCard(
+                          track: track,
+                          onTap: () async {
+                            try {
+                              await ref
+                                  .read(playbackNotifierProvider.notifier)
+                                  .playTrack(
+                                    track.videoId,
+                                    track.videoUrl,
+                                    track.title,
+                                    track.artist,
+                                    track.thumbnailUrl,
+                                  );
+                            } on PlaybackFailure catch (error) {
+                              if (!context.mounted) {
+                                return;
+                              }
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(error.message)),
+                              );
+                            }
+                          },
+                          onLongPress: () => _showTrackActionsSheet(
+                            context,
+                            ref,
+                            track,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                if (playlists.isNotEmpty) ...[
+                  const SizedBox(height: 32),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16),
+                    child: _HomeSectionHeader(
+                      eyebrow: 'Collections',
+                      title: 'Your playlists',
+                      subtitle: 'Open a playlist or pick up where you left off.',
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                for (final playlist in playlists)
+                  _PlaylistPreviewSection(playlist: playlist),
+              ],
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeShortcutData {
+  const _HomeShortcutData({
+    required this.title,
+    required this.subtitle,
+    this.artworkUrl,
+    this.localArtworkPath,
+    this.icon,
+    this.isLikedCollection = false,
+    this.usesAppLogoFallback = false,
+    required this.onTap,
+    this.onLongPress,
+  });
+
+  final String title;
+  final String subtitle;
+  final String? artworkUrl;
+  final String? localArtworkPath;
+  final IconData? icon;
+  final bool isLikedCollection;
+  final bool usesAppLogoFallback;
+  final VoidCallback onTap;
+  final VoidCallback? onLongPress;
+}
+
+class _HomeTopBar extends StatelessWidget {
+  const _HomeTopBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            accentPrimary.withValues(alpha: 0.14),
+            bgBase.withValues(alpha: 0),
+          ],
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: accentPrimary.withValues(alpha: 0.18),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.18),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: ClipOval(
+              child: Image.asset(
+                'lib/assets/app_icon.png',
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Audio Docker',
+              style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                    color: textPrimary,
+                    fontSize: 22,
+                    letterSpacing: 0,
+                  ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeCollectionGrid extends StatelessWidget {
+  const _HomeCollectionGrid({
+    required this.items,
+  });
+
+  final List<_HomeShortcutData> items;
+
+  @override
+  Widget build(BuildContext context) {
+    final visibleItems = items.take(8).toList();
+    final width = MediaQuery.of(context).size.width - 32;
+    final isCompact = width < 380;
+    final bannerAspectRatio = isCompact ? 2.8 : 3.2;
+
+    return GridView.builder(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      itemCount: visibleItems.length,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 8,
+        mainAxisSpacing: 8,
+        childAspectRatio: bannerAspectRatio,
+      ),
+      itemBuilder: (context, index) {
+        return _HomeCollectionTile(item: visibleItems[index]);
+      },
+    );
+  }
+}
+
+class _HomeCollectionTile extends StatelessWidget {
+  const _HomeCollectionTile({
+    required this.item,
+  });
+
+  final _HomeShortcutData item;
+
+  @override
+  Widget build(BuildContext context) {
+    final mediaQuery = MediaQuery.of(context);
+    final isCompact = mediaQuery.size.width < 380;
+    final devicePixelRatio = mediaQuery.devicePixelRatio;
+    final artworkCacheSize = (78 * devicePixelRatio).round();
+    final tileHeight = isCompact ? 52.0 : 48.0;
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: item.onTap,
+        onLongPress: item.onLongPress,
+        borderRadius: BorderRadius.circular(8),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: SizedBox(
+            height: tileHeight,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final showSubtitle =
+                    item.subtitle.isNotEmpty && constraints.maxHeight >= 56;
+
+                return Row(
                   children: [
-                    Expanded(
-                      child: Text(
-                        'Recents',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: accentPrimary,
-                              fontWeight: FontWeight.bold,
-                            ),
+                    SizedBox(
+                      width: isCompact ? 48 : 44,
+                      height: double.infinity,
+                      child: _HomeCollectionArtwork(
+                        item: item,
+                        artworkCacheSize: artworkCacheSize,
                       ),
                     ),
-                    TextButton(
-                      onPressed: onViewMore,
-                      style: TextButton.styleFrom(
-                        minimumSize: Size.zero,
-                        padding: EdgeInsets.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: BorderSide.none,
-                      ),
-                      child: Text(
-                        'Show all',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: accentPrimary,
-                              fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    color: textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                    height: 1.1,
+                                    fontSize: isCompact ? 10.5 : 10,
+                                  ),
                             ),
+                            if (showSubtitle) ...[
+                              const SizedBox(height: 1),
+                              Text(
+                                item.subtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                      color: textSecondary,
+                                      fontSize: isCompact ? 7.6 : 7.2,
+                                      letterSpacing: 0.2,
+                                    ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                   ],
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeCollectionArtwork extends StatelessWidget {
+  const _HomeCollectionArtwork({
+    required this.item,
+    required this.artworkCacheSize,
+  });
+
+  final _HomeShortcutData item;
+  final int artworkCacheSize;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget child;
+
+    if (item.isLikedCollection) {
+      child = Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFFF4FD8),
+              Color(0xFFFF003C),
+              Color(0xFF6A00FF),
+            ],
+          ),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: const Alignment(0.2, -0.2),
+                  radius: 1.1,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.28),
+                    Colors.transparent,
+                  ],
                 ),
               ),
-              if (recentlyPlayed.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    'No recent tracks yet',
-                    style: Theme.of(context).textTheme.labelSmall,
-                  ),
+            ),
+            const Center(
+              child: Icon(
+                Icons.favorite_rounded,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (item.localArtworkPath != null && item.localArtworkPath!.isNotEmpty) {
+      child = Image.file(
+        File(item.localArtworkPath!),
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => _defaultArtwork(item),
+      );
+    } else if (item.artworkUrl != null && item.artworkUrl!.isNotEmpty) {
+      child = CachedNetworkImage(
+        imageUrl: item.artworkUrl!,
+        memCacheWidth: artworkCacheSize,
+        memCacheHeight: artworkCacheSize,
+        maxWidthDiskCache: artworkCacheSize,
+        maxHeightDiskCache: artworkCacheSize,
+        fit: BoxFit.cover,
+        placeholder: (_, __) => const ColoredBox(
+          color: bgDivider,
+          child: Center(
+            child: SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: accentPrimary,
+              ),
+            ),
+          ),
+        ),
+        errorWidget: (_, __, ___) => _defaultArtwork(item),
+      );
+    } else {
+      child = _defaultArtwork(item);
+    }
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.horizontal(left: Radius.circular(8)),
+      child: child,
+    );
+  }
+
+  Widget _defaultArtwork(_HomeShortcutData item) {
+    if (item.usesAppLogoFallback) {
+      return Image.asset(
+        'lib/assets/app_icon.png',
+        fit: BoxFit.cover,
+      );
+    }
+
+    return Container(
+      color: bgDivider,
+      child: Icon(
+        item.icon ?? Icons.music_note_rounded,
+        color: textPrimary,
+        size: 24,
+      ),
+    );
+  }
+}
+
+class _HomeSectionHeader extends StatelessWidget {
+  const _HomeSectionHeader({
+    required this.eyebrow,
+    required this.title,
+    this.subtitle,
+    this.actionLabel,
+    this.onAction,
+  });
+
+  final String eyebrow;
+  final String title;
+  final String? subtitle;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                eyebrow.toUpperCase(),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: accentPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 9,
+                      letterSpacing: 1.0,
+                    ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      color: textPrimary,
+                      fontSize: 19,
+                    ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  subtitle!,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: textSecondary,
+                        fontSize: 12,
+                      ),
                 ),
-              if (recentlyPlayed.isNotEmpty)
-                SizedBox(
-                  height: 208,
-                  child: ListView.separated(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    scrollDirection: Axis.horizontal,
-                    itemCount: recentlyPlayed.length,
-                    separatorBuilder: (_, __) => const SizedBox(width: 12),
-                    itemBuilder: (context, index) {
-                      final track = recentlyPlayed[index];
-                      return _RecentlyPlayedCard(
-                        track: track,
-                        onTap: () async {
-                          try {
-                            await ref.read(playbackNotifierProvider.notifier).playTrack(
-                                  track.videoId,
-                                  track.videoUrl,
-                                  track.title,
-                                  track.artist,
-                                  track.thumbnailUrl,
-                                );
-                          } on PlaybackFailure catch (error) {
-                            if (!context.mounted) {
-                              return;
-                            }
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(content: Text(error.message)),
-                            );
-                          }
-                        },
-                        onLongPress: () => _showTrackActionsSheet(
-                          context,
-                          ref,
-                          track,
-                        ),
-                      );
-                    },
+              ],
+            ],
+          ),
+        ),
+        if (actionLabel != null && onAction != null)
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              minimumSize: Size.zero,
+              padding: EdgeInsets.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              side: BorderSide.none,
+            ),
+            child: Text(
+              actionLabel!,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: accentPrimary,
+                    fontWeight: FontWeight.w700,
                   ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _InlineInfoCard extends StatelessWidget {
+  const _InlineInfoCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: bgCard,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: bgDivider),
+      ),
+      padding: const EdgeInsets.all(18),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: bgSurface,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: accentPrimary),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                 ),
-              for (final playlist in playlists)
-                _PlaylistPreviewSection(playlist: playlist),
-            ],
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: textSecondary,
+                        height: 1.35,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HomeEmptyState extends StatelessWidget {
+  const _HomeEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: bgCard,
+          borderRadius: BorderRadius.circular(28),
+          border: Border.all(color: bgDivider),
+        ),
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: accentPrimary.withValues(alpha: 0.12),
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(
+                Icons.graphic_eq_rounded,
+                color: accentPrimary,
+                size: 34,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'Your home feed is waiting',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: textPrimary,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Play a few tracks or create a playlist and your recent activity will start showing up here.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: textSecondary,
+                    height: 1.45,
+                  ),
+            ),
           ],
         ),
       ),
@@ -164,49 +752,27 @@ class _PlaylistPreviewSection extends ConsumerWidget {
         final tracks = snapshot.data?.take(10).toList() ?? const <LibraryTrack>[];
 
         return Padding(
-          padding: const EdgeInsets.only(top: 18),
+          padding: const EdgeInsets.only(top: 20),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        playlist.name,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: accentPrimary,
-                              fontWeight: FontWeight.bold,
-                            ),
+                child: _HomeSectionHeader(
+                  eyebrow: 'Playlist',
+                  title: playlist.name,
+                  subtitle: '${playlist.trackCount} tracks saved',
+                  actionLabel: 'Open',
+                  onAction: () {
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => PlaylistDetailsScreen(
+                          title: playlist.name,
+                          playlistId: playlist.id,
+                        ),
                       ),
-                    ),
-                    TextButton(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => PlaylistDetailsScreen(
-                              title: playlist.name,
-                              playlistId: playlist.id,
-                            ),
-                          ),
-                        );
-                      },
-                      style: TextButton.styleFrom(
-                        minimumSize: Size.zero,
-                        padding: EdgeInsets.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: BorderSide.none,
-                      ),
-                      child: Text(
-                        'Show playlist',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                              color: accentPrimary,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                    ),
-                  ],
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 12),
@@ -218,11 +784,13 @@ class _PlaylistPreviewSection extends ConsumerWidget {
                   ),
                 )
               else if (tracks.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    'No songs in this playlist yet',
-                    style: Theme.of(context).textTheme.labelSmall,
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: _InlineInfoCard(
+                    icon: Icons.playlist_remove_rounded,
+                    title: 'No songs in this playlist yet',
+                    subtitle:
+                        'Add tracks to this playlist and they will show up here.',
                   ),
                 )
               else
@@ -239,7 +807,9 @@ class _PlaylistPreviewSection extends ConsumerWidget {
                         track: track,
                         onTap: () async {
                           try {
-                            await ref.read(playbackNotifierProvider.notifier).playTrack(
+                            await ref
+                                .read(playbackNotifierProvider.notifier)
+                                .playTrack(
                                   track.videoId,
                                   track.videoUrl,
                                   track.title,

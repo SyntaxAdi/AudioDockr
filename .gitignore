@@ -26,6 +26,21 @@ migrate_working_dir/
 # VS Code (uncomment if you don't want to share launch configs)
 #.vscode/
 
+# Local AI / assistant tooling
+/.github/
+/.agent/
+/.claude/
+/.codebuddy/
+/.continue/
+/.cursor/
+/.gemini/
+/.kiro/
+/.opencode/
+/.qoder/
+/.roo/
+/.trae/
+/.windsurf/
+
 # Xcode
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
