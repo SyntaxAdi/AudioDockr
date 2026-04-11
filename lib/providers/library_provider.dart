@@ -12,6 +12,7 @@ class LibraryTrack {
     required this.durationSeconds,
     required this.thumbnailUrl,
     required this.reaction,
+    this.lastPlayedAt = 0,
     bool? hiddenInPlaylist,
   }) : _hiddenInPlaylist = hiddenInPlaylist;
 
@@ -22,6 +23,7 @@ class LibraryTrack {
   final int durationSeconds;
   final String thumbnailUrl;
   final String reaction;
+  final int lastPlayedAt;
   final bool? _hiddenInPlaylist;
   bool get hiddenInPlaylist => _hiddenInPlaylist ?? false;
 
@@ -37,6 +39,7 @@ class LibraryTrack {
       durationSeconds: track.durationSeconds,
       thumbnailUrl: track.thumbnailUrl,
       reaction: track.reaction,
+      lastPlayedAt: track.lastPlayedAt,
       hiddenInPlaylist: track.hiddenInPlaylist,
     );
   }
@@ -48,12 +51,14 @@ class LibraryPlaylist {
     required this.name,
     required this.trackCount,
     this.coverImagePath = '',
+    this.lastOpenedAt = 0,
   });
 
   final String id;
   final String name;
   final int trackCount;
   final String coverImagePath;
+  final int lastOpenedAt;
 
   factory LibraryPlaylist.fromStoredPlaylist(StoredPlaylist playlist) {
     return LibraryPlaylist(
@@ -61,6 +66,7 @@ class LibraryPlaylist {
       name: playlist.name,
       trackCount: playlist.trackCount,
       coverImagePath: playlist.coverImagePath,
+      lastOpenedAt: playlist.lastOpenedAt,
     );
   }
 }
@@ -72,13 +78,16 @@ class LibraryState {
     this.likedTracks = const [],
     this.playlists = const [],
     this.recentTracks = const [],
-  });
+    List<LibraryPlaylist>? recentPlaylists,
+  }) : _recentPlaylists = recentPlaylists;
 
   final bool isLoading;
   final List<LibraryTrack> allTracks;
   final List<LibraryTrack> likedTracks;
   final List<LibraryPlaylist> playlists;
   final List<LibraryTrack> recentTracks;
+  final List<LibraryPlaylist>? _recentPlaylists;
+  List<LibraryPlaylist> get recentPlaylists => _recentPlaylists ?? const [];
   List<LibraryPlaylist> get userPlaylists =>
       playlists.where((playlist) => playlist.id != likedPlaylistId).toList();
 
@@ -88,6 +97,7 @@ class LibraryState {
     List<LibraryTrack>? likedTracks,
     List<LibraryPlaylist>? playlists,
     List<LibraryTrack>? recentTracks,
+    List<LibraryPlaylist>? recentPlaylists,
   }) {
     return LibraryState(
       isLoading: isLoading ?? this.isLoading,
@@ -95,6 +105,7 @@ class LibraryState {
       likedTracks: likedTracks ?? this.likedTracks,
       playlists: playlists ?? this.playlists,
       recentTracks: recentTracks ?? this.recentTracks,
+      recentPlaylists: recentPlaylists ?? this.recentPlaylists,
     );
   }
 }
@@ -125,17 +136,20 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
       _databaseHelper.fetchLikedTracks(),
       _databaseHelper.fetchPlaylists(),
       _databaseHelper.fetchRecentlyPlayed(),
+      _databaseHelper.fetchRecentlyOpenedPlaylists(),
     ]);
     final allTracks = results[0] as List<StoredTrack>;
     final likedTracks = results[1] as List<StoredTrack>;
     final playlists = results[2] as List<StoredPlaylist>;
     final recentTracks = results[3] as List<StoredTrack>;
+    final recentPlaylists = results[4] as List<StoredPlaylist>;
     state = state.copyWith(
       isLoading: false,
       allTracks: _mapTracks(allTracks),
       likedTracks: _mapTracks(likedTracks),
       playlists: _mapPlaylists(playlists),
       recentTracks: _mapTracks(recentTracks),
+      recentPlaylists: _mapPlaylists(recentPlaylists),
     );
   }
 
@@ -158,18 +172,32 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
     final results = await Future.wait([
       _databaseHelper.fetchAllTracks(),
       _databaseHelper.fetchRecentlyPlayed(),
+      _databaseHelper.fetchRecentlyOpenedPlaylists(),
     ]);
     state = state.copyWith(
       allTracks: _mapTracks(results[0] as List<StoredTrack>),
       recentTracks: _mapTracks(results[1] as List<StoredTrack>),
+      recentPlaylists: _mapPlaylists(results[2] as List<StoredPlaylist>),
+    );
+  }
+
+  Future<void> recordPlaylistOpened(String playlistId) async {
+    await _databaseHelper.recordPlaylistOpened(playlistId);
+    final recentPlaylists = await _databaseHelper.fetchRecentlyOpenedPlaylists();
+    state = state.copyWith(
+      recentPlaylists: _mapPlaylists(recentPlaylists),
     );
   }
 
   Future<void> createPlaylist(String name) async {
     await _databaseHelper.createPlaylist(name);
-    final playlists = await _databaseHelper.fetchPlaylists();
+    final results = await Future.wait([
+      _databaseHelper.fetchPlaylists(),
+      _databaseHelper.fetchRecentlyOpenedPlaylists(),
+    ]);
     state = state.copyWith(
-      playlists: _mapPlaylists(playlists),
+      playlists: _mapPlaylists(results[0] as List<StoredPlaylist>),
+      recentPlaylists: _mapPlaylists(results[1] as List<StoredPlaylist>),
     );
   }
 
@@ -183,9 +211,13 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
       name: name,
       coverImagePath: coverImagePath,
     );
-    final playlists = await _databaseHelper.fetchPlaylists();
+    final results = await Future.wait([
+      _databaseHelper.fetchPlaylists(),
+      _databaseHelper.fetchRecentlyOpenedPlaylists(),
+    ]);
     state = state.copyWith(
-      playlists: _mapPlaylists(playlists),
+      playlists: _mapPlaylists(results[0] as List<StoredPlaylist>),
+      recentPlaylists: _mapPlaylists(results[1] as List<StoredPlaylist>),
     );
   }
 
@@ -196,12 +228,14 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
       _databaseHelper.fetchLikedTracks(),
       _databaseHelper.fetchPlaylists(),
       _databaseHelper.fetchRecentlyPlayed(),
+      _databaseHelper.fetchRecentlyOpenedPlaylists(),
     ]);
     state = state.copyWith(
       allTracks: _mapTracks(results[0] as List<StoredTrack>),
       likedTracks: _mapTracks(results[1] as List<StoredTrack>),
       playlists: _mapPlaylists(results[2] as List<StoredPlaylist>),
       recentTracks: _mapTracks(results[3] as List<StoredTrack>),
+      recentPlaylists: _mapPlaylists(results[4] as List<StoredPlaylist>),
     );
   }
 
@@ -227,11 +261,13 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
       _databaseHelper.fetchAllTracks(),
       _databaseHelper.fetchPlaylists(),
       _databaseHelper.fetchRecentlyPlayed(),
+      _databaseHelper.fetchRecentlyOpenedPlaylists(),
     ]);
     state = state.copyWith(
       allTracks: _mapTracks(results[0] as List<StoredTrack>),
       playlists: _mapPlaylists(results[1] as List<StoredPlaylist>),
       recentTracks: _mapTracks(results[2] as List<StoredTrack>),
+      recentPlaylists: _mapPlaylists(results[3] as List<StoredPlaylist>),
     );
     return added;
   }
@@ -288,12 +324,14 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
       _databaseHelper.fetchLikedTracks(),
       _databaseHelper.fetchPlaylists(),
       _databaseHelper.fetchRecentlyPlayed(),
+      _databaseHelper.fetchRecentlyOpenedPlaylists(),
     ]);
     state = state.copyWith(
       allTracks: _mapTracks(results[0] as List<StoredTrack>),
       likedTracks: _mapTracks(results[1] as List<StoredTrack>),
       playlists: _mapPlaylists(results[2] as List<StoredPlaylist>),
       recentTracks: _mapTracks(results[3] as List<StoredTrack>),
+      recentPlaylists: _mapPlaylists(results[4] as List<StoredPlaylist>),
     );
     return shouldSave;
   }
@@ -313,9 +351,13 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
       videoId: videoId,
       hidden: hidden,
     );
-    final playlists = await _databaseHelper.fetchPlaylists();
+    final results = await Future.wait([
+      _databaseHelper.fetchPlaylists(),
+      _databaseHelper.fetchRecentlyOpenedPlaylists(),
+    ]);
     state = state.copyWith(
-      playlists: _mapPlaylists(playlists),
+      playlists: _mapPlaylists(results[0] as List<StoredPlaylist>),
+      recentPlaylists: _mapPlaylists(results[1] as List<StoredPlaylist>),
     );
   }
 
@@ -357,12 +399,14 @@ class LibraryNotifier extends StateNotifier<LibraryState> {
       _databaseHelper.fetchLikedTracks(),
       _databaseHelper.fetchPlaylists(),
       _databaseHelper.fetchRecentlyPlayed(),
+      _databaseHelper.fetchRecentlyOpenedPlaylists(),
     ]);
     state = state.copyWith(
       allTracks: _mapTracks(results[0] as List<StoredTrack>),
       likedTracks: _mapTracks(results[1] as List<StoredTrack>),
       playlists: _mapPlaylists(results[2] as List<StoredPlaylist>),
       recentTracks: _mapTracks(results[3] as List<StoredTrack>),
+      recentPlaylists: _mapPlaylists(results[4] as List<StoredPlaylist>),
     );
     return playlistName;
   }

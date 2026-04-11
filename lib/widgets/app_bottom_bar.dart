@@ -56,35 +56,53 @@ class AppBottomBar extends ConsumerWidget {
             ),
           ),
         const MiniPlayer(),
-        Container(
-          height: 1,
-          color: bgDivider,
-        ),
-        BottomNavigationBar(
-          currentIndex: currentIndex,
-          onTap: onTap,
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.home_rounded),
-              label: 'HOME',
+        DecoratedBox(
+          decoration: const BoxDecoration(
+            color: bgBase,
+          ),
+          child: Theme(
+            data: Theme.of(context).copyWith(
+              canvasColor: bgBase,
+              shadowColor: Colors.transparent,
+              splashColor: Colors.transparent,
+              highlightColor: Colors.transparent,
+              bottomNavigationBarTheme:
+                  const BottomNavigationBarThemeData(
+                backgroundColor: bgBase,
+                elevation: 0,
+                type: BottomNavigationBarType.fixed,
+              ),
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.search),
-              label: 'SEARCH',
+            child: BottomNavigationBar(
+              elevation: 0,
+              backgroundColor: bgBase,
+              type: BottomNavigationBarType.fixed,
+              currentIndex: currentIndex,
+              onTap: onTap,
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.home_rounded),
+                  label: 'HOME',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.search),
+                  label: 'SEARCH',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.library_music),
+                  label: 'LIBRARY',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.download_rounded),
+                  label: 'DOWNLOADS',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.tune),
+                  label: 'SETTINGS',
+                ),
+              ],
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.library_music),
-              label: 'LIBRARY',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.download_rounded),
-              label: 'DOWNLOADS',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.tune),
-              label: 'SETTINGS',
-            ),
-          ],
+          ),
         ),
       ],
     );

@@ -15,14 +15,19 @@ class HomeScreen extends ConsumerWidget {
   const HomeScreen({
     super.key,
     required this.onViewMore,
+    required this.onOpenMenu,
   });
 
   final VoidCallback onViewMore;
+  final VoidCallback onOpenMenu;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final libraryState = ref.watch(libraryProvider);
     final recentlyPlayed = libraryState.recentTracks.take(3).toList();
+    final latestPlayedTrack = libraryState.recentTracks.isNotEmpty
+        ? libraryState.recentTracks.first
+        : null;
     final playlists = libraryState.userPlaylists;
     final likedTracks = libraryState.likedTracks;
     final mediaQuery = MediaQuery.of(context);
@@ -31,7 +36,6 @@ class HomeScreen extends ConsumerWidget {
       _HomeShortcutData(
         title: 'Liked Songs',
         subtitle: '',
-        artworkUrl: likedTracks.isNotEmpty ? likedTracks.first.thumbnailUrl : null,
         icon: Icons.favorite_rounded,
         isLikedCollection: true,
         onTap: () {
@@ -48,9 +52,7 @@ class HomeScreen extends ConsumerWidget {
       _HomeShortcutData(
         title: 'Recents',
         subtitle: '${libraryState.recentTracks.length} tracks',
-        artworkUrl: libraryState.recentTracks.isNotEmpty
-            ? libraryState.recentTracks.first.thumbnailUrl
-            : null,
+        isCyberpunkRecents: true,
         icon: Icons.history_rounded,
         onTap: () {
           Navigator.of(context).push(
@@ -64,10 +66,23 @@ class HomeScreen extends ConsumerWidget {
         },
       ),
       _HomeShortcutData(
-        title: 'Playlists',
-        subtitle: '',
-        icon: Icons.library_music_rounded,
-        onTap: onViewMore,
+        title: latestPlayedTrack?.title ?? 'Recently played',
+        subtitle: latestPlayedTrack?.artist ?? 'Your latest song will appear here',
+        artworkUrl: latestPlayedTrack?.thumbnailUrl,
+        icon: Icons.history_rounded,
+        onTap: () {
+          Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => PlaylistDetailsScreen(
+                title: 'Recents',
+                tracks: libraryState.recentTracks,
+              ),
+            ),
+          );
+        },
+        onLongPress: latestPlayedTrack == null
+            ? null
+            : () => _showTrackActionsSheet(context, ref, latestPlayedTrack),
       ),
     ];
 
@@ -97,8 +112,11 @@ class HomeScreen extends ConsumerWidget {
     ]);
 
     final remainingSongSlots = 8 - shortcutItems.length;
+    final gridRecentTracks = latestPlayedTrack == null
+        ? libraryState.recentTracks
+        : libraryState.recentTracks.skip(1).toList();
     shortcutItems.addAll([
-      for (final track in libraryState.recentTracks.take(remainingSongSlots))
+      for (final track in gridRecentTracks.take(remainingSongSlots))
         _HomeShortcutData(
           title: track.title,
           subtitle: track.artist,
@@ -131,7 +149,9 @@ class HomeScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 24),
           children: [
-            const _HomeTopBar(),
+            _HomeTopBar(
+              onProfileTap: onOpenMenu,
+            ),
             if (shortcutItems.isNotEmpty) ...[
               const SizedBox(height: 16),
               Padding(
@@ -213,18 +233,7 @@ class HomeScreen extends ConsumerWidget {
                       },
                     ),
                   ),
-                if (playlists.isNotEmpty) ...[
-                  const SizedBox(height: 32),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: _HomeSectionHeader(
-                      eyebrow: 'Collections',
-                      title: 'Your playlists',
-                      subtitle: 'Open a playlist or pick up where you left off.',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                ],
+                if (playlists.isNotEmpty) const SizedBox(height: 1),
                 for (final playlist in playlists)
                   _PlaylistPreviewSection(playlist: playlist),
               ],
@@ -244,6 +253,7 @@ class _HomeShortcutData {
     this.localArtworkPath,
     this.icon,
     this.isLikedCollection = false,
+    this.isCyberpunkRecents = false,
     this.usesAppLogoFallback = false,
     required this.onTap,
     this.onLongPress,
@@ -255,13 +265,18 @@ class _HomeShortcutData {
   final String? localArtworkPath;
   final IconData? icon;
   final bool isLikedCollection;
+  final bool isCyberpunkRecents;
   final bool usesAppLogoFallback;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
 }
 
 class _HomeTopBar extends StatelessWidget {
-  const _HomeTopBar();
+  const _HomeTopBar({
+    required this.onProfileTap,
+  });
+
+  final VoidCallback onProfileTap;
 
   @override
   Widget build(BuildContext context) {
@@ -279,26 +294,33 @@ class _HomeTopBar extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              border: Border.all(
-                color: accentPrimary.withValues(alpha: 0.18),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.18),
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: onProfileTap,
+              borderRadius: BorderRadius.circular(999),
+              child: Ink(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: accentPrimary.withValues(alpha: 0.18),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.18),
+                      blurRadius: 14,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
                 ),
-              ],
-            ),
-            child: ClipOval(
-              child: Image.asset(
-                'lib/assets/app_icon.png',
-                fit: BoxFit.cover,
+                child: ClipOval(
+                  child: Image.asset(
+                    'lib/assets/app_icon.png',
+                    fit: BoxFit.cover,
+                  ),
+                ),
               ),
             ),
           ),
@@ -460,24 +482,48 @@ class _HomeCollectionArtwork extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFFFF4FD8),
+              Color(0xFFFF4D6D),
               Color(0xFFFF003C),
-              Color(0xFF6A00FF),
+              Color(0xFF1B0A12),
             ],
           ),
         ),
         child: Stack(
           fit: StackFit.expand,
           children: [
-            DecoratedBox(
-              decoration: BoxDecoration(
-                gradient: RadialGradient(
-                  center: const Alignment(0.2, -0.2),
-                  radius: 1.1,
-                  colors: [
-                    Colors.white.withValues(alpha: 0.28),
-                    Colors.transparent,
-                  ],
+            Positioned(
+              top: 8,
+              left: -12,
+              child: Transform.rotate(
+                angle: -0.45,
+                child: Container(
+                  width: 34,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.78),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: 0,
+              top: 0,
+              bottom: 0,
+              child: Container(
+                width: 1.3,
+                color: accentPrimary.withValues(alpha: 0.72),
+              ),
+            ),
+            Positioned(
+              bottom: 7,
+              right: 6,
+              child: Container(
+                width: 14,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: accentPrimary.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(999),
                 ),
               ),
             ),
@@ -485,6 +531,71 @@ class _HomeCollectionArtwork extends StatelessWidget {
               child: Icon(
                 Icons.favorite_rounded,
                 color: Colors.white,
+                size: 24,
+              ),
+            ),
+          ],
+        ),
+      );
+    } else if (item.isCyberpunkRecents) {
+      child = Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFFF5E642),
+              Color(0xFFE0B400),
+              Color(0xFF382B00),
+            ],
+          ),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Positioned(
+              top: 7,
+              left: -10,
+              child: Transform.rotate(
+                angle: -0.42,
+                child: Container(
+                  width: 36,
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: -8,
+              bottom: 8,
+              child: Transform.rotate(
+                angle: -0.42,
+                child: Container(
+                  width: 32,
+                  height: 5,
+                  decoration: BoxDecoration(
+                    color: accentCyan.withValues(alpha: 0.95),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 0,
+              bottom: 0,
+              left: 18,
+              child: Container(
+                width: 1.4,
+                color: Colors.black.withValues(alpha: 0.72),
+              ),
+            ),
+            const Center(
+              child: Icon(
+                Icons.history_toggle_off_rounded,
+                color: Colors.black,
                 size: 24,
               ),
             ),

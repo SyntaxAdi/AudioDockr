@@ -189,12 +189,6 @@ class MiniPlayer extends ConsumerWidget {
                 right: 0,
                 child: const _MiniPlayerProgressBar(),
               ),
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: Container(height: 1, color: accentPrimary),
-              ),
             ],
           ),
         ),

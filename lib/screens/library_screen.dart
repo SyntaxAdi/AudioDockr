@@ -6,6 +6,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../database_helper.dart';
 import '../providers/library_provider.dart';
 import '../providers/playback_provider.dart';
 import '../providers/spotify_import_provider.dart';
@@ -410,12 +411,14 @@ class PlaylistDetailsScreen extends ConsumerStatefulWidget {
 class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
   Future<List<LibraryTrack>>? _playlistTracksFuture;
 
-  bool get _isEditableCustomPlaylist => widget.playlistId != null;
+  bool get _isEditableCustomPlaylist =>
+      widget.playlistId != null && widget.playlistId != likedPlaylistId;
 
   @override
   void initState() {
     super.initState();
     _refreshPlaylistTracksFuture();
+    _recordPlaylistOpen();
   }
 
   @override
@@ -423,7 +426,16 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.playlistId != widget.playlistId) {
       _refreshPlaylistTracksFuture();
+      _recordPlaylistOpen();
     }
+  }
+
+  void _recordPlaylistOpen() {
+    final playlistId = widget.playlistId;
+    if (playlistId == null || playlistId.isEmpty) {
+      return;
+    }
+    unawaited(ref.read(libraryProvider.notifier).recordPlaylistOpened(playlistId));
   }
 
   void _refreshPlaylistTracksFuture() {
@@ -941,6 +953,7 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
   ) async {
     await showModalBottomSheet<void>(
       context: context,
+      isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
         Future<void> handleAction(_PlaylistMenuAction action) async {
@@ -955,46 +968,48 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
               color: bgSurface,
               borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Center(
-                  child: Container(
-                    width: 44,
-                    height: 4,
-                    margin: const EdgeInsets.only(top: 12, bottom: 20),
-                    decoration: BoxDecoration(
-                      color: bgDivider,
-                      borderRadius: BorderRadius.circular(999),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 44,
+                      height: 4,
+                      margin: const EdgeInsets.only(top: 12, bottom: 20),
+                      decoration: BoxDecoration(
+                        color: bgDivider,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
                     ),
                   ),
-                ),
-                _PlaylistOptionTile(
-                  icon: Icons.tune_rounded,
-                  title: 'Modify playlist',
-                  subtitle: 'Update the name and cover art',
-                  onTap: () => handleAction(_PlaylistMenuAction.modify),
-                ),
-                _PlaylistOptionTile(
-                  icon: Icons.drive_file_rename_outline_rounded,
-                  title: 'Rename playlist',
-                  subtitle: 'Change the playlist name only',
-                  onTap: () => handleAction(_PlaylistMenuAction.rename),
-                ),
-                _PlaylistOptionTile(
-                  icon: Icons.image_outlined,
-                  title: 'Change cover art',
-                  subtitle: 'Pick a new image for this playlist',
-                  onTap: () => handleAction(_PlaylistMenuAction.changeCoverArt),
-                ),
-                _PlaylistOptionTile(
-                  icon: Icons.delete_outline_rounded,
-                  title: 'Delete playlist',
-                  subtitle: 'Remove this playlist and its saved order',
-                  onTap: () => handleAction(_PlaylistMenuAction.delete),
-                ),
-                const SizedBox(height: 12),
-              ],
+                  _PlaylistOptionTile(
+                    icon: Icons.tune_rounded,
+                    title: 'Modify playlist',
+                    subtitle: 'Update the name and cover art',
+                    onTap: () => handleAction(_PlaylistMenuAction.modify),
+                  ),
+                  _PlaylistOptionTile(
+                    icon: Icons.drive_file_rename_outline_rounded,
+                    title: 'Rename playlist',
+                    subtitle: 'Change the playlist name only',
+                    onTap: () => handleAction(_PlaylistMenuAction.rename),
+                  ),
+                  _PlaylistOptionTile(
+                    icon: Icons.image_outlined,
+                    title: 'Change cover art',
+                    subtitle: 'Pick a new image for this playlist',
+                    onTap: () => handleAction(_PlaylistMenuAction.changeCoverArt),
+                  ),
+                  _PlaylistOptionTile(
+                    icon: Icons.delete_outline_rounded,
+                    title: 'Delete playlist',
+                    subtitle: 'Remove this playlist and its saved order',
+                    onTap: () => handleAction(_PlaylistMenuAction.delete),
+                  ),
+                  const SizedBox(height: 12),
+                ],
+              ),
             ),
           ),
         );
@@ -1720,9 +1735,9 @@ class _CyberpunkPlaylistBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLiked = variant == _CyberpunkPlaylistBadgeVariant.liked;
-    final frameColor = isLiked ? accentRed : accentCyan;
-    final glowColor = isLiked ? accentPrimary : accentCyan;
-    final icon = isLiked ? Icons.favorite_rounded : Icons.bolt_rounded;
+    final icon = isLiked
+        ? Icons.favorite_rounded
+        : Icons.history_toggle_off_rounded;
 
     return Container(
       width: 56,
@@ -1732,18 +1747,21 @@ class _CyberpunkPlaylistBadge extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            glowColor.withValues(alpha: 0.22),
-            bgSurface,
-          ],
-        ),
-        border: Border.all(
-          color: frameColor.withValues(alpha: 0.9),
-          width: 1.2,
+          colors: isLiked
+              ? const [
+                  Color(0xFFFF4D6D),
+                  Color(0xFFFF003C),
+                  Color(0xFF1B0A12),
+                ]
+              : const [
+                  Color(0xFFF5E642),
+                  Color(0xFFE0B400),
+                  Color(0xFF382B00),
+                ],
         ),
         boxShadow: [
           BoxShadow(
-            color: frameColor.withValues(alpha: 0.18),
+            color: (isLiked ? accentRed : accentPrimary).withValues(alpha: 0.18),
             blurRadius: 14,
             spreadRadius: 1,
           ),
@@ -1752,33 +1770,62 @@ class _CyberpunkPlaylistBadge extends StatelessWidget {
       child: Stack(
         children: [
           Positioned(
-            top: 7,
-            left: 7,
-            right: 7,
-            child: Container(
-              height: 2,
-              decoration: BoxDecoration(
-                color: accentPrimary.withValues(alpha: 0.75),
-                borderRadius: BorderRadius.circular(99),
+            top: 8,
+            left: -10,
+            child: Transform.rotate(
+              angle: -0.42,
+              child: Container(
+                width: 36,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.8),
+                  borderRadius: BorderRadius.circular(999),
+                ),
               ),
             ),
           ),
           Positioned(
-            bottom: 8,
-            left: 8,
+            right: isLiked ? 0 : -8,
+            top: isLiked ? 0 : null,
+            bottom: isLiked ? null : 8,
             child: Container(
-              width: 14,
-              height: 2,
+              width: isLiked ? 1.3 : 32,
+              height: isLiked ? 56 : 5,
               decoration: BoxDecoration(
-                color: frameColor.withValues(alpha: 0.75),
+                color: isLiked
+                    ? accentPrimary.withValues(alpha: 0.75)
+                    : accentCyan.withValues(alpha: 0.95),
                 borderRadius: BorderRadius.circular(99),
               ),
             ),
           ),
+          if (isLiked)
+            Positioned(
+              bottom: 7,
+              right: 6,
+              child: Container(
+                width: 14,
+                height: 3,
+                decoration: BoxDecoration(
+                  color: accentPrimary.withValues(alpha: 0.95),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+            ),
+          if (!isLiked)
+            Positioned(
+              top: 0,
+              bottom: 0,
+              left: 18,
+              child: Container(
+                width: 1.4,
+                color: Colors.black.withValues(alpha: 0.72),
+              ),
+            ),
           Center(
             child: Icon(
               icon,
-              color: frameColor,
+              color: isLiked ? Colors.white : Colors.black,
               size: 24,
             ),
           ),

@@ -51,12 +51,14 @@ class StoredPlaylist {
     required this.name,
     required this.trackCount,
     required this.coverImagePath,
+    this.lastOpenedAt = 0,
   });
 
   final String id;
   final String name;
   final int trackCount;
   final String coverImagePath;
+  final int lastOpenedAt;
 }
 
 class TrackWriteData {
@@ -101,7 +103,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 7,
+      version: 8,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -148,6 +150,13 @@ class DatabaseHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE recent_playlists (
+        playlist_id TEXT PRIMARY KEY,
+        last_opened_at INTEGER
+      )
+    ''');
+
     await db.execute(
       'CREATE INDEX idx_playlist_tracks_playlist_position '
       'ON playlist_tracks(playlist_id, position)',
@@ -157,6 +166,10 @@ class DatabaseHelper {
     );
     await db.execute(
       'CREATE INDEX idx_search_history_searched_at ON search_history(searched_at)',
+    );
+    await db.execute(
+      'CREATE INDEX idx_recent_playlists_last_opened_at '
+      'ON recent_playlists(last_opened_at)',
     );
   }
 
@@ -215,6 +228,18 @@ class DatabaseHelper {
         'INTEGER DEFAULT 0',
       );
     }
+    if (oldVersion < 8) {
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS recent_playlists (
+          playlist_id TEXT PRIMARY KEY,
+          last_opened_at INTEGER
+        )
+      ''');
+      await db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_recent_playlists_last_opened_at '
+        'ON recent_playlists(last_opened_at)',
+      );
+    }
   }
 
   Future<void> _ensureColumn(
@@ -250,6 +275,16 @@ class DatabaseHelper {
       'playlist_tracks',
       'hidden',
       'INTEGER DEFAULT 0',
+    );
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS recent_playlists (
+        playlist_id TEXT PRIMARY KEY,
+        last_opened_at INTEGER
+      )
+    ''');
+    await db.execute(
+      'CREATE INDEX IF NOT EXISTS idx_recent_playlists_last_opened_at '
+      'ON recent_playlists(last_opened_at)',
     );
   }
 
@@ -391,6 +426,11 @@ class DatabaseHelper {
       await txn.delete(
         'playlists',
         where: 'id = ?',
+        whereArgs: [playlistId],
+      );
+      await txn.delete(
+        'recent_playlists',
+        where: 'playlist_id = ?',
         whereArgs: [playlistId],
       );
       await txn.delete(
@@ -593,6 +633,52 @@ class DatabaseHelper {
     return result.map(StoredTrack.fromMap).toList();
   }
 
+  Future<void> recordPlaylistOpened(String playlistId) async {
+    final trimmedId = playlistId.trim();
+    if (trimmedId.isEmpty) {
+      return;
+    }
+
+    final db = await database;
+    await db.insert(
+      'recent_playlists',
+      {
+        'playlist_id': trimmedId,
+        'last_opened_at': DateTime.now().millisecondsSinceEpoch,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<StoredPlaylist>> fetchRecentlyOpenedPlaylists({int? limit}) async {
+    final db = await database;
+    final result = await db.rawQuery('''
+      SELECT p.id,
+             p.name,
+             p.cover_image_path,
+             COUNT(pt.video_id) AS track_count,
+             rp.last_opened_at
+      FROM recent_playlists rp
+      INNER JOIN playlists p ON p.id = rp.playlist_id
+      LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
+      GROUP BY p.id, p.name, p.cover_image_path, rp.last_opened_at
+      ORDER BY rp.last_opened_at DESC
+      ${limit != null ? 'LIMIT $limit' : ''}
+    ''');
+
+    return result
+        .map(
+          (map) => StoredPlaylist(
+            id: (map['id'] as String?) ?? '',
+            name: (map['name'] as String?) ?? '',
+            trackCount: (map['track_count'] as int?) ?? 0,
+            coverImagePath: (map['cover_image_path'] as String?) ?? '',
+            lastOpenedAt: (map['last_opened_at'] as int?) ?? 0,
+          ),
+        )
+        .toList();
+  }
+
   Future<List<StoredPlaylist>> fetchPlaylists() async {
     final db = await database;
     final result = await db.rawQuery('''
@@ -610,6 +696,7 @@ class DatabaseHelper {
             name: (map['name'] as String?) ?? '',
             trackCount: (map['track_count'] as int?) ?? 0,
             coverImagePath: (map['cover_image_path'] as String?) ?? '',
+            lastOpenedAt: 0,
           ),
         )
         .toList();
