@@ -4,9 +4,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../database_helper.dart';
-import '../providers/library_provider.dart';
-import '../providers/playback_provider.dart';
+
+import '../library/library_provider.dart';
+import '../playback/playback_provider.dart';
 import 'library_screen.dart';
 import '../theme.dart';
 import '../widgets/playlist_sheets.dart';
@@ -174,8 +174,8 @@ class HomeScreen extends ConsumerWidget {
                 )
               else ...[
                 const SizedBox(height: 28),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
                   child: _HomeSectionHeader(
                     eyebrow: 'Jump back in',
                     title: 'Recent songs played',
@@ -997,7 +997,7 @@ Future<void> _showTrackActionsSheet(
       final metrics = _SheetMetrics.fromContext(sheetContext);
       final mediaQuery = MediaQuery.of(sheetContext);
       final viewportHeight = mediaQuery.size.height;
-      final actionCount = 4;
+      const actionCount = 4;
       return DraggableScrollableSheet(
         expand: false,
         initialChildSize: metrics.actionsInitialSizeFor(

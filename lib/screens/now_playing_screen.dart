@@ -5,9 +5,9 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../database_helper.dart';
-import '../providers/library_provider.dart';
-import '../providers/playback_provider.dart';
+
+import '../library/library_provider.dart';
+import '../playback/playback_provider.dart';
 import '../theme.dart';
 import '../widgets/playlist_sheets.dart';
 
@@ -97,7 +97,7 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
                                         context,
                                         ref,
                                       );
-                                      if (created && mounted) {
+                                      if (created && mounted && context.mounted) {
                                         final refreshedState =
                                             ref.read(libraryProvider);
                                         await _showAddToPlaylistSheet(
@@ -310,6 +310,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     };
     final searchController = TextEditingController();
     var query = '';
+
+    if (!context.mounted) return;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -662,6 +664,8 @@ class _NowPlayingScreenState extends ConsumerState<NowPlayingScreen> {
     final savedPlaylists = libraryState.playlists
         .where((playlist) => savedPlaylistIds.contains(playlist.id))
         .toList(growable: false);
+
+    if (!context.mounted) return;
 
     await showModalBottomSheet<void>(
       context: context,
@@ -1957,9 +1961,9 @@ class _SavedInPlaylistRowState extends State<_SavedInPlaylistRow>
                     : null,
               ),
               child: isLikedPlaylist
-                  ? Stack(
+                  ? const Stack(
                       children: [
-                        const Positioned(
+                        Positioned(
                           left: 8,
                           top: 8,
                           child: Text(
@@ -1975,9 +1979,9 @@ class _SavedInPlaylistRowState extends State<_SavedInPlaylistRow>
                         Center(
                           child: Icon(
                             Icons.favorite_rounded,
-                            color: const Color(0xFF0B1020),
+                            color: Color(0xFF0B1020),
                             size: 23,
-                            shadows: const [
+                            shadows: [
                               Shadow(
                                 color: Color(0x6600E7FF),
                                 blurRadius: 10,
@@ -1985,7 +1989,7 @@ class _SavedInPlaylistRowState extends State<_SavedInPlaylistRow>
                             ],
                           ),
                         ),
-                        const Positioned(
+                        Positioned(
                           right: 7,
                           bottom: 7,
                           child: Icon(
@@ -2376,10 +2380,10 @@ String _formatDuration(Duration d) {
 Widget _buildRepeatIcon(PlaybackRepeatMode mode) {
   switch (mode) {
     case PlaybackRepeatMode.one:
-      return Stack(
+      return const Stack(
         clipBehavior: Clip.none,
         alignment: Alignment.center,
-        children: const [
+        children: [
           Icon(Icons.repeat, color: accentPrimary),
           Positioned(
             right: -5,

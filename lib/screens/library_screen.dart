@@ -6,9 +6,9 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../database_helper.dart';
-import '../providers/library_provider.dart';
-import '../providers/playback_provider.dart';
+
+import '../library/library_provider.dart';
+import '../playback/playback_provider.dart';
 import '../providers/spotify_import_provider.dart';
 import '../theme.dart';
 import '../widgets/app_bottom_bar.dart';

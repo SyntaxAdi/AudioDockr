@@ -4,8 +4,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../providers/library_provider.dart';
-import '../providers/playback_provider.dart';
+import '../library/library_provider.dart';
+import '../playback/playback_provider.dart';
 import '../providers/search_provider.dart';
 import '../theme.dart';
 import '../widgets/mini_player.dart';
@@ -53,10 +53,10 @@ class SearchScreen extends ConsumerWidget {
                     ),
                   );
                 },
-                child: IgnorePointer(
+                child: const IgnorePointer(
                   child: TextField(
                     decoration: InputDecoration(
-                      prefixIcon: const Icon(Icons.search, color: textSecondary),
+                      prefixIcon: Icon(Icons.search, color: textSecondary),
                       hintText: 'Search Music 🎵',
                     ),
                   ),

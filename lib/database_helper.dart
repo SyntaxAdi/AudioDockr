@@ -1,7 +1,7 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
-const String likedPlaylistId = 'liked';
+import 'library/library_state.dart' show likedPlaylistId;
 
 class StoredTrack {
   const StoredTrack({

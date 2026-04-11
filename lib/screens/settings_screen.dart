@@ -193,7 +193,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            _SectionLabel('Account'),
+            const _SectionLabel('Account'),
             _SettingsGroup(
               children: [
                 _SettingsActionTile(
@@ -305,7 +305,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            _SectionLabel('App settings'),
+            const _SectionLabel('App settings'),
             _SettingsGroup(
               children: [
                 _SettingsActionTile(
@@ -462,7 +462,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               ],
             ),
             const SizedBox(height: 24),
-            _SectionLabel('Support'),
+            const _SectionLabel('Support'),
             _SettingsGroup(
               children: [
                 _SettingsActionTile(
@@ -911,7 +911,7 @@ class _SettingsSwitchTile extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: accentPrimary,
+            activeThumbColor: accentPrimary,
             activeTrackColor: accentPrimary.withValues(alpha: 0.35),
             inactiveThumbColor: textSecondary,
             inactiveTrackColor: bgDivider,

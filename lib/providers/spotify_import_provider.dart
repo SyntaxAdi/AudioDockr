@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/spotify_import_service.dart';
-import 'library_provider.dart';
+import '../library/library_provider.dart';
 
 class SpotifyImportState {
   const SpotifyImportState({

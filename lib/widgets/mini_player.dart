@@ -2,8 +2,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../providers/library_provider.dart';
-import '../providers/playback_provider.dart';
+import '../library/library_provider.dart';
+import '../playback/playback_provider.dart';
 import '../screens/now_playing_screen.dart';
 import '../theme.dart';
 import 'infinite_marquee_text.dart';
@@ -183,11 +183,11 @@ class MiniPlayer extends ConsumerWidget {
                   ],
                 ],
               ),
-              Positioned(
+              const Positioned(
                 bottom: 0,
                 left: 0,
                 right: 0,
-                child: const _MiniPlayerProgressBar(),
+                child: _MiniPlayerProgressBar(),
               ),
             ],
           ),

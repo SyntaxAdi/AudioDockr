@@ -163,7 +163,7 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
         default:
           return SearchFailure(
             error.code,
-            error.message ?? 'Search failed. Please try again.',
+            error.message,
           );
       }
     }

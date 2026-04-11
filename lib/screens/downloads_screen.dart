@@ -110,9 +110,9 @@ class DownloadsScreen extends ConsumerWidget {
       color: bgSurface,
       child: Column(
         children: [
-          Row(
+          const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: const [
+            children: [
               Text('USED: 2.3 GB', style: TextStyle(fontSize: 11, color: textPrimary)),
               Text('DEVICE STORAGE', style: TextStyle(fontSize: 11, color: textSecondary)),
             ],
