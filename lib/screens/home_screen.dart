@@ -848,7 +848,7 @@ class _HomeEmptyState extends StatelessWidget {
   }
 }
 
-class _PlaylistPreviewSection extends ConsumerWidget {
+class _PlaylistPreviewSection extends ConsumerStatefulWidget {
   const _PlaylistPreviewSection({
     required this.playlist,
   });
@@ -856,11 +856,42 @@ class _PlaylistPreviewSection extends ConsumerWidget {
   final LibraryPlaylist playlist;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_PlaylistPreviewSection> createState() =>
+      _PlaylistPreviewSectionState();
+}
+
+class _PlaylistPreviewSectionState
+    extends ConsumerState<_PlaylistPreviewSection> {
+  late Future<List<LibraryTrack>> _tracksFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _tracksFuture = _loadTracks();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PlaylistPreviewSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.playlist.id != widget.playlist.id ||
+        oldWidget.playlist.trackCount != widget.playlist.trackCount) {
+      _tracksFuture = _loadTracks();
+    }
+  }
+
+  Future<List<LibraryTrack>> _loadTracks() {
+    return ref
+        .read(libraryProvider.notifier)
+        .fetchPlaylistTracks(widget.playlist.id);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return FutureBuilder<List<LibraryTrack>>(
-      future: ref.read(libraryProvider.notifier).fetchPlaylistTracks(playlist.id),
+      future: _tracksFuture,
       builder: (context, snapshot) {
-        final tracks = snapshot.data?.take(10).toList() ?? const <LibraryTrack>[];
+        final tracks =
+            snapshot.data?.take(10).toList() ?? const <LibraryTrack>[];
 
         return Padding(
           padding: const EdgeInsets.only(top: 20),
@@ -871,15 +902,15 @@ class _PlaylistPreviewSection extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: _HomeSectionHeader(
                   eyebrow: 'Playlist',
-                  title: playlist.name,
-                  subtitle: '${playlist.trackCount} tracks saved',
+                  title: widget.playlist.name,
+                  subtitle: '${widget.playlist.trackCount} tracks saved',
                   actionLabel: 'Open',
                   onAction: () {
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => PlaylistDetailsScreen(
-                          title: playlist.name,
-                          playlistId: playlist.id,
+                          title: widget.playlist.name,
+                          playlistId: widget.playlist.id,
                         ),
                       ),
                     );
