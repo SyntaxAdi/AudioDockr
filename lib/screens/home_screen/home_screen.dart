@@ -31,7 +31,7 @@ class HomeScreen extends ConsumerWidget {
     final libraryState = ref.watch(libraryProvider);
     final displayName = ref.watch(displayNameProvider);
     final profileImage = ref.watch(profileImageProvider);
-    final recentlyPlayed = libraryState.recentTracks.take(3).toList();
+    final recentlyPlayed = libraryState.recentTracks.take(10).toList();
     final latestPlayedTrack =
         libraryState.recentTracks.isNotEmpty ? libraryState.recentTracks.first : null;
     final playlists = libraryState.userPlaylists;

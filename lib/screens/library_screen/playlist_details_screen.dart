@@ -674,45 +674,54 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
 
                 if (playlistTracks.isEmpty) {
                   return ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                    padding: const EdgeInsets.only(top: 8, bottom: 24),
                     children: [
-                      LibraryEditablePlaylistHeader(
-                        playlist: editablePlaylist,
-                        tracks: playlistTracks,
-                        shuffleEnabled: shuffleEnabled,
-                        onPlayPressed: () =>
-                            _playPlaylistTracks(context, playlistTracks),
-                        onShufflePressed: () => ref
-                            .read(playbackNotifierProvider.notifier)
-                            .setShuffleEnabled(!shuffleEnabled),
-                        onMenuPressed: () => _showPlaylistActionSheet(
-                            context, editablePlaylist),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: LibraryEditablePlaylistHeader(
+                          playlist: editablePlaylist,
+                          tracks: playlistTracks,
+                          shuffleEnabled: shuffleEnabled,
+                          onPlayPressed: () =>
+                              _playPlaylistTracks(context, playlistTracks),
+                          onShufflePressed: () => ref
+                              .read(playbackNotifierProvider.notifier)
+                              .setShuffleEnabled(!shuffleEnabled),
+                          onMenuPressed: () => _showPlaylistActionSheet(
+                              context, editablePlaylist),
+                        ),
                       ),
                       const SizedBox(height: 28),
-                      const LibraryEmptyPlaylistState(),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 20),
+                        child: LibraryEmptyPlaylistState(),
+                      ),
                     ],
                   );
                 }
 
                 return ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                  padding: const EdgeInsets.only(top: 8, bottom: 24),
                   itemCount: playlistTracks.length + 2,
                   itemBuilder: (context, index) {
                     if (index == 0) {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          LibraryEditablePlaylistHeader(
-                            playlist: editablePlaylist,
-                            tracks: playlistTracks,
-                            shuffleEnabled: shuffleEnabled,
-                            onPlayPressed: () =>
-                                _playPlaylistTracks(context, playlistTracks),
-                            onShufflePressed: () => ref
-                                .read(playbackNotifierProvider.notifier)
-                                .setShuffleEnabled(!shuffleEnabled),
-                            onMenuPressed: () => _showPlaylistActionSheet(
-                                context, editablePlaylist),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
+                            child: LibraryEditablePlaylistHeader(
+                              playlist: editablePlaylist,
+                              tracks: playlistTracks,
+                              shuffleEnabled: shuffleEnabled,
+                              onPlayPressed: () =>
+                                  _playPlaylistTracks(context, playlistTracks),
+                              onShufflePressed: () => ref
+                                  .read(playbackNotifierProvider.notifier)
+                                  .setShuffleEnabled(!shuffleEnabled),
+                              onMenuPressed: () => _showPlaylistActionSheet(
+                                  context, editablePlaylist),
+                            ),
                           ),
                           const SizedBox(height: 12),
                         ],
