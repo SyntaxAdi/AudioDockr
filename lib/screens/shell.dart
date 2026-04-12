@@ -8,7 +8,7 @@ import 'search/search_screen.dart';
 import 'library_screen/library_screen.dart';
 import 'downloads_screen.dart';
 import 'recents/recents_screen.dart';
-import 'settings_screen.dart';
+import 'settings/settings_screen.dart';
 import '../widgets/app_bottom_bar.dart';
 
 class AppShell extends ConsumerStatefulWidget {
