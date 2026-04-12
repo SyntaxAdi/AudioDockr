@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../library/library_provider.dart';
 import '../playback/playback_provider.dart';
 import '../theme.dart';
-import 'library_screen.dart';
+import 'library_screen/playlist_details_screen.dart';
 
 class RecentsScreen extends ConsumerStatefulWidget {
   const RecentsScreen({super.key});

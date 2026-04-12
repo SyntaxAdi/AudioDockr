@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../theme.dart';
-import 'app_updates_screen.dart';
-import 'home_screen.dart';
+import 'app_updates/app_updates_screen.dart';
+import 'home_screen/home_screen.dart';
 import 'search_screen.dart';
-import 'library_screen.dart';
+import 'library_screen/library_screen.dart';
 import 'downloads_screen.dart';
 import 'recents_screen.dart';
 import 'settings_screen.dart';
