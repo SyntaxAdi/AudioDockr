@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../library/library_provider.dart';
 import '../playback/playback_provider.dart';
-import '../screens/now_playing_screen.dart';
+import '../screens/now_playing/now_playing_screen.dart';
 import '../theme.dart';
 import 'infinite_marquee_text.dart';
 
