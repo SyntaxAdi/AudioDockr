@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../library/library_provider.dart';
 import '../../playback/playback_provider.dart';
+import '../../providers/profile_provider.dart';
 import '../../theme.dart';
 import '../../widgets/horizontal_track_card.dart';
 import '../library_screen/playlist_details_screen.dart';
@@ -28,6 +29,8 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final libraryState = ref.watch(libraryProvider);
+    final displayName = ref.watch(displayNameProvider);
+    final profileImage = ref.watch(profileImageProvider);
     final recentlyPlayed = libraryState.recentTracks.take(3).toList();
     final latestPlayedTrack =
         libraryState.recentTracks.isNotEmpty ? libraryState.recentTracks.first : null;
@@ -50,7 +53,11 @@ class HomeScreen extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 24),
           children: [
-            HomeTopBar(onProfileTap: onOpenMenu),
+            HomeTopBar(
+              onProfileTap: onOpenMenu,
+              displayName: displayName,
+              profileImage: profileImage,
+            ),
             if (shortcutItems.isNotEmpty) ...[
               const SizedBox(height: 16),
               Padding(

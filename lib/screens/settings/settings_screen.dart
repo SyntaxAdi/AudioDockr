@@ -10,7 +10,6 @@ import 'pages/playback_page.dart';
 import 'pages/profile_pages.dart';
 import 'pages/storage_page.dart';
 import 'pages/support_pages.dart';
-import 'widgets/profile_header_card.dart';
 import 'widgets/section_label.dart';
 import 'widgets/settings_group.dart';
 import 'widgets/settings_tiles.dart';
@@ -29,16 +28,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   static const String _backgroundPlaybackKey = 'background_playback';
   static const String _downloadNotificationsKey = 'download_notifications';
   static const String _releaseNotificationsKey = 'release_notifications';
-  static const String _privateSessionKey = 'private_session';
-  static const String _showActivityKey = 'show_activity_status';
 
   String _downloadPath = _defaultDownloadPath;
   bool _resumeOnStart = true;
   bool _backgroundPlayback = true;
   bool _downloadNotifications = true;
   bool _releaseNotifications = false;
-  bool _privateSession = false;
-  bool _showActivityStatus = true;
 
   @override
   void initState() {
@@ -61,8 +56,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           preferences.getBool(_downloadNotificationsKey) ?? true;
       _releaseNotifications =
           preferences.getBool(_releaseNotificationsKey) ?? false;
-      _privateSession = preferences.getBool(_privateSessionKey) ?? false;
-      _showActivityStatus = preferences.getBool(_showActivityKey) ?? true;
     });
   }
 
@@ -147,24 +140,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
           children: [
-            ProfileHeaderCard(
-              onTap: () => _openSettingsPage(
-                ProfileOverviewPage(
-                  privateSession: _privateSession,
-                  showActivityStatus: _showActivityStatus,
-                  onPrivateSessionChanged: (value) {
-                    setState(() => _privateSession = value);
-                    _updateBoolPreference(_privateSessionKey, value);
-                  },
-                  onShowActivityChanged: (value) {
-                    setState(() => _showActivityStatus = value);
-                    _updateBoolPreference(_showActivityKey, value);
-                  },
-                  onShowComingSoon: _showComingSoonMessage,
-                ),
-              ),
-            ),
-            const SizedBox(height: 24),
             const SectionLabel('Account'),
             SettingsGroup(
               children: [
@@ -172,21 +147,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   icon: Icons.person_outline_rounded,
                   title: 'Profile',
                   subtitle: 'Manage your personal and privacy settings',
-                  onTap: () => _openSettingsPage(
-                    AccountProfilePage(
-                      privateSession: _privateSession,
-                      showActivityStatus: _showActivityStatus,
-                      onPrivateSessionChanged: (value) {
-                        setState(() => _privateSession = value);
-                        _updateBoolPreference(_privateSessionKey, value);
-                      },
-                      onShowActivityChanged: (value) {
-                        setState(() => _showActivityStatus = value);
-                        _updateBoolPreference(_showActivityKey, value);
-                      },
-                      onShowComingSoon: _showComingSoonMessage,
-                    ),
-                  ),
+                  onTap: () => _openSettingsPage(const AccountProfilePage()),
                 ),
                 SettingsActionTile(
                   icon: Icons.notifications_none_rounded,

@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
+import 'dart:io';
 
+import '../../providers/profile_provider.dart';
 import '../../theme.dart';
 
 class HomeTopBar extends StatelessWidget {
-  const HomeTopBar({super.key, required this.onProfileTap});
+  const HomeTopBar({
+    super.key,
+    required this.onProfileTap,
+    required this.displayName,
+    required this.profileImage,
+  });
 
   final VoidCallback onProfileTap;
+  final String displayName;
+  final ProfileImageState profileImage;
 
   @override
   Widget build(BuildContext context) {
@@ -45,10 +54,7 @@ class HomeTopBar extends StatelessWidget {
                   ],
                 ),
                 child: ClipOval(
-                  child: Image.asset(
-                    'lib/assets/app_icon.png',
-                    fit: BoxFit.cover,
-                  ),
+                  child: _ProfileAvatar(profileImage: profileImage),
                 ),
               ),
             ),
@@ -56,7 +62,7 @@ class HomeTopBar extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Audio Docker',
+              displayName,
               style: Theme.of(context).textTheme.displayLarge?.copyWith(
                     color: textPrimary,
                     fontSize: 22,
@@ -65,6 +71,47 @@ class HomeTopBar extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ProfileAvatar extends StatelessWidget {
+  const _ProfileAvatar({required this.profileImage});
+
+  final ProfileImageState profileImage;
+
+  @override
+  Widget build(BuildContext context) {
+    switch (profileImage.mode) {
+      case ProfileImageMode.customFile:
+        final imagePath = profileImage.customImagePath;
+        if (imagePath == null || imagePath.trim().isEmpty) {
+          return _buildFallbackIcon();
+        }
+        return Image.file(
+          File(imagePath),
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildFallbackIcon(),
+        );
+      case ProfileImageMode.none:
+        return _buildFallbackIcon();
+      case ProfileImageMode.defaultAsset:
+        return Image.asset(
+          defaultProfileImageAsset,
+          fit: BoxFit.cover,
+        );
+    }
+  }
+
+  Widget _buildFallbackIcon() {
+    return Container(
+      color: bgSurface,
+      alignment: Alignment.center,
+      child: const Icon(
+        Icons.person_rounded,
+        color: textSecondary,
+        size: 22,
       ),
     );
   }
