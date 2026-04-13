@@ -25,6 +25,7 @@ class LibraryPlaylistTrackList extends StatelessWidget {
     }
 
     return ListView.builder(
+      itemExtent: 76,
       itemCount: tracks.length,
       itemBuilder: (context, index) {
         final track = tracks[index];

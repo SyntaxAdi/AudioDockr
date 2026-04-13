@@ -12,6 +12,7 @@ class LibraryPlaylistCard extends StatelessWidget {
     required this.icon,
     this.leading,
     required this.onTap,
+    this.height = 88,
   });
 
   final String title;
@@ -19,31 +20,38 @@ class LibraryPlaylistCard extends StatelessWidget {
   final IconData icon;
   final Widget? leading;
   final VoidCallback onTap;
+  final double height;
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic sizing based on height
+    final bool isCompact = height < 70;
+    final double iconSize = isCompact ? 36 : 56;
+    final double padding = isCompact ? 12 : 16;
+    final double titleFontSize = isCompact ? 13 : 16;
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(isCompact ? 10 : 14),
       child: Container(
-        height: 88,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        height: height,
+        padding: EdgeInsets.symmetric(horizontal: padding),
         decoration: BoxDecoration(
           color: bgCard,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(isCompact ? 10 : 14),
           border: Border.all(color: bgDivider),
         ),
         child: Row(
           children: [
             leading ??
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: iconSize,
+                  height: iconSize,
                   decoration: BoxDecoration(
                     color: accentPrimary.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(isCompact ? 8 : 12),
                   ),
-                  child: Icon(icon, color: accentPrimary),
+                  child: Icon(icon, color: accentPrimary, size: isCompact ? 20 : 24),
                 ),
             const SizedBox(width: 14),
             Expanded(
@@ -53,15 +61,22 @@ class LibraryPlaylistCard extends StatelessWidget {
                 children: [
                   Text(
                     title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           fontWeight: FontWeight.w700,
+                          fontSize: titleFontSize,
                         ),
                   ),
                   if (subtitle.isNotEmpty) ...[
-                    const SizedBox(height: 4),
+                    SizedBox(height: isCompact ? 2 : 4),
                     Text(
                       subtitle.toUpperCase(),
-                      style: Theme.of(context).textTheme.labelSmall,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            fontSize: isCompact ? 9 : 11,
+                          ),
                     ),
                   ],
                 ],
@@ -79,9 +94,11 @@ class LibraryCyberpunkPlaylistBadge extends StatelessWidget {
   const LibraryCyberpunkPlaylistBadge({
     super.key,
     required this.variant,
+    this.size = 56,
   });
 
   final LibraryCyberpunkPlaylistBadgeVariant variant;
+  final double size;
 
   @override
   Widget build(BuildContext context) {
@@ -89,12 +106,14 @@ class LibraryCyberpunkPlaylistBadge extends StatelessWidget {
     final icon = isLiked
         ? Icons.favorite_rounded
         : Icons.history_toggle_off_rounded;
+    final isCompact = size < 45;
+    final scale = size / 56.0; // Base size is 56
 
     return Container(
-      width: 56,
-      height: 56,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(isCompact ? 8 : 12),
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -113,7 +132,7 @@ class LibraryCyberpunkPlaylistBadge extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: (isLiked ? accentRed : accentPrimary).withValues(alpha: 0.18),
-            blurRadius: 14,
+            blurRadius: 14 * scale,
             spreadRadius: 1,
           ),
         ],
@@ -121,13 +140,13 @@ class LibraryCyberpunkPlaylistBadge extends StatelessWidget {
       child: Stack(
         children: [
           Positioned(
-            top: 8,
-            left: -10,
+            top: 8 * scale,
+            left: -10 * scale,
             child: Transform.rotate(
               angle: -0.42,
               child: Container(
-                width: 36,
-                height: 6,
+                width: 36 * scale,
+                height: 6 * scale,
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(999),
@@ -136,12 +155,12 @@ class LibraryCyberpunkPlaylistBadge extends StatelessWidget {
             ),
           ),
           Positioned(
-            right: isLiked ? 0 : -8,
+            right: isLiked ? 0 : -8 * scale,
             top: isLiked ? 0 : null,
-            bottom: isLiked ? null : 8,
+            bottom: isLiked ? null : 8 * scale,
             child: Container(
-              width: isLiked ? 1.3 : 32,
-              height: isLiked ? 56 : 5,
+              width: isLiked ? 1.3 : 32 * scale,
+              height: isLiked ? size : 5 * scale,
               decoration: BoxDecoration(
                 color: isLiked
                     ? accentPrimary.withValues(alpha: 0.75)
@@ -152,11 +171,11 @@ class LibraryCyberpunkPlaylistBadge extends StatelessWidget {
           ),
           if (isLiked)
             Positioned(
-              bottom: 7,
-              right: 6,
+              bottom: 7 * scale,
+              right: 6 * scale,
               child: Container(
-                width: 14,
-                height: 3,
+                width: 14 * scale,
+                height: 3 * scale,
                 decoration: BoxDecoration(
                   color: accentPrimary.withValues(alpha: 0.95),
                   borderRadius: BorderRadius.circular(999),
@@ -167,7 +186,7 @@ class LibraryCyberpunkPlaylistBadge extends StatelessWidget {
             Positioned(
               top: 0,
               bottom: 0,
-              left: 18,
+              left: 18 * scale,
               child: Container(
                 width: 1.4,
                 color: Colors.black.withValues(alpha: 0.72),
@@ -177,7 +196,7 @@ class LibraryCyberpunkPlaylistBadge extends StatelessWidget {
             child: Icon(
               icon,
               color: isLiked ? Colors.white : Colors.black,
-              size: 24,
+              size: 24 * scale,
             ),
           ),
         ],

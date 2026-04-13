@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../download_manager/download_provider.dart';
+import '../../settings/app_preferences.dart';
 import '../../theme.dart';
 import 'pages/library_data_page.dart';
 import 'pages/notifications_page.dart';
@@ -22,14 +24,12 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  static const String _defaultDownloadPath = '/storage/emulated/0/Music';
-  static const String _downloadPathKey = 'download_path';
   static const String _resumeOnStartKey = 'resume_on_start';
   static const String _backgroundPlaybackKey = 'background_playback';
   static const String _downloadNotificationsKey = 'download_notifications';
   static const String _releaseNotificationsKey = 'release_notifications';
 
-  String _downloadPath = _defaultDownloadPath;
+  String _downloadPath = AppPreferences.defaultDownloadPath;
   bool _resumeOnStart = true;
   bool _backgroundPlayback = true;
   bool _downloadNotifications = true;
@@ -48,8 +48,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
 
     setState(() {
-      _downloadPath =
-          _readStringPreference(preferences, _downloadPathKey, _defaultDownloadPath);
+      _downloadPath = AppPreferences.readDownloadPath(preferences);
       _resumeOnStart = preferences.getBool(_resumeOnStartKey) ?? true;
       _backgroundPlayback = preferences.getBool(_backgroundPlaybackKey) ?? true;
       _downloadNotifications =
@@ -57,18 +56,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _releaseNotifications =
           preferences.getBool(_releaseNotificationsKey) ?? false;
     });
-  }
-
-  String _readStringPreference(
-    SharedPreferences preferences,
-    String key,
-    String fallback,
-  ) {
-    final value = preferences.getString(key);
-    if (value == null || value.trim().isEmpty) {
-      return fallback;
-    }
-    return value;
   }
 
   Future<void> _updateBoolPreference(String key, bool value) async {
@@ -85,7 +72,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
 
     final preferences = await SharedPreferences.getInstance();
-    await preferences.setString(_downloadPathKey, selectedPath);
+    await preferences.setString(AppPreferences.downloadPathKey, selectedPath);
     if (!mounted) {
       return;
     }
@@ -93,6 +80,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     setState(() {
       _downloadPath = selectedPath;
     });
+    ref.invalidate(downloadPathProvider);
   }
 
   String _pathLabel(String path) {

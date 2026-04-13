@@ -43,7 +43,7 @@ class NowPlayingControls extends ConsumerWidget {
           onTap: () => notifier.togglePlayPause(),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOut,
+            curve: Curves.easeOutCubic,
             width: 76,
             height: 76,
             decoration: BoxDecoration(
@@ -101,7 +101,7 @@ class PlayerControlButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(16),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
+        curve: Curves.easeOutCubic,
         width: 52,
         height: 52,
         decoration: BoxDecoration(

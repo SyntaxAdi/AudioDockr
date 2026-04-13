@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'playback_models.dart';
 import 'playback_notifier.dart';
@@ -12,18 +13,84 @@ mixin PlaybackEngineMixin on PlaybackNotifierBase {
     required String title,
     required String artist,
     required String thumbnailUrl,
+    String? localFilePath,
   }) async {
     await PlaybackUrlResolver.ensurePlaybackPermissions();
+
+    try {
+      await nativePlayerService.pause();
+    } catch (_) {}
+
+    // Try local file first (offline playback)
+    if (localFilePath != null && localFilePath.isNotEmpty) {
+      final localFile = File(localFilePath);
+      if (await localFile.exists()) {
+        try {
+          state = state.copyWith(
+            currentTrackId: videoId,
+            currentTitle: title,
+            currentArtist: artist,
+            currentThumbnailUrl: thumbnailUrl,
+            currentVideoUrl: videoUrl,
+            position: Duration.zero,
+            duration: Duration.zero,
+            isPreparing: true,
+            lastError: null,
+          );
+
+          await nativePlayerService.playLocalFile(
+            filePath: localFilePath,
+            title: title,
+            artist: artist,
+            thumbnailUrl: thumbnailUrl,
+          );
+          lastTrackStart = DateTime.now();
+
+          unawaited(
+            libraryNotifier
+                .recordTrack(
+                  videoId: videoId,
+                  videoUrl: videoUrl,
+                  title: title,
+                  artist: artist,
+                  thumbnailUrl: thumbnailUrl,
+                )
+                .catchError((_) {}),
+          );
+
+          state = state.copyWith(
+            currentTrackId: videoId,
+            currentTitle: title,
+            currentArtist: artist,
+            currentThumbnailUrl: thumbnailUrl,
+            currentVideoUrl: videoUrl,
+            position: Duration.zero,
+            duration: Duration.zero,
+            isPreparing: false,
+            isPlaying: true,
+            recentlyPlayed: updatedRecentlyPlayed(
+              videoId: videoId,
+              videoUrl: videoUrl,
+              title: title,
+              artist: artist,
+              thumbnailUrl: thumbnailUrl,
+            ),
+            lastError: null,
+          );
+          return;
+        } catch (_) {
+          // Local playback failed, fall through to online
+        }
+      }
+    }
+
+    // Online playback
     final resolvedMedia = await resolver.resolveVideoUrlIfNeeded(
       videoId: videoId,
       videoUrl: videoUrl,
       title: title,
       artist: artist,
     );
-
-    try {
-      await nativePlayerService.pause();
-    } catch (_) {}
 
     try {
       state = state.copyWith(

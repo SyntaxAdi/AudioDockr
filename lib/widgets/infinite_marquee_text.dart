@@ -94,9 +94,10 @@ class _InfiniteMarqueeTextState extends State<InfiniteMarqueeText>
         }
 
         return ClipRect(
-          child: SizedBox(
-            height: textPainter.height,
-            child: AnimatedBuilder(
+          child: RepaintBoundary(
+            child: SizedBox(
+              height: textPainter.height,
+              child: AnimatedBuilder(
               animation: _controller,
               builder: (context, _) {
                 final offset = -_controller.value * cycleWidth;
@@ -131,9 +132,10 @@ class _InfiniteMarqueeTextState extends State<InfiniteMarqueeText>
               },
             ),
           ),
-        );
-      },
-    );
+        ),
+      );
+    },
+  );
   }
 }
 

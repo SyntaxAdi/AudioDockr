@@ -196,64 +196,84 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
           ? const Center(
               child: CircularProgressIndicator(color: accentPrimary),
             )
-          : ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                LibraryPlaylistCard(
-                  title: 'Liked Songs',
-                  subtitle: '${libraryState.likedTracks.length} tracks',
-                  icon: Icons.favorite,
-                  leading: const LibraryCyberpunkPlaylistBadge(
-                    variant: LibraryCyberpunkPlaylistBadgeVariant.liked,
-                  ),
-                  onTap: () {
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => PlaylistDetailsScreen(
-                          title: 'Liked Songs',
-                          tracks: libraryState.likedTracks,
-                          onNavigateToTab: widget.onNavigateToTab,
-                        ),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final totalItems = 2 + libraryState.userPlaylists.length;
+                final availableHeight = constraints.maxHeight - 32; // 16px padding tb
+                // Need to fit at least 7 items. Items have 12px height spacing between them.
+                final itemSpacingCount = totalItems > 1 ? totalItems - 1 : 0;
+                final visibleItems = totalItems < 7 ? 7 : 7;
+                final maxSpacing = (visibleItems - 1) * 12;
+                final dynamicCardHeight = ((availableHeight - maxSpacing) / visibleItems).clamp(60.0, 88.0);
+
+                final isCompact = dynamicCardHeight < 70;
+                final leadingSize = isCompact ? 36.0 : 56.0;
+
+                return ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    LibraryPlaylistCard(
+                      title: 'Liked Songs',
+                      subtitle: '${libraryState.likedTracks.length} tracks',
+                      icon: Icons.favorite,
+                      height: dynamicCardHeight,
+                      leading: LibraryCyberpunkPlaylistBadge(
+                        variant: LibraryCyberpunkPlaylistBadgeVariant.liked,
+                        size: leadingSize,
                       ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                LibraryPlaylistCard(
-                  title: 'Recents',
-                  subtitle: '${libraryState.recentTracks.length} tracks',
-                  icon: Icons.history,
-                  leading: const LibraryCyberpunkPlaylistBadge(
-                    variant: LibraryCyberpunkPlaylistBadgeVariant.recents,
-                  ),
-                  onTap: _openRecents,
-                ),
-                for (final playlist in libraryState.userPlaylists) ...[
-                  const SizedBox(height: 12),
-                  LibraryPlaylistCard(
-                    title: playlist.name,
-                    subtitle: '',
-                    icon: Icons.queue_music_rounded,
-                    leading: LibraryPlaylistCoverArt(
-                      imagePath: playlist.coverImagePath,
-                      imageUrl: '',
-                      size: 56,
-                      borderRadius: 12,
-                    ),
-                    onTap: () {
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => PlaylistDetailsScreen(
-                            title: playlist.name,
-                            playlistId: playlist.id,
-                            onNavigateToTab: widget.onNavigateToTab,
+                      onTap: () {
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => PlaylistDetailsScreen(
+                              title: 'Liked Songs',
+                              tracks: libraryState.likedTracks,
+                              onNavigateToTab: widget.onNavigateToTab,
+                            ),
                           ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    LibraryPlaylistCard(
+                      title: 'Recents',
+                      subtitle: '${libraryState.recentTracks.length} tracks',
+                      icon: Icons.history,
+                      height: dynamicCardHeight,
+                      leading: LibraryCyberpunkPlaylistBadge(
+                        variant: LibraryCyberpunkPlaylistBadgeVariant.recents,
+                        size: leadingSize,
+                      ),
+                      onTap: _openRecents,
+                    ),
+                    for (final playlist in libraryState.userPlaylists) ...[
+                      const SizedBox(height: 12),
+                      LibraryPlaylistCard(
+                        title: playlist.name,
+                        subtitle: '',
+                        icon: Icons.queue_music_rounded,
+                        height: dynamicCardHeight,
+                        leading: LibraryPlaylistCoverArt(
+                          imagePath: playlist.coverImagePath,
+                          imageUrl: '',
+                          size: leadingSize,
+                          borderRadius: isCompact ? 8 : 12,
                         ),
-                      );
-                    },
-                  ),
-                ],
-              ],
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => PlaylistDetailsScreen(
+                                title: playlist.name,
+                                playlistId: playlist.id,
+                                onNavigateToTab: widget.onNavigateToTab,
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ],
+                );
+              },
             ),
     );
   }

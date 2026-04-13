@@ -50,96 +50,105 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: ListView(
+        child: ListView.builder(
           padding: const EdgeInsets.only(bottom: 24),
-          children: [
-            HomeTopBar(
-              onProfileTap: onOpenMenu,
-              displayName: displayName,
-              profileImage: profileImage,
-            ),
-            if (shortcutItems.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: HomeCollectionGrid(items: shortcutItems),
+          itemCount: 1 +
+              (shortcutItems.isNotEmpty ? 2 : 0) +
+              (libraryState.isLoading ? 1 : 0) +
+              (!libraryState.isLoading && !hasContent ? 1 : 0) +
+              (!libraryState.isLoading && hasContent ? 4 : 0) +
+              (!libraryState.isLoading && hasContent ? playlists.length : 0),
+          itemBuilder: (context, index) {
+            final children = <Widget>[
+              HomeTopBar(
+                onProfileTap: onOpenMenu,
+                displayName: displayName,
+                profileImage: profileImage,
               ),
-            ],
-            if (libraryState.isLoading)
-              const Padding(
-                padding: EdgeInsets.only(top: 80),
-                child: Center(
-                  child: CircularProgressIndicator(color: accentPrimary),
+              if (shortcutItems.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: HomeCollectionGrid(items: shortcutItems),
                 ),
-              )
-            else ...[
-              if (!hasContent)
-                SizedBox(
-                  height: mediaQuery.size.height * 0.42,
-                  child: const HomeEmptyState(),
+              ],
+              if (libraryState.isLoading)
+                const Padding(
+                  padding: EdgeInsets.only(top: 80),
+                  child: Center(
+                    child: CircularProgressIndicator(color: accentPrimary),
+                  ),
                 )
               else ...[
-                const SizedBox(height: 28),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: HomeSectionHeader(
-                    eyebrow: 'Jump back in',
-                    title: 'Recent songs played',
-                  ),
-                ),
-                const SizedBox(height: 14),
-                if (recentlyPlayed.isEmpty)
+                if (!hasContent)
+                  SizedBox(
+                    height: mediaQuery.size.height * 0.42,
+                    child: const HomeEmptyState(),
+                  )
+                else ...[
+                  const SizedBox(height: 28),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 16),
-                    child: HomeInlineInfoCard(
-                      icon: Icons.history_rounded,
-                      title: 'No recent tracks yet',
-                      subtitle:
-                          'Start a song and it will appear here for quick access.',
-                    ),
-                  )
-                else
-                  SizedBox(
-                    height: 208,
-                    child: ListView.separated(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      scrollDirection: Axis.horizontal,
-                      itemCount: recentlyPlayed.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 12),
-                      itemBuilder: (context, index) {
-                        final track = recentlyPlayed[index];
-                        return HorizontalTrackCard(
-                          track: track,
-                          onTap: () async {
-                            try {
-                              await ref
-                                  .read(playbackNotifierProvider.notifier)
-                                  .playTrack(
-                                    track.videoId,
-                                    track.videoUrl,
-                                    track.title,
-                                    track.artist,
-                                    track.thumbnailUrl,
-                                  );
-                            } on PlaybackFailure catch (error) {
-                              if (!context.mounted) return;
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(content: Text(error.message)),
-                              );
-                            }
-                          },
-                          onLongPress: () =>
-                              showTrackActionsSheet(context, ref, track),
-                        );
-                      },
+                    child: HomeSectionHeader(
+                      eyebrow: 'Jump back in',
+                      title: 'Recent songs played',
                     ),
                   ),
-                if (playlists.isNotEmpty) const SizedBox(height: 1),
-                for (final playlist in playlists)
-                  HomePlaylistPreviewSection(playlist: playlist),
+                  const SizedBox(height: 14),
+                  if (recentlyPlayed.isEmpty)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 16),
+                      child: HomeInlineInfoCard(
+                        icon: Icons.history_rounded,
+                        title: 'No recent tracks yet',
+                        subtitle:
+                            'Start a song and it will appear here for quick access.',
+                      ),
+                    )
+                  else
+                    SizedBox(
+                      height: 208,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: recentlyPlayed.length,
+                        separatorBuilder: (_, __) => const SizedBox(width: 12),
+                        itemBuilder: (context, index) {
+                          final track = recentlyPlayed[index];
+                          return HorizontalTrackCard(
+                            track: track,
+                            onTap: () async {
+                              try {
+                                await ref
+                                    .read(playbackNotifierProvider.notifier)
+                                    .playTrack(
+                                      track.videoId,
+                                      track.videoUrl,
+                                      track.title,
+                                      track.artist,
+                                      track.thumbnailUrl,
+                                    );
+                              } on PlaybackFailure catch (error) {
+                                if (!context.mounted) return;
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(content: Text(error.message)),
+                                );
+                              }
+                            },
+                            onLongPress: () =>
+                                showTrackActionsSheet(context, ref, track),
+                          );
+                        },
+                      ),
+                    ),
+                  if (playlists.isNotEmpty) const SizedBox(height: 1),
+                  for (final playlist in playlists)
+                    HomePlaylistPreviewSection(playlist: playlist),
+                ],
               ],
-            ],
-          ],
+            ];
+            return children[index];
+          },
         ),
       ),
     );

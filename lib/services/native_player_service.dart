@@ -40,6 +40,28 @@ class NativePlayerService {
     }
   }
 
+  Future<void> playLocalFile({
+    required String filePath,
+    required String title,
+    required String artist,
+    required String thumbnailUrl,
+  }) async {
+    try {
+      await _commandChannel.invokeMethod<void>(
+        'play',
+        {
+          'url': filePath,
+          'headers': const <String, String>{},
+          'title': title,
+          'artist': artist,
+          'artworkUrl': thumbnailUrl,
+        },
+      );
+    } on PlatformException catch (error) {
+      throw Exception('Local playback failed: ${error.message}');
+    }
+  }
+
   Future<void> pause() async {
     await _commandChannel.invokeMethod<void>('pause');
   }

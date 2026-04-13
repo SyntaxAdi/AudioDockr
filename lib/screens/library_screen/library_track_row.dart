@@ -359,7 +359,7 @@ class _LibraryQueueSwipeWrapperState
         AnimatedContainer(
           duration: const Duration(milliseconds: 140),
           transform: Matrix4.translationValues(revealWidth, 0, 0),
-          curve: Curves.easeOut,
+          curve: Curves.easeOutCubic,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onHorizontalDragStart: (_) => _queueTriggered = false,

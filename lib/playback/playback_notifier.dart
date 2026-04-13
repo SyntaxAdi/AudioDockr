@@ -30,6 +30,7 @@ abstract class PlaybackNotifierBase extends StateNotifier<PlaybackState> {
     required String title,
     required String artist,
     required String thumbnailUrl,
+    String? localFilePath,
   });
   Future<void> advanceQueue();
   QueuedTrack? currentTrackSnapshot();
@@ -87,8 +88,9 @@ class PlaybackNotifier extends PlaybackNotifierBase
     String videoUrl,
     String title,
     String artist,
-    String thumbnailUrl,
-  ) async {
+    String thumbnailUrl, {
+    String? localFilePath,
+  }) async {
     final current = currentTrackSnapshot();
     if (current != null && current.videoId != videoId) {
       history.add(current);
@@ -99,6 +101,7 @@ class PlaybackNotifier extends PlaybackNotifierBase
       title: title,
       artist: artist,
       thumbnailUrl: thumbnailUrl,
+      localFilePath: localFilePath,
     );
   }
 

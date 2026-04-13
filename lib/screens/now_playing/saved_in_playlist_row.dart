@@ -302,7 +302,7 @@ class _CelebrationOverlay extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final value = Curves.easeOut.transform(controller.value);
+        final value = Curves.easeOutCubic.transform(controller.value);
         if (value <= 0 || !visible) return const SizedBox.shrink();
 
         return Stack(
@@ -362,7 +362,7 @@ class _DeselectOverlay extends StatelessWidget {
     return AnimatedBuilder(
       animation: controller,
       builder: (context, _) {
-        final value = Curves.easeOut.transform(controller.value);
+        final value = Curves.easeOutCubic.transform(controller.value);
         if (value <= 0 || !visible) return const SizedBox.shrink();
 
         return Stack(

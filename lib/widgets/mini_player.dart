@@ -66,7 +66,7 @@ class MiniPlayer extends ConsumerWidget {
 
     return AnimatedPadding(
       duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOut,
+      curve: Curves.easeOutCubic,
       padding: EdgeInsets.only(bottom: bottomInset),
       child: GestureDetector(
         onTap: () {

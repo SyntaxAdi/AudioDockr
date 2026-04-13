@@ -49,7 +49,7 @@ Future<bool> showCreatePlaylistSheet(
 
       return AnimatedPadding(
         duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
+        curve: Curves.easeOutCubic,
         padding: EdgeInsets.only(bottom: bottomOffset),
         child: Align(
           alignment: Alignment.bottomCenter,
@@ -208,7 +208,7 @@ Future<String?> showSpotifyPlaylistImportSheet(BuildContext context) async {
 
           return AnimatedPadding(
             duration: const Duration(milliseconds: 180),
-            curve: Curves.easeOut,
+            curve: Curves.easeOutCubic,
             padding: EdgeInsets.only(bottom: bottomOffset),
             child: Align(
               alignment: Alignment.bottomCenter,

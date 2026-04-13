@@ -50,31 +50,35 @@ class _RecentsScreenState extends ConsumerState<RecentsScreen> {
       ),
       body: SafeArea(
         top: false,
-        child: ListView(
+        child: ListView.builder(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-          children: [
-            _buildFilterChip(),
-            const SizedBox(height: 20),
-            if (activityItems.isEmpty)
-              const RecentsEmptyState()
-            else ...[
-              RecentsSectionHeader(
+          itemCount: activityItems.isEmpty ? 3 : 4 + activityItems.length,
+          itemBuilder: (context, index) {
+            if (index == 0) return _buildFilterChip();
+            if (index == 1) return const SizedBox(height: 20);
+            if (activityItems.isEmpty && index == 2) {
+              return const RecentsEmptyState();
+            } else if (index == 2) {
+              return RecentsSectionHeader(
                 title: 'Recently played',
                 subtitle: _musicOnly
                     ? 'Showing only music.'
                     : 'Songs and playlists in one place.',
-              ),
-              const SizedBox(height: 12),
-              for (final item in activityItems)
-                if (item.track != null)
-                  RecentTrackTile(
-                    track: item.track!,
-                    onTap: () => _playTrack(item.track!),
-                  )
-                else if (item.playlist != null)
-                  RecentPlaylistTile(playlist: item.playlist!),
-            ],
-          ],
+              );
+            }
+            if (index == 3) return const SizedBox(height: 12);
+            
+            final item = activityItems[index - 4];
+            if (item.track != null) {
+              return RecentTrackTile(
+                track: item.track!,
+                onTap: () => _playTrack(item.track!),
+              );
+            } else if (item.playlist != null) {
+              return RecentPlaylistTile(playlist: item.playlist!);
+            }
+            return const SizedBox.shrink();
+          },
         ),
       ),
     );

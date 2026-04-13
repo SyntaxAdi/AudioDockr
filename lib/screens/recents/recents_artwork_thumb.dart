@@ -27,6 +27,7 @@ class ArtworkThumb extends StatelessWidget {
       child = Image.file(
         File(localArtworkPath!),
         fit: BoxFit.cover,
+        filterQuality: FilterQuality.low,
         errorBuilder: (_, __, ___) => _fallback(),
       );
     } else if (artworkUrl != null && artworkUrl!.isNotEmpty) {

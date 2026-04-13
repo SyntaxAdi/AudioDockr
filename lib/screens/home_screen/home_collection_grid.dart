@@ -269,6 +269,7 @@ class _HomeCollectionArtwork extends StatelessWidget {
       child = Image.file(
         File(item.localArtworkPath!),
         fit: BoxFit.cover,
+        filterQuality: FilterQuality.low,
         errorBuilder: (_, __, ___) => _defaultArtwork(),
       );
     } else if (item.artworkUrl != null && item.artworkUrl!.isNotEmpty) {
