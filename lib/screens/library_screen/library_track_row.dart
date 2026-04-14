@@ -196,147 +196,149 @@ class LibraryTrackRow extends ConsumerWidget {
     final downloadState = ref.watch(downloadNotifierProvider);
     final isDownloaded = downloadState.recordForTrack(track.videoId)?.isCompleted == true;
 
-    final row = InkWell(
-      onTap: isHidden
-          ? null
-          : () async {
-              try {
-                await ref.read(playbackNotifierProvider.notifier).playTrack(
-                      track.videoId,
-                      track.videoUrl,
-                      track.title,
-                      track.artist,
-                      track.thumbnailUrl,
-                    );
-              } on PlaybackFailure catch (error) {
-                if (!context.mounted) return;
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(error.message)),
-                );
-              }
-            },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        child: Row(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: Opacity(
-                opacity: isHidden ? 0.42 : 1,
-                child: Container(
-                  width: 44,
-                  height: 44,
-                  color: bgDivider,
-                  child: track.thumbnailUrl.isEmpty
-                      ? const Center(
-                          child:
-                              Icon(Icons.music_note, color: textSecondary, size: 18),
-                        )
-                      : CachedNetworkImage(
-                          imageUrl: track.thumbnailUrl,
-                          memCacheWidth: artworkCacheSize,
-                          memCacheHeight: artworkCacheSize,
-                          maxWidthDiskCache: artworkCacheSize,
-                          maxHeightDiskCache: artworkCacheSize,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => Container(
-                            color: bgDivider,
-                            child: const Center(
-                              child: SizedBox(
-                                width: 14,
-                                height: 14,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 1.5,
-                                  color: textSecondary,
+    final row = RepaintBoundary(
+      child: InkWell(
+        onTap: isHidden
+            ? null
+            : () async {
+                try {
+                  await ref.read(playbackNotifierProvider.notifier).playTrack(
+                        track.videoId,
+                        track.videoUrl,
+                        track.title,
+                        track.artist,
+                        track.thumbnailUrl,
+                      );
+                } on PlaybackFailure catch (error) {
+                  if (!context.mounted) return;
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text(error.message)),
+                  );
+                }
+              },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: Opacity(
+                  opacity: isHidden ? 0.42 : 1,
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    color: bgDivider,
+                    child: track.thumbnailUrl.isEmpty
+                        ? const Center(
+                            child:
+                                Icon(Icons.music_note, color: textSecondary, size: 18),
+                          )
+                        : CachedNetworkImage(
+                            imageUrl: track.thumbnailUrl,
+                            memCacheWidth: artworkCacheSize,
+                            memCacheHeight: artworkCacheSize,
+                            maxWidthDiskCache: artworkCacheSize,
+                            maxHeightDiskCache: artworkCacheSize,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => Container(
+                              color: bgDivider,
+                              child: const Center(
+                                child: SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 1.5,
+                                    color: textSecondary,
+                                  ),
                                 ),
                               ),
                             ),
+                            errorWidget: (_, __, ___) => const Center(
+                              child: Icon(Icons.music_note,
+                                  color: textSecondary, size: 18),
+                            ),
                           ),
-                          errorWidget: (_, __, ___) => const Center(
-                            child: Icon(Icons.music_note,
-                                color: textSecondary, size: 18),
-                          ),
-                        ),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    track.title,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: effectiveTextColor,
-                          fontWeight: FontWeight.w600,
-                          fontSize: 13,
-                          height: 1.2,
-                        ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 1),
-                  Row(
-                    children: [
-                      if (isDownloaded)
-                        const Padding(
-                          padding: EdgeInsets.only(right: 6),
-                          child: Icon(
-                            Icons.check_circle_rounded,
-                            color: accentPrimary,
-                            size: 13,
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      track.title,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: effectiveTextColor,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                            height: 1.2,
+                          ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 1),
+                    Row(
+                      children: [
+                        if (isDownloaded)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 6),
+                            child: Icon(
+                              Icons.check_circle_rounded,
+                              color: accentPrimary,
+                              size: 13,
+                            ),
+                          ),
+                        Expanded(
+                          child: Text(
+                            isHidden ? '${track.artist} • Hidden' : track.artist,
+                            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                  color: effectiveSubtitleColor,
+                                  fontSize: 11,
+                                  height: 1.2,
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      Expanded(
-                        child: Text(
-                          isHidden ? '${track.artist} • Hidden' : track.artist,
-                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                color: effectiveSubtitleColor,
-                                fontSize: 11,
-                                height: 1.2,
-                              ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            if (isPlaylistTrack) ...[
-              IconButton(
-                onPressed: toggleLiked,
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: Icon(
-                  track.isLiked ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
-                  color: track.isLiked ? accentPrimary : textSecondary,
-                  size: 22,
+                      ],
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 14),
-              IconButton(
-                onPressed: showTrackOptionsSheet,
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
-                icon: const Icon(Icons.more_vert_rounded, color: textSecondary, size: 20),
-              ),
-            ] else if (enableQueueActions)
-              IconButton(
-                onPressed: queueTrack,
-                tooltip: 'Add to queue',
-                icon: const Icon(Icons.queue_music_rounded,
-                    color: accentPrimary, size: 22),
-              ),
-            if (!isPlaylistTrack && track.isLiked)
-              const Icon(Icons.check_circle_rounded, color: accentPrimary, size: 20),
-          ],
+              if (isPlaylistTrack) ...[
+                IconButton(
+                  onPressed: toggleLiked,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: Icon(
+                    track.isLiked ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
+                    color: track.isLiked ? accentPrimary : textSecondary,
+                    size: 22,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                IconButton(
+                  onPressed: showTrackOptionsSheet,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(Icons.more_vert_rounded, color: textSecondary, size: 20),
+                ),
+              ] else if (enableQueueActions)
+                IconButton(
+                  onPressed: queueTrack,
+                  tooltip: 'Add to queue',
+                  icon: const Icon(Icons.queue_music_rounded,
+                      color: accentPrimary, size: 22),
+                ),
+              if (!isPlaylistTrack && track.isLiked)
+                const Icon(Icons.check_circle_rounded, color: accentPrimary, size: 20),
+            ],
+          ),
         ),
       ),
     );

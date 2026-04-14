@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -176,9 +177,8 @@ class HomeScreen extends ConsumerWidget {
         isLikedCollection: true,
         onTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => PlaylistDetailsScreen(
-                title: 'Liked Songs',
+            CupertinoPageRoute(
+              builder: (_) => PlaylistDetailsScreen(                title: 'Liked Songs',
                 tracks: likedTracks,
               ),
             ),
@@ -192,9 +192,8 @@ class HomeScreen extends ConsumerWidget {
         icon: Icons.history_rounded,
         onTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => PlaylistDetailsScreen(
-                title: 'Recents',
+            CupertinoPageRoute(
+              builder: (_) => PlaylistDetailsScreen(                title: 'Recents',
                 tracks: libraryState.recentTracks,
               ),
             ),
@@ -208,9 +207,8 @@ class HomeScreen extends ConsumerWidget {
         icon: Icons.history_rounded,
         onTap: () {
           Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => PlaylistDetailsScreen(
-                title: 'Recents',
+            CupertinoPageRoute(
+              builder: (_) => PlaylistDetailsScreen(                title: 'Recents',
                 tracks: libraryState.recentTracks,
               ),
             ),
@@ -236,7 +234,7 @@ class HomeScreen extends ConsumerWidget {
           usesAppLogoFallback: true,
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(
+              CupertinoPageRoute(
                 builder: (_) => PlaylistDetailsScreen(
                   title: playlist.name,
                   playlistId: playlist.id,

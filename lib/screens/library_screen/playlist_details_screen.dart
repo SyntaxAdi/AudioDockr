@@ -50,7 +50,14 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
     super.initState();
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
-    _refreshPlaylistTracksFuture();
+    // Delay fetching slightly to allow navigation transition to start at 120fps
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) {
+        setState(() {
+          _refreshPlaylistTracksFuture();
+        });
+      }
+    });
     _recordPlaylistOpen();
   }
 
@@ -90,7 +97,7 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
 
   void _refreshPlaylistTracksFuture() {
     if (widget.playlistId == null) {
-      _playlistTracksFuture = null;
+      _playlistTracksFuture = Future.value(widget.tracks ?? []);
       return;
     }
     _playlistTracksFuture = ref
@@ -717,6 +724,9 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
       );
     }
 
+    final currentPlaylist = playlist!;
+    final isLikedOrRecents = currentPlaylist.id == likedPlaylistId || currentPlaylist.id == 'recents';
+
     return Scaffold(
       backgroundColor: bgBase,
       body: FutureBuilder<List<LibraryTrack>>(
@@ -725,14 +735,14 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
           : Future.value(displayTracks ?? []),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
-            return const Center(
-              child: CircularProgressIndicator(color: accentPrimary),
+            return _PlaylistSkeleton(
+              title: currentPlaylist.name,
+              isLikedOrRecents: isLikedOrRecents,
+              playlistId: currentPlaylist.id,
+              coverImagePath: currentPlaylist.coverImagePath,
             );
           }
           final playlistTracks = snapshot.data!;
-          final currentPlaylist = playlist!;
-          final isLikedOrRecents = currentPlaylist.id == likedPlaylistId || currentPlaylist.id == 'recents';
-
           final subtitleText = '${playlistTracks.length} songs';
 
           return CustomScrollView(
@@ -762,69 +772,71 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                     ),
                   ),
                   centerTitle: true,
-                  background: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // Large background image
-                      if (currentPlaylist.coverImagePath.isNotEmpty)
-                        Image.file(
-                          File(currentPlaylist.coverImagePath),
-                          fit: BoxFit.cover,
-                        )
-                      else if (isLikedOrRecents)
-                        LibraryCyberpunkPlaylistBadge(
-                          variant: currentPlaylist.id == likedPlaylistId 
-                            ? LibraryCyberpunkPlaylistBadgeVariant.liked 
-                            : LibraryCyberpunkPlaylistBadgeVariant.recents,
-                          size: 400,
-                        )
-                      else
-                        Container(
-                          color: bgSurface,
-                          child: Image.asset(
-                            'lib/assets/app_icon.png',
+                  background: RepaintBoundary(
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        // Large background image
+                        if (currentPlaylist.coverImagePath.isNotEmpty)
+                          Image.file(
+                            File(currentPlaylist.coverImagePath),
                             fit: BoxFit.cover,
-                            opacity: const AlwaysStoppedAnimation(0.24),
-                            errorBuilder: (_, __, ___) => const Icon(
-                              Icons.music_note,
-                              size: 100,
-                              color: textSecondary,
+                          )
+                        else if (isLikedOrRecents)
+                          LibraryCyberpunkPlaylistBadge(
+                            variant: currentPlaylist.id == likedPlaylistId 
+                              ? LibraryCyberpunkPlaylistBadgeVariant.liked 
+                              : LibraryCyberpunkPlaylistBadgeVariant.recents,
+                            size: 400,
+                          )
+                        else
+                          Container(
+                            color: bgSurface,
+                            child: Image.asset(
+                              'lib/assets/app_icon.png',
+                              fit: BoxFit.cover,
+                              opacity: const AlwaysStoppedAnimation(0.24),
+                              errorBuilder: (_, __, ___) => const Icon(
+                                Icons.music_note,
+                                size: 100,
+                                color: textSecondary,
+                              ),
+                            ),
+                          ),
+                        // Gradient overlay
+                        const DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              stops: [0.0, 0.6, 1.0],
+                              colors: [
+                                Colors.black26,
+                                Colors.transparent,
+                                bgBase,
+                              ],
                             ),
                           ),
                         ),
-                      // Gradient overlay
-                      const DecoratedBox(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topCenter,
-                            end: Alignment.bottomCenter,
-                            stops: [0.0, 0.6, 1.0],
-                            colors: [
-                              Colors.black26,
-                              Colors.transparent,
-                              bgBase,
-                            ],
+                        // Title at the bottom
+                        Positioned(
+                          left: 20,
+                          right: 20,
+                          bottom: 24,
+                          child: Text(
+                            currentPlaylist.name,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 48,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -1.5,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                      ),
-                      // Title at the bottom
-                      Positioned(
-                        left: 20,
-                        right: 20,
-                        bottom: 24,
-                        child: Text(
-                          currentPlaylist.name,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 48,
-                            fontWeight: FontWeight.w900,
-                            letterSpacing: -1.5,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -873,24 +885,26 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                   delegate: SliverChildBuilderDelegate(
                     (context, index) {
                       final track = playlistTracks[index];
-                      return SizedBox(
-                        height: 64,
-                        child: LibraryTrackRow(
-                          track: track,
-                          playlistId: currentPlaylist.id,
-                          enableQueueActions: true, // Enable swipe to queue
-                          onAddToAnotherPlaylist: () =>
-                              _showAddToAnotherPlaylistSheet(
-                            context,
-                            currentPlaylistId: currentPlaylist.id,
+                      return RepaintBoundary(
+                        child: SizedBox(
+                          height: 64,
+                          child: LibraryTrackRow(
                             track: track,
-                          ),
-                          onToggleHidden: () => _toggleTrackHidden(
-                            context,
                             playlistId: currentPlaylist.id,
-                            track: track,
+                            enableQueueActions: true, // Enable swipe to queue
+                            onAddToAnotherPlaylist: () =>
+                                _showAddToAnotherPlaylistSheet(
+                              context,
+                              currentPlaylistId: currentPlaylist.id,
+                              track: track,
+                            ),
+                            onToggleHidden: () => _toggleTrackHidden(
+                              context,
+                              playlistId: currentPlaylist.id,
+                              track: track,
+                            ),
+                            onGoToQueue: () => _showQueueSheet(context),
                           ),
-                          onGoToQueue: () => _showQueueSheet(context),
                         ),
                       );
                     },
@@ -906,6 +920,211 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
         currentIndex: 2,
         onTap: (index) => _handleBottomNavigation(context, index),
       ),
+    );
+  }
+}
+
+class _PlaylistSkeleton extends StatefulWidget {
+  const _PlaylistSkeleton({
+    required this.title,
+    required this.isLikedOrRecents,
+    required this.playlistId,
+    required this.coverImagePath,
+  });
+
+  final String title;
+  final bool isLikedOrRecents;
+  final String playlistId;
+  final String coverImagePath;
+
+  @override
+  State<_PlaylistSkeleton> createState() => _PlaylistSkeletonState();
+}
+
+class _PlaylistSkeletonState extends State<_PlaylistSkeleton> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomScrollView(
+      slivers: [
+        SliverAppBar(
+          expandedHeight: 340,
+          pinned: true,
+          elevation: 0,
+          backgroundColor: bgBase,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          flexibleSpace: FlexibleSpaceBar(
+            collapseMode: CollapseMode.pin,
+            background: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (widget.coverImagePath.isNotEmpty)
+                  Image.file(
+                    File(widget.coverImagePath),
+                    fit: BoxFit.cover,
+                  )
+                else if (widget.isLikedOrRecents)
+                  LibraryCyberpunkPlaylistBadge(
+                    variant: widget.playlistId == likedPlaylistId 
+                      ? LibraryCyberpunkPlaylistBadgeVariant.liked 
+                      : LibraryCyberpunkPlaylistBadgeVariant.recents,
+                    size: 400,
+                  )
+                else
+                  Container(
+                    color: bgSurface,
+                    child: Image.asset(
+                      'lib/assets/app_icon.png',
+                      fit: BoxFit.cover,
+                      opacity: const AlwaysStoppedAnimation(0.24),
+                    ),
+                  ),
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      stops: [0.0, 0.6, 1.0],
+                      colors: [
+                        Colors.black26,
+                        Colors.transparent,
+                        bgBase,
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 20,
+                  right: 20,
+                  bottom: 24,
+                  child: Text(
+                    widget.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 48,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -1.5,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ShimmerBlock(controller: _controller, width: 60, height: 12),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    _ShimmerBlock(controller: _controller, width: 100, height: 42, radius: 21),
+                    const SizedBox(width: 12),
+                    _ShimmerBlock(controller: _controller, width: 42, height: 42, radius: 21),
+                    const Spacer(),
+                    _ShimmerBlock(controller: _controller, width: 32, height: 32, radius: 16),
+                  ],
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        ),
+        SliverList(
+          delegate: SliverChildBuilderDelegate(
+            (context, index) => Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                children: [
+                  _ShimmerBlock(controller: _controller, width: 44, height: 44, radius: 4),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _ShimmerBlock(controller: _controller, width: double.infinity, height: 14),
+                        const SizedBox(height: 6),
+                        _ShimmerBlock(controller: _controller, width: 120, height: 10),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _ShimmerBlock(controller: _controller, width: 24, height: 24, radius: 12),
+                  const SizedBox(width: 14),
+                  _ShimmerBlock(controller: _controller, width: 20, height: 20, radius: 4),
+                ],
+              ),
+            ),
+            childCount: 8,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ShimmerBlock extends StatelessWidget {
+  const _ShimmerBlock({
+    required this.controller,
+    required this.width,
+    required this.height,
+    this.radius = 2,
+  });
+
+  final AnimationController controller;
+  final double width;
+  final double height;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        return Container(
+          width: width,
+          height: height,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(radius),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                bgDivider.withValues(alpha: 0.4),
+                bgDivider.withValues(alpha: 0.8),
+                bgDivider.withValues(alpha: 0.4),
+              ],
+              stops: [
+                (controller.value - 0.3).clamp(0.0, 1.0),
+                controller.value,
+                (controller.value + 0.3).clamp(0.0, 1.0),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

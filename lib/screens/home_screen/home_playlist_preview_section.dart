@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -67,7 +68,7 @@ class _HomePlaylistPreviewSectionState
                   actionLabel: 'Open',
                   onAction: () {
                     Navigator.of(context).push(
-                      MaterialPageRoute(
+                      CupertinoPageRoute(
                         builder: (_) => PlaylistDetailsScreen(
                           title: widget.playlist.name,
                           playlistId: widget.playlist.id,

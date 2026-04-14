@@ -479,71 +479,76 @@ class _StorageBarState extends State<_StorageBar> {
     final otherFraction = _totalBytes > 0 ? (otherUsed / _totalBytes).clamp(0.0, 1.0) : 0.0;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       color: bgSurface,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text(
-                '${widget.activeCount} active • ${widget.completedCount} saved',
-                style: const TextStyle(fontSize: 10, color: textPrimary),
-              ),
-              if (_loaded)
-                Text(
-                  '${_formatBytes(_usedBytes)} / ${_formatBytes(_totalBytes)}',
-                  style: const TextStyle(fontSize: 10, color: textSecondary),
-                ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(3),
-            child: SizedBox(
-              height: 5,
-              child: Row(
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  if (appFraction > 0)
-                    Flexible(
-                      flex: (appFraction * 10000).round().clamp(1, 10000),
-                      child: Container(color: accentPrimary),
-                    ),
-                  if (otherFraction > 0)
-                    Flexible(
-                      flex: (otherFraction * 10000).round().clamp(1, 10000),
-                      child: Container(color: _otherStorageColor),
-                    ),
-                  Flexible(
-                    flex: ((1.0 - appFraction - otherFraction).clamp(0.0, 1.0) * 10000).round().clamp(1, 10000),
-                    child: Container(color: bgDivider),
+                  Text(
+                    '${widget.activeCount} active • ${widget.completedCount} saved',
+                    style: const TextStyle(fontSize: 10, color: textPrimary),
                   ),
+                  if (_loaded)
+                    Text(
+                      '${_formatBytes(_usedBytes)} / ${_formatBytes(_totalBytes)}',
+                      style: const TextStyle(fontSize: 10, color: textSecondary),
+                    ),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(height: 5),
-          Row(
-            children: [
-              Container(width: 6, height: 6, color: accentPrimary),
-              const SizedBox(width: 3),
-              Text(
-                'AudioDockr (${_formatBytes(_appBytes)})',
-                style: const TextStyle(fontSize: 9, color: textSecondary),
+              const SizedBox(height: 6),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(3),
+                child: SizedBox(
+                  height: 5,
+                  child: Row(
+                    children: [
+                      if (appFraction > 0)
+                        Flexible(
+                          flex: (appFraction * 10000).round().clamp(1, 10000),
+                          child: Container(color: accentPrimary),
+                        ),
+                      if (otherFraction > 0)
+                        Flexible(
+                          flex: (otherFraction * 10000).round().clamp(1, 10000),
+                          child: Container(color: _otherStorageColor),
+                        ),
+                      Flexible(
+                        flex: ((1.0 - appFraction - otherFraction).clamp(0.0, 1.0) * 10000).round().clamp(1, 10000),
+                        child: Container(color: bgDivider),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-              const SizedBox(width: 10),
-              Container(width: 6, height: 6, color: _otherStorageColor),
-              const SizedBox(width: 3),
-              const Text('Used', style: TextStyle(fontSize: 9, color: textSecondary)),
-              const SizedBox(width: 10),
-              Container(width: 6, height: 6, color: bgDivider),
-              const SizedBox(width: 3),
-              const Text('Free', style: TextStyle(fontSize: 9, color: textSecondary)),
+              const SizedBox(height: 5),
+              Row(
+                children: [
+                  Container(width: 6, height: 6, color: accentPrimary),
+                  const SizedBox(width: 3),
+                  Text(
+                    'AudioDockr (${_formatBytes(_appBytes)})',
+                    style: const TextStyle(fontSize: 9, color: textSecondary),
+                  ),
+                  const SizedBox(width: 10),
+                  Container(width: 6, height: 6, color: _otherStorageColor),
+                  const SizedBox(width: 3),
+                  const Text('Used', style: TextStyle(fontSize: 9, color: textSecondary)),
+                  const SizedBox(width: 10),
+                  Container(width: 6, height: 6, color: bgDivider),
+                  const SizedBox(width: 3),
+                  const Text('Free', style: TextStyle(fontSize: 9, color: textSecondary)),
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }

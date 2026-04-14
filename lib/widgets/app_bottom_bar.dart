@@ -19,91 +19,94 @@ class AppBottomBar extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final importState = ref.watch(spotifyImportProvider);
 
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (importState.isImporting)
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+    return SafeArea(
+      top: false,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (importState.isImporting)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: const BoxDecoration(
+                color: bgSurface,
+                border: Border(
+                  top: BorderSide(color: bgDivider),
+                ),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      color: accentPrimary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Importing songs from Spotify',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: textPrimary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          const MiniPlayer(),
+          DecoratedBox(
             decoration: const BoxDecoration(
-              color: bgSurface,
-              border: Border(
-                top: BorderSide(color: bgDivider),
+              color: bgBase,
+            ),
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                canvasColor: bgBase,
+                shadowColor: Colors.transparent,
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                bottomNavigationBarTheme:
+                    const BottomNavigationBarThemeData(
+                  backgroundColor: bgBase,
+                  elevation: 0,
+                  type: BottomNavigationBarType.fixed,
+                ),
               ),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.2,
-                    color: accentPrimary,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'Importing songs from Spotify',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          color: textPrimary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        const MiniPlayer(),
-        DecoratedBox(
-          decoration: const BoxDecoration(
-            color: bgBase,
-          ),
-          child: Theme(
-            data: Theme.of(context).copyWith(
-              canvasColor: bgBase,
-              shadowColor: Colors.transparent,
-              splashColor: Colors.transparent,
-              highlightColor: Colors.transparent,
-              bottomNavigationBarTheme:
-                  const BottomNavigationBarThemeData(
-                backgroundColor: bgBase,
+              child: BottomNavigationBar(
                 elevation: 0,
+                backgroundColor: bgBase,
                 type: BottomNavigationBarType.fixed,
+                currentIndex: currentIndex,
+                onTap: onTap,
+                selectedItemColor: Colors.white,
+                unselectedItemColor: textSecondary,
+                selectedFontSize: 11,
+                unselectedFontSize: 11,
+                iconSize: 24,
+                items: const [
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.home_outlined),
+                    activeIcon: Icon(Icons.home_filled),
+                    label: 'Home',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.search),
+                    label: 'Search',
+                  ),
+                  BottomNavigationBarItem(
+                    icon: Icon(Icons.library_music_outlined),
+                    activeIcon: Icon(Icons.library_music),
+                    label: 'Your Library',
+                  ),
+                ],
               ),
             ),
-            child: BottomNavigationBar(
-              elevation: 0,
-              backgroundColor: bgBase,
-              type: BottomNavigationBarType.fixed,
-              currentIndex: currentIndex,
-              onTap: onTap,
-              selectedItemColor: Colors.white,
-              unselectedItemColor: textSecondary,
-              selectedFontSize: 11,
-              unselectedFontSize: 11,
-              iconSize: 24,
-              items: const [
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.home_outlined),
-                  activeIcon: Icon(Icons.home_filled),
-                  label: 'Home',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.search),
-                  label: 'Search',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.library_music_outlined),
-                  activeIcon: Icon(Icons.library_music),
-                  label: 'Your Library',
-                ),
-              ],
-            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }

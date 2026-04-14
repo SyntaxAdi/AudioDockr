@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -78,7 +79,7 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
   void _openRecents() {
     final libraryState = ref.read(libraryProvider);
     Navigator.of(context).push(
-      MaterialPageRoute(
+      CupertinoPageRoute(
         builder: (_) => PlaylistDetailsScreen(
           title: 'Recents',
           tracks: libraryState.recentTracks,
@@ -222,7 +223,7 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
                       ),
                       onTap: () {
                         Navigator.of(context).push(
-                          MaterialPageRoute(
+                          CupertinoPageRoute(
                             builder: (_) => PlaylistDetailsScreen(
                               title: 'Liked Songs',
                               tracks: libraryState.likedTracks,
@@ -259,7 +260,7 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
                         ),
                         onTap: () {
                           Navigator.of(context).push(
-                            MaterialPageRoute(
+                            CupertinoPageRoute(
                               builder: (_) => PlaylistDetailsScreen(
                                 title: playlist.name,
                                 playlistId: playlist.id,

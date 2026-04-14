@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 import '../../library/library_models.dart';
@@ -22,7 +23,7 @@ class RecentPlaylistTile extends StatelessWidget {
         child: InkWell(
           onTap: () {
             Navigator.of(context).push(
-              MaterialPageRoute(
+              CupertinoPageRoute(
                 builder: (_) => PlaylistDetailsScreen(
                   title: playlist.name,
                   playlistId: playlist.id,
