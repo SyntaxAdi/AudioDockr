@@ -25,12 +25,12 @@ class LibraryPlaylistTrackList extends StatelessWidget {
     }
 
     return ListView.builder(
-      itemExtent: 76,
+      itemExtent: 60,
       itemCount: tracks.length,
       itemBuilder: (context, index) {
         final track = tracks[index];
         return SizedBox(
-          height: 76,
+          height: 60,
           child: LibraryTrackRow(
             track: track,
             enableQueueActions: enableQueueActions,

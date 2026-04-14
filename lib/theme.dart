@@ -8,6 +8,7 @@ const Color bgDivider = Color(0xFF1E1E2E);
 const Color accentPrimary = Color(0xFFF5E642);
 const Color accentCyan = Color(0xFF00E5FF);
 const Color accentRed = Color(0xFFFF003C);
+const Color spotifyGreen = Color(0xFF1DB954);
 const Color textPrimary = Color(0xFFE8E8E8);
 const Color textSecondary = Color(0xFF8A8A9A);
 

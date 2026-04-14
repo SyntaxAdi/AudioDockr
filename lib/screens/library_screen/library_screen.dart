@@ -176,7 +176,8 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
     final libraryState = ref.watch(libraryProvider);
     final screenWidth = MediaQuery.of(context).size.width;
     final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
-          fontSize: screenWidth < 360 ? 22 : 26,
+          fontSize: screenWidth < 360 ? 18 : 20,
+          letterSpacing: 1.2,
         );
 
     return Scaffold(
@@ -187,30 +188,28 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
         actions: [
           IconButton(
             onPressed: () => _showPlaylistOptions(context, ref),
-            icon: const Icon(Icons.add_rounded, color: accentPrimary),
+            icon: const Icon(Icons.add_rounded, color: accentPrimary, size: 24),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
         ],
       ),
       body: libraryState.isLoading
           ? const Center(
               child: CircularProgressIndicator(color: accentPrimary),
             )
-          : LayoutBuilder(
+            : LayoutBuilder(
               builder: (context, constraints) {
-                final totalItems = 2 + libraryState.userPlaylists.length;
-                final availableHeight = constraints.maxHeight - 32; // 16px padding tb
-                // Need to fit at least 7 items. Items have 12px height spacing between them.
-                final itemSpacingCount = totalItems > 1 ? totalItems - 1 : 0;
-                final visibleItems = totalItems < 7 ? 7 : 7;
-                final maxSpacing = (visibleItems - 1) * 12;
-                final dynamicCardHeight = ((availableHeight - maxSpacing) / visibleItems).clamp(60.0, 88.0);
+                final availableHeight = constraints.maxHeight - 24; // 12px padding tb
+                // Display exactly 7 items before scrolling
+                const targetVisible = 7.0;
+                const itemSpacing = 8.0;
+                const spacingHeight = (targetVisible - 1) * itemSpacing;
+                final dynamicCardHeight = (availableHeight - spacingHeight) / targetVisible;
 
-                final isCompact = dynamicCardHeight < 70;
-                final leadingSize = isCompact ? 36.0 : 56.0;
+                final leadingSize = (dynamicCardHeight * 0.76).clamp(42.0, 58.0);
 
                 return ListView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(12),
                   children: [
                     LibraryPlaylistCard(
                       title: 'Liked Songs',
@@ -233,7 +232,7 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
                         );
                       },
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: itemSpacing),
                     LibraryPlaylistCard(
                       title: 'Recents',
                       subtitle: '${libraryState.recentTracks.length} tracks',
@@ -246,7 +245,7 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
                       onTap: _openRecents,
                     ),
                     for (final playlist in libraryState.userPlaylists) ...[
-                      const SizedBox(height: 12),
+                      const SizedBox(height: itemSpacing),
                       LibraryPlaylistCard(
                         title: playlist.name,
                         subtitle: '',
@@ -256,7 +255,7 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
                           imagePath: playlist.coverImagePath,
                           imageUrl: '',
                           size: leadingSize,
-                          borderRadius: isCompact ? 8 : 12,
+                          borderRadius: 8,
                         ),
                         onTap: () {
                           Navigator.of(context).push(

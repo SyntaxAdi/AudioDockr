@@ -79,26 +79,25 @@ class AppBottomBar extends ConsumerWidget {
               type: BottomNavigationBarType.fixed,
               currentIndex: currentIndex,
               onTap: onTap,
+              selectedItemColor: Colors.white,
+              unselectedItemColor: textSecondary,
+              selectedFontSize: 11,
+              unselectedFontSize: 11,
+              iconSize: 24,
               items: const [
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.home_rounded),
-                  label: 'HOME',
+                  icon: Icon(Icons.home_outlined),
+                  activeIcon: Icon(Icons.home_filled),
+                  label: 'Home',
                 ),
                 BottomNavigationBarItem(
                   icon: Icon(Icons.search),
-                  label: 'SEARCH',
+                  label: 'Search',
                 ),
                 BottomNavigationBarItem(
-                  icon: Icon(Icons.library_music),
-                  label: 'LIBRARY',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.download_rounded),
-                  label: 'DOWNLOADS',
-                ),
-                BottomNavigationBarItem(
-                  icon: Icon(Icons.tune),
-                  label: 'SETTINGS',
+                  icon: Icon(Icons.library_music_outlined),
+                  activeIcon: Icon(Icons.library_music),
+                  label: 'Your Library',
                 ),
               ],
             ),

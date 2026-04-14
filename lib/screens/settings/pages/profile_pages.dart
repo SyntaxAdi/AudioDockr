@@ -89,7 +89,7 @@ class AccountProfilePage extends ConsumerWidget {
           content: TextFormField(
             initialValue: currentDisplayName,
             autofocus: true,
-            maxLength: 40,
+            maxLength: 15,
             textCapitalization: TextCapitalization.words,
             onChanged: (value) => editedName = value,
             decoration: const InputDecoration(
@@ -135,17 +135,6 @@ class AccountProfilePage extends ConsumerWidget {
     );
   }
 
-  Future<void> _resetProfileImage(BuildContext context, WidgetRef ref) async {
-    await ref.read(profileImageProvider.notifier).resetToDefault();
-    if (!context.mounted) {
-      return;
-    }
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile image reset to default.')),
-    );
-  }
-
   Future<void> _deleteProfileImage(BuildContext context, WidgetRef ref) async {
     await ref.read(profileImageProvider.notifier).deleteImage();
     if (!context.mounted) {
@@ -153,7 +142,7 @@ class AccountProfilePage extends ConsumerWidget {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile image removed.')),
+      const SnackBar(content: Text('Profile image reverted to app logo.')),
     );
   }
 
@@ -196,15 +185,9 @@ class AccountProfilePage extends ConsumerWidget {
               onTap: () => _pickProfileImage(context, ref),
             ),
             SettingsActionTile(
-              icon: Icons.restore_rounded,
-              title: 'Reset to default',
-              subtitle: 'Use the original AudioDockr logo again',
-              onTap: () => _resetProfileImage(context, ref),
-            ),
-            SettingsActionTile(
               icon: Icons.delete_outline_rounded,
               title: 'Delete image',
-              subtitle: 'Remove the avatar and show an empty profile placeholder',
+              subtitle: 'Revert the avatar back to the app logo',
               onTap: () => _deleteProfileImage(context, ref),
             ),
           ],

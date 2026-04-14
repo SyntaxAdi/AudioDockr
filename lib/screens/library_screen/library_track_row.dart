@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../download_manager/download_provider.dart';
 import '../../library/library_provider.dart';
 import '../../playback/playback_provider.dart';
 import '../../theme.dart';
@@ -192,6 +193,9 @@ class LibraryTrackRow extends ConsumerWidget {
       );
     }
 
+    final downloadState = ref.watch(downloadNotifierProvider);
+    final isDownloaded = downloadState.recordForTrack(track.videoId)?.isCompleted == true;
+
     final row = InkWell(
       onTap: isHidden
           ? null
@@ -212,22 +216,21 @@ class LibraryTrackRow extends ConsumerWidget {
               }
             },
       child: Container(
-        height: 76,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         child: Row(
           children: [
             ClipRRect(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(4),
               child: Opacity(
                 opacity: isHidden ? 0.42 : 1,
                 child: Container(
-                  width: 56,
-                  height: 56,
+                  width: 44,
+                  height: 44,
                   color: bgDivider,
                   child: track.thumbnailUrl.isEmpty
                       ? const Center(
                           child:
-                              Icon(Icons.music_note, color: textSecondary),
+                              Icon(Icons.music_note, color: textSecondary, size: 18),
                         )
                       : CachedNetworkImage(
                           imageUrl: track.thumbnailUrl,
@@ -236,17 +239,31 @@ class LibraryTrackRow extends ConsumerWidget {
                           maxWidthDiskCache: artworkCacheSize,
                           maxHeightDiskCache: artworkCacheSize,
                           fit: BoxFit.cover,
+                          placeholder: (_, __) => Container(
+                            color: bgDivider,
+                            child: const Center(
+                              child: SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 1.5,
+                                  color: textSecondary,
+                                ),
+                              ),
+                            ),
+                          ),
                           errorWidget: (_, __, ___) => const Center(
                             child: Icon(Icons.music_note,
-                                color: textSecondary),
+                                color: textSecondary, size: 18),
                           ),
                         ),
                 ),
               ),
             ),
-            const SizedBox(width: 14),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
+                mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -254,18 +271,38 @@ class LibraryTrackRow extends ConsumerWidget {
                     track.title,
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                           color: effectiveTextColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
+                          height: 1.2,
                         ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isHidden ? '${track.artist} • Hidden' : track.artist,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: effectiveSubtitleColor,
+                  const SizedBox(height: 1),
+                  Row(
+                    children: [
+                      if (isDownloaded)
+                        const Padding(
+                          padding: EdgeInsets.only(right: 6),
+                          child: Icon(
+                            Icons.check_circle_rounded,
+                            color: accentPrimary,
+                            size: 13,
+                          ),
                         ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                      Expanded(
+                        child: Text(
+                          isHidden ? '${track.artist} • Hidden' : track.artist,
+                          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                color: effectiveSubtitleColor,
+                                fontSize: 11,
+                                height: 1.2,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -273,35 +310,36 @@ class LibraryTrackRow extends ConsumerWidget {
             if (isPlaylistTrack) ...[
               IconButton(
                 onPressed: toggleLiked,
-                tooltip: track.isLiked
-                    ? 'Remove from liked songs'
-                    : 'Add to liked songs',
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
                 icon: Icon(
-                  track.isLiked
-                      ? Icons.favorite_rounded
-                      : Icons.favorite_border_rounded,
+                  track.isLiked ? Icons.check_circle_rounded : Icons.add_circle_outline_rounded,
                   color: track.isLiked ? accentPrimary : textSecondary,
+                  size: 22,
                 ),
               ),
+              const SizedBox(width: 14),
               IconButton(
                 onPressed: showTrackOptionsSheet,
-                tooltip: 'Track options',
-                icon: const Icon(Icons.more_vert_rounded, color: textPrimary),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+                icon: const Icon(Icons.more_vert_rounded, color: textSecondary, size: 20),
               ),
             ] else if (enableQueueActions)
               IconButton(
                 onPressed: queueTrack,
                 tooltip: 'Add to queue',
                 icon: const Icon(Icons.queue_music_rounded,
-                    color: accentPrimary),
+                    color: accentPrimary, size: 22),
               ),
             if (!isPlaylistTrack && track.isLiked)
-              const Icon(Icons.favorite, color: accentPrimary, size: 20),
+              const Icon(Icons.check_circle_rounded, color: accentPrimary, size: 20),
           ],
         ),
       ),
     );
-
     if (!enableQueueActions) return row;
 
     return _LibraryQueueSwipeWrapper(onQueued: queueTrack, child: row);
@@ -330,8 +368,9 @@ class _LibraryQueueSwipeWrapperState
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final maxReveal = screenWidth * 0.46;
-    final triggerThreshold = maxReveal * 0.62;
+    // Limit swipe to a quarter of the screen
+    final maxReveal = screenWidth * 0.25;
+    final triggerThreshold = maxReveal * 0.8;
     final revealWidth = _dragOffset.clamp(0.0, maxReveal).toDouble();
     final actionReady = revealWidth >= triggerThreshold;
 

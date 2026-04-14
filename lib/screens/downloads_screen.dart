@@ -23,7 +23,19 @@ class DownloadsScreen extends ConsumerWidget {
       appBar: AppBar(
         backgroundColor: bgBase,
         elevation: 0,
-        title: Text('DOWNLOADS', style: Theme.of(context).textTheme.displayLarge),
+        title: LayoutBuilder(
+          builder: (context, constraints) {
+            final screenWidth = MediaQuery.of(context).size.width;
+            final fontSize = (screenWidth * 0.056).clamp(18.0, 24.0);
+            return Text(
+              'DOWNLOADS',
+              style: Theme.of(context).textTheme.displayLarge?.copyWith(
+                    fontSize: fontSize,
+                    letterSpacing: 1.2,
+                  ),
+            );
+          },
+        ),
       ),
       body: Column(
         children: [
@@ -40,6 +52,7 @@ class DownloadsScreen extends ConsumerWidget {
                           context,
                           ref,
                           download,
+                          _computeItemHeight(constraints.maxHeight, activeDownloads.length, completedDownloads.length),
                         ),
                       ),
                     ],
@@ -50,7 +63,7 @@ class DownloadsScreen extends ConsumerWidget {
                       ...completedDownloads.map<Widget>(
                         (download) => _CompletedDownloadTile(
                           download: download,
-                          height: _computeItemHeight(constraints.maxHeight, completedDownloads.length),
+                          height: _computeItemHeight(constraints.maxHeight, activeDownloads.length, completedDownloads.length),
                         ),
                       ),
                   ],
@@ -64,21 +77,31 @@ class DownloadsScreen extends ConsumerWidget {
     );
   }
 
-  /// Compute item height to fit ~11 items, adapting to screen size.
-  double _computeItemHeight(double availableHeight, int itemCount) {
-    // Reserve space for section header (~28px)
-    final listHeight = availableHeight - 28;
-    // Target 11 items visible, min 48px per item
-    final targetHeight = (listHeight / 11).clamp(48.0, 72.0);
+  /// Compute item height to fit ~8.5 items, making elements look "zoomed in".
+  double _computeItemHeight(double availableHeight, int activeCount, int completedCount) {
+    // Reserve space for section headers (~44px each now with padding)
+    double reservedHeight = 0;
+    if (activeCount > 0) reservedHeight += 44;
+    if (completedCount >= 0) reservedHeight += 44;
+
+    final listHeight = (availableHeight - reservedHeight).clamp(0.0, availableHeight);
+    
+    // Target 8.5 items visible for a larger, "zoomed" look
+    final targetHeight = (listHeight / 8.5).clamp(64.0, 92.0);
     return targetHeight;
   }
 
   Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+      padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
       child: Text(
         title,
-        style: const TextStyle(color: textSecondary, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.12),
+        style: const TextStyle(
+          color: textSecondary,
+          fontSize: 14,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }
@@ -102,33 +125,35 @@ class DownloadsScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
     DownloadRecord download,
+    double height,
   ) {
     return Container(
+      height: height,
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       color: bgCard,
       child: Row(
         children: [
-          _TrackArtwork(thumbnailUrl: download.thumbnailUrl, size: 36),
-          const SizedBox(width: 10),
+          _TrackArtwork(thumbnailUrl: download.thumbnailUrl, size: (height * 0.72).clamp(44.0, 64.0)),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
                   download.title,
-                  style: const TextStyle(color: textPrimary, fontSize: 12, fontWeight: FontWeight.w500),
+                  style: const TextStyle(color: textPrimary, fontSize: 15, fontWeight: FontWeight.bold),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 // Progress bar inline
                 Row(
                   children: [
                     Expanded(
                       child: Container(
-                        height: 2,
+                        height: 3,
                         color: bgDivider,
                         alignment: Alignment.centerLeft,
                         child: FractionallySizedBox(
@@ -137,22 +162,22 @@ class DownloadsScreen extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 10),
                     Text(
                       '${(download.progress * 100).round()}%',
-                      style: const TextStyle(color: accentPrimary, fontSize: 9, fontWeight: FontWeight.bold),
+                      style: const TextStyle(color: accentPrimary, fontSize: 12, fontWeight: FontWeight.bold),
                     ),
                   ],
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           GestureDetector(
             onTap: () {
               ref.read(downloadNotifierProvider.notifier).cancelDownload(download.videoId);
             },
-            child: const Icon(Icons.close_rounded, color: accentRed, size: 18),
+            child: const Icon(Icons.close_rounded, color: accentRed, size: 24),
           ),
         ],
       ),
@@ -177,7 +202,6 @@ class DownloadsScreen extends ConsumerWidget {
 /// Completed download tile with swipe gestures and tap-to-play.
 class _CompletedDownloadTile extends ConsumerStatefulWidget {
   const _CompletedDownloadTile({
-    super.key,
     required this.download,
     required this.height,
   });
@@ -259,14 +283,14 @@ class _CompletedDownloadTileState extends ConsumerState<_CompletedDownloadTile> 
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    final thumbSize = (widget.height * 0.7).clamp(28.0, 48.0);
+    final thumbSize = (widget.height * 0.72).clamp(44.0, 64.0);
 
     return Stack(
       children: [
         // Background layer containing actions
         Positioned.fill(
           child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 1),
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
             decoration: BoxDecoration(
               color: bgCard,
               borderRadius: BorderRadius.circular(2),
@@ -279,14 +303,14 @@ class _CompletedDownloadTileState extends ConsumerState<_CompletedDownloadTile> 
                   width: width * _swipeLimitPercent,
                   color: accentPrimary.withValues(alpha: 0.15),
                   alignment: Alignment.center,
-                  child: const Icon(Icons.queue_music_rounded, color: accentPrimary, size: 18),
+                  child: const Icon(Icons.queue_music_rounded, color: accentPrimary, size: 24),
                 ),
                 // Right action (visible on left swipe)
                 Container(
                   width: width * _swipeLimitPercent,
                   color: accentRed.withValues(alpha: 0.15),
                   alignment: Alignment.center,
-                  child: const Icon(Icons.delete_outline_rounded, color: accentRed, size: 18),
+                  child: const Icon(Icons.delete_outline_rounded, color: accentRed, size: 24),
                 ),
               ],
             ),
@@ -310,13 +334,13 @@ class _CompletedDownloadTileState extends ConsumerState<_CompletedDownloadTile> 
             offset: Offset(_dragOffset, 0),
             child: Container(
               height: widget.height,
-              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 1),
-              padding: const EdgeInsets.symmetric(horizontal: 12),
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               color: bgCard,
               child: Row(
                 children: [
                   _TrackArtwork(thumbnailUrl: widget.download.thumbnailUrl, size: thumbSize),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -324,21 +348,22 @@ class _CompletedDownloadTileState extends ConsumerState<_CompletedDownloadTile> 
                       children: [
                         Text(
                           widget.download.title,
-                          style: const TextStyle(color: textPrimary, fontSize: 12, fontWeight: FontWeight.w500),
+                          style: const TextStyle(color: textPrimary, fontSize: 15, fontWeight: FontWeight.bold),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           widget.download.artist,
-                          style: const TextStyle(color: textSecondary, fontSize: 10),
+                          style: const TextStyle(color: textSecondary, fontSize: 12),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  const Icon(Icons.check_circle_rounded, color: accentPrimary, size: 14),
+                  const SizedBox(width: 10),
+                  const Icon(Icons.check_circle_rounded, color: accentPrimary, size: 20),
                 ],
               ),
             ),

@@ -40,7 +40,8 @@ migrate_working_dir/
 /.roo/
 /.trae/
 /.windsurf/
-
+/.mcp.json
+/.opencode.json
 # Xcode
 *.xcworkspace/xcuserdata/
 *.xcodeproj/xcuserdata/
@@ -126,3 +127,5 @@ downloads/
 
 # ── Pub lock (keep for apps, remove for packages) ─
 # pubspec.lock   ← Keep committed for apps (it is committed here)
+# Added by code-review-graph
+.code-review-graph/

@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../download_manager/download_provider.dart';
 import '../../library/library_provider.dart';
 import '../../playback/playback_provider.dart';
 import '../../theme.dart';
@@ -13,11 +15,11 @@ import '../../widgets/playlist_sheets.dart';
 import 'library_edit_playlist_sheet.dart';
 import 'library_editable_playlist_header.dart';
 import 'library_empty_playlist_state.dart';
+import 'library_playlist_card.dart';
 import 'library_playlist_option_tile.dart';
-import 'library_playlist_track_list.dart';
 import 'library_track_row.dart';
 
-enum _PlaylistMenuAction { modify, rename, changeCoverArt, delete }
+enum _PlaylistMenuAction { modify, rename, changeCoverArt, download, delete }
 
 class PlaylistDetailsScreen extends ConsumerStatefulWidget {
   const PlaylistDetailsScreen({
@@ -40,15 +42,34 @@ class PlaylistDetailsScreen extends ConsumerStatefulWidget {
 
 class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
   Future<List<LibraryTrack>>? _playlistTracksFuture;
-
-  bool get _isEditableCustomPlaylist =>
-      widget.playlistId != null && widget.playlistId != likedPlaylistId;
+  late final ScrollController _scrollController;
+  double _appBarTitleOpacity = 0.0;
 
   @override
   void initState() {
     super.initState();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_onScroll);
     _refreshPlaylistTracksFuture();
     _recordPlaylistOpen();
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    final offset = _scrollController.offset;
+    // Start appearing at 240px, fully visible at 290px
+    // (Total collapse is at ~284px: 340 expanded - 56 toolbar)
+    final double newOpacity = ((offset - 240) / (290 - 240)).clamp(0.0, 1.0);
+    if (newOpacity != _appBarTitleOpacity) {
+      setState(() {
+        _appBarTitleOpacity = newOpacity;
+      });
+    }
   }
 
   @override
@@ -531,6 +552,41 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
     );
   }
 
+  Future<void> _downloadPlaylist(
+    BuildContext context,
+    LibraryPlaylist playlist,
+  ) async {
+    final tracks = await ref
+        .read(libraryProvider.notifier)
+        .fetchPlaylistTracks(playlist.id);
+
+    if (tracks.isEmpty) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No tracks to download in this playlist')),
+      );
+      return;
+    }
+
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Starting download of ${tracks.length} tracks...'),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    for (final track in tracks) {
+      unawaited(ref.read(downloadNotifierProvider.notifier).startDownload(
+            videoId: track.videoId,
+            videoUrl: track.videoUrl,
+            title: track.title,
+            artist: track.artist,
+            thumbnailUrl: track.thumbnailUrl,
+          ));
+    }
+  }
+
   Future<void> _handlePlaylistMenuAction(
     BuildContext context,
     _PlaylistMenuAction action,
@@ -545,6 +601,9 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
         return;
       case _PlaylistMenuAction.changeCoverArt:
         await _changePlaylistCoverArt(context, playlist);
+        return;
+      case _PlaylistMenuAction.download:
+        await _downloadPlaylist(context, playlist);
         return;
       case _PlaylistMenuAction.delete:
         await _deletePlaylist(context, playlist);
@@ -609,6 +668,12 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                         handleAction(_PlaylistMenuAction.changeCoverArt),
                   ),
                   LibraryPlaylistOptionTile(
+                    icon: Icons.download_rounded,
+                    title: 'Download playlist',
+                    subtitle: 'Save all tracks for offline listening',
+                    onTap: () => handleAction(_PlaylistMenuAction.download),
+                  ),
+                  LibraryPlaylistOptionTile(
                     icon: Icons.delete_outline_rounded,
                     title: 'Delete playlist',
                     subtitle: 'Remove this playlist and its saved order',
@@ -631,139 +696,212 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
     final shuffleEnabled = ref.watch(
       playbackNotifierProvider.select((s) => s.shuffleEnabled),
     );
-    final screenWidth = MediaQuery.of(context).size.width;
-    final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
-          fontSize: screenWidth < 360 ? 22 : 26,
-        );
+    final displayTracks = widget.tracks;
     final playlists = ref.watch(libraryProvider).playlists;
     LibraryPlaylist? playlist;
-    for (final entry in playlists) {
-      if (entry.id == widget.playlistId) {
-        playlist = entry;
-        break;
+    
+    if (widget.playlistId != null) {
+      for (final entry in playlists) {
+        if (entry.id == widget.playlistId) {
+          playlist = entry;
+          break;
+        }
       }
+    } else {
+      // It might be Liked Songs or Recents without a playlistId
+      playlist = LibraryPlaylist(
+        id: widget.title == 'Liked Songs' ? likedPlaylistId : 'recents',
+        name: widget.title,
+        coverImagePath: '',
+        trackCount: displayTracks?.length ?? 0,
+      );
     }
-    final canEdit = _isEditableCustomPlaylist && playlist != null;
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: bgBase,
-        elevation: 0,
-        title: canEdit
-            ? null
-            : Text(widget.title.toUpperCase(), style: titleStyle),
-      ),
-      body: widget.playlistId == null
-          ? LibraryPlaylistTrackList(
-              tracks: widget.tracks ?? const [],
-              enableQueueActions: true,
-            )
-          : FutureBuilder<List<LibraryTrack>>(
-              future: _playlistTracksFuture,
-              builder: (context, snapshot) {
-                if (!snapshot.hasData) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: accentPrimary),
-                  );
-                }
-                final playlistTracks = snapshot.data!;
-                if (!canEdit) {
-                  return LibraryPlaylistTrackList(tracks: playlistTracks);
-                }
-                final editablePlaylist = playlist!;
+      backgroundColor: bgBase,
+      body: FutureBuilder<List<LibraryTrack>>(
+        future: widget.playlistId != null 
+          ? _playlistTracksFuture 
+          : Future.value(displayTracks ?? []),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const Center(
+              child: CircularProgressIndicator(color: accentPrimary),
+            );
+          }
+          final playlistTracks = snapshot.data!;
+          final currentPlaylist = playlist!;
+          final isLikedOrRecents = currentPlaylist.id == likedPlaylistId || currentPlaylist.id == 'recents';
 
-                if (playlistTracks.isEmpty) {
-                  return ListView(
-                    padding: const EdgeInsets.only(top: 8, bottom: 24),
+          final subtitleText = '${playlistTracks.length} songs';
+
+          return CustomScrollView(
+            controller: _scrollController,
+            slivers: [
+              SliverAppBar(
+                expandedHeight: 340,
+                pinned: true,
+                elevation: 0,
+                backgroundColor: bgBase,
+                leading: IconButton(
+                  icon: const Icon(Icons.arrow_back),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+                flexibleSpace: FlexibleSpaceBar(
+                  collapseMode: CollapseMode.pin,
+                  title: AnimatedOpacity(
+                    opacity: _appBarTitleOpacity,
+                    duration: const Duration(milliseconds: 100),
+                    child: Text(
+                      currentPlaylist.name,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                  centerTitle: true,
+                  background: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        child: LibraryEditablePlaylistHeader(
-                          playlist: editablePlaylist,
-                          tracks: playlistTracks,
-                          shuffleEnabled: shuffleEnabled,
-                          onPlayPressed: () =>
-                              _playPlaylistTracks(context, playlistTracks),
-                          onShufflePressed: () => ref
-                              .read(playbackNotifierProvider.notifier)
-                              .setShuffleEnabled(!shuffleEnabled),
-                          onMenuPressed: () => _showPlaylistActionSheet(
-                              context, editablePlaylist),
+                      // Large background image
+                      if (currentPlaylist.coverImagePath.isNotEmpty)
+                        Image.file(
+                          File(currentPlaylist.coverImagePath),
+                          fit: BoxFit.cover,
+                        )
+                      else if (isLikedOrRecents)
+                        LibraryCyberpunkPlaylistBadge(
+                          variant: currentPlaylist.id == likedPlaylistId 
+                            ? LibraryCyberpunkPlaylistBadgeVariant.liked 
+                            : LibraryCyberpunkPlaylistBadgeVariant.recents,
+                          size: 400,
+                        )
+                      else
+                        Container(
+                          color: bgSurface,
+                          child: Image.asset(
+                            'lib/assets/app_icon.png',
+                            fit: BoxFit.cover,
+                            opacity: const AlwaysStoppedAnimation(0.24),
+                            errorBuilder: (_, __, ___) => const Icon(
+                              Icons.music_note,
+                              size: 100,
+                              color: textSecondary,
+                            ),
+                          ),
+                        ),
+                      // Gradient overlay
+                      const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            stops: [0.0, 0.6, 1.0],
+                            colors: [
+                              Colors.black26,
+                              Colors.transparent,
+                              bgBase,
+                            ],
+                          ),
                         ),
                       ),
-                      const SizedBox(height: 28),
-                      const Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 20),
-                        child: LibraryEmptyPlaylistState(),
+                      // Title at the bottom
+                      Positioned(
+                        left: 20,
+                        right: 20,
+                        bottom: 24,
+                        child: Text(
+                          currentPlaylist.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 48,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -1.5,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
                     ],
-                  );
-                }
-
-                return ListView.builder(
-                  padding: const EdgeInsets.only(top: 8, bottom: 24),
-                  itemCount: playlistTracks.length + 2,
-                  itemBuilder: (context, index) {
-                    if (index == 0) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 20),
-                            child: LibraryEditablePlaylistHeader(
-                              playlist: editablePlaylist,
-                              tracks: playlistTracks,
-                              shuffleEnabled: shuffleEnabled,
-                              onPlayPressed: () =>
-                                  _playPlaylistTracks(context, playlistTracks),
-                              onShufflePressed: () => ref
-                                  .read(playbackNotifierProvider.notifier)
-                                  .setShuffleEnabled(!shuffleEnabled),
-                              onMenuPressed: () => _showPlaylistActionSheet(
-                                  context, editablePlaylist),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                      );
-                    }
-
-                    if (index == playlistTracks.length + 1) {
-                      return const SizedBox(height: 0);
-                    }
-
-                    final track = playlistTracks[index - 1];
-                    return SizedBox(
-                      height: 77,
-                      child: Column(
-                        children: [
-                          Expanded(
-                            child: LibraryTrackRow(
-                              track: track,
-                              playlistId: editablePlaylist.id,
-                              onAddToAnotherPlaylist: () =>
-                                  _showAddToAnotherPlaylistSheet(
-                                context,
-                                currentPlaylistId: editablePlaylist.id,
-                                track: track,
-                              ),
-                              onToggleHidden: () => _toggleTrackHidden(
-                                context,
-                                playlistId: editablePlaylist.id,
-                                track: track,
-                              ),
-                              onGoToQueue: () => _showQueueSheet(context),
-                            ),
-                          ),
-                          if (index != playlistTracks.length)
-                            const Divider(height: 1, color: bgDivider),
-                        ],
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        subtitleText,
+                        style: const TextStyle(
+                          color: textSecondary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                        ),
                       ),
-                    );
-                  },
-                );
-              },
-            ),
+                      const SizedBox(height: 16),
+                      LibraryPlaylistHeaderActions(
+                        hasTracks: playlistTracks.isNotEmpty,
+                        shuffleEnabled: shuffleEnabled,
+                        onPlayPressed: () => _playPlaylistTracks(
+                            context, playlistTracks),
+                        onShufflePressed: () => ref
+                            .read(playbackNotifierProvider.notifier)
+                            .setShuffleEnabled(!shuffleEnabled),
+                        onMenuPressed: isLikedOrRecents 
+                          ? () {} // No menu for liked/recents or define actions
+                          : () => _showPlaylistActionSheet(context, currentPlaylist),
+                        showMenu: !isLikedOrRecents,
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  ),
+                ),
+              ),
+              if (playlistTracks.isEmpty)
+                const SliverFillRemaining(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    child: LibraryEmptyPlaylistState(),
+                  ),
+                )
+              else
+                SliverList(
+                  delegate: SliverChildBuilderDelegate(
+                    (context, index) {
+                      final track = playlistTracks[index];
+                      return SizedBox(
+                        height: 64,
+                        child: LibraryTrackRow(
+                          track: track,
+                          playlistId: currentPlaylist.id,
+                          enableQueueActions: true, // Enable swipe to queue
+                          onAddToAnotherPlaylist: () =>
+                              _showAddToAnotherPlaylistSheet(
+                            context,
+                            currentPlaylistId: currentPlaylist.id,
+                            track: track,
+                          ),
+                          onToggleHidden: () => _toggleTrackHidden(
+                            context,
+                            playlistId: currentPlaylist.id,
+                            track: track,
+                          ),
+                          onGoToQueue: () => _showQueueSheet(context),
+                        ),
+                      );
+                    },
+                    childCount: playlistTracks.length,
+                  ),
+                ),
+              const SliverToBoxAdapter(child: SizedBox(height: 40)),
+            ],
+          );
+        },
+      ),
       bottomNavigationBar: AppBottomBar(
         currentIndex: 2,
         onTap: (index) => _handleBottomNavigation(context, index),

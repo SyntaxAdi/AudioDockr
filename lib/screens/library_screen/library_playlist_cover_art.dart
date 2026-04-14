@@ -67,8 +67,12 @@ class LibraryPlaylistCoverArt extends StatelessWidget {
       fit: BoxFit.cover,
       errorBuilder: (_, __, ___) => Container(
         color: bgCard,
-        child: const Center(
-          child: Icon(Icons.music_note_rounded, color: textSecondary, size: 42),
+        child: Center(
+          child: Icon(
+            Icons.music_note_rounded,
+            color: textSecondary,
+            size: size * 0.6,
+          ),
         ),
       ),
     );

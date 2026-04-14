@@ -81,28 +81,28 @@ class MiniPlayer extends ConsumerWidget {
           );
         },
         child: Container(
-          height: 64,
+          height: 58,
           color: bgCard,
           child: Stack(
             children: [
               Row(
                 children: [
                   Container(
-                    width: 48,
-                    height: 48,
+                    width: 44,
+                    height: 44,
                     margin: const EdgeInsets.only(left: 8),
                     color: bgDivider,
                     child: (currentThumbnailUrl ?? '').isEmpty
                         ? const Center(
-                            child: Icon(Icons.music_note, color: textSecondary),
+                            child: Icon(Icons.music_note, color: textSecondary, size: 20),
                           )
                         : CachedNetworkImage(
                             imageUrl: currentThumbnailUrl!,
-                            memCacheWidth: 144,
-                            memCacheHeight: 144,
+                            memCacheWidth: 132,
+                            memCacheHeight: 132,
                             fit: BoxFit.cover,
                             errorWidget: (_, __, ___) => const Center(
-                              child: Icon(Icons.music_note, color: textSecondary),
+                              child: Icon(Icons.music_note, color: textSecondary, size: 20),
                             ),
                           ),
                   ),
@@ -119,8 +119,9 @@ class MiniPlayer extends ConsumerWidget {
                                   : 'Unknown track'),
                           style:
                               Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                    fontSize: 13,
+                                    fontSize: 12,
                                     color: textPrimary,
+                                    fontWeight: FontWeight.w600,
                                   ),
                         ),
                         Text(
@@ -128,7 +129,7 @@ class MiniPlayer extends ConsumerWidget {
                               ? 'Starting playback'
                               : (currentArtist ?? 'Unknown artist'),
                           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                                fontSize: 11,
+                                fontSize: 10,
                                 color: textSecondary,
                               ),
                           maxLines: 1,
@@ -141,8 +142,8 @@ class MiniPlayer extends ConsumerWidget {
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 16),
                       child: SizedBox(
-                        width: 18,
-                        height: 18,
+                        width: 16,
+                        height: 16,
                         child: CircularProgressIndicator(
                           strokeWidth: 2,
                           color: accentPrimary,
@@ -151,9 +152,13 @@ class MiniPlayer extends ConsumerWidget {
                     )
                   else ...[
                     IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                       icon: Icon(
                         isLiked ? Icons.favorite : Icons.favorite_border,
                         color: accentPrimary,
+                        size: 22,
                       ),
                       onPressed: () async {
                         if (currentTrackId == null) {
@@ -170,16 +175,21 @@ class MiniPlayer extends ConsumerWidget {
                             );
                       },
                     ),
+                    const SizedBox(width: 12),
                     IconButton(
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
                       icon: Icon(
                         isPlaying ? Icons.pause : Icons.play_arrow,
                         color: accentPrimary,
+                        size: 26,
                       ),
                       onPressed: () => ref
                           .read(playbackNotifierProvider.notifier)
                           .togglePlayPause(),
                     ),
-                    const SizedBox(width: 8),
+                    const SizedBox(width: 16),
                   ],
                 ],
               ),

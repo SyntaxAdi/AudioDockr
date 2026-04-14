@@ -73,22 +73,24 @@ class HorizontalTrackCard extends StatelessWidget {
                         ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 6),
               Text(
                 track.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       fontWeight: FontWeight.w600,
+                      fontSize: 13,
                     ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 2),
               Text(
                 track.artist,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: textSecondary,
+                      fontSize: 11,
                     ),
               ),
             ],

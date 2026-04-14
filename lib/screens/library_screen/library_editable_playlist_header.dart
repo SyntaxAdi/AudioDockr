@@ -26,71 +26,79 @@ class LibraryEditablePlaylistHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final hasTracks = tracks.isNotEmpty;
 
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        LibraryPlaylistCoverArt(
-          imagePath: playlist.coverImagePath,
-          imageUrl: '',
-          size: 120,
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.only(top: 10),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final shouldStack = constraints.maxWidth < 230;
-                final title = Text(
-                  playlist.name,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontSize: 32,
-                        color: textPrimary,
-                      ),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                );
-                final actions = LibraryPlaylistHeaderActions(
-                  hasTracks: hasTracks,
-                  shuffleEnabled: shuffleEnabled,
-                  onPlayPressed: onPlayPressed,
-                  onShufflePressed: onShufflePressed,
-                  onMenuPressed: onMenuPressed,
-                );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isWide = constraints.maxWidth > 380;
+        
+        final title = Text(
+          playlist.name,
+          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: textPrimary,
+                letterSpacing: -0.5,
+              ),
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+        );
 
-                if (shouldStack) {
-                  return Column(
+        final actions = LibraryPlaylistHeaderActions(
+          hasTracks: hasTracks,
+          shuffleEnabled: shuffleEnabled,
+          onPlayPressed: onPlayPressed,
+          onShufflePressed: onShufflePressed,
+          onMenuPressed: onMenuPressed,
+        );
+
+        if (isWide) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              LibraryPlaylistCoverArt(
+                imagePath: playlist.coverImagePath,
+                imageUrl: '',
+                size: 100,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 4),
+                  child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       title,
-                      const SizedBox(height: 10),
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: actions,
-                        ),
-                      ),
+                      const SizedBox(height: 12),
+                      actions,
                     ],
-                  );
-                }
+                  ),
+                ),
+              ),
+            ],
+          );
+        }
 
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Flexible(child: title),
-                    const SizedBox(width: 8),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: actions,
-                    ),
-                  ],
-                );
-              },
+        // Vertical layout for smaller screens
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                LibraryPlaylistCoverArt(
+                  imagePath: playlist.coverImagePath,
+                  imageUrl: '',
+                  size: 80,
+                  borderRadius: 10,
+                ),
+                const SizedBox(width: 14),
+                Expanded(child: title),
+              ],
             ),
-          ),
-        ),
-      ],
+            const SizedBox(height: 12),
+            actions,
+          ],
+        );
+      },
     );
   }
 }
@@ -103,6 +111,7 @@ class LibraryPlaylistHeaderActions extends StatelessWidget {
     required this.onPlayPressed,
     required this.onShufflePressed,
     required this.onMenuPressed,
+    this.showMenu = true,
   });
 
   final bool hasTracks;
@@ -110,46 +119,44 @@ class LibraryPlaylistHeaderActions extends StatelessWidget {
   final VoidCallback onPlayPressed;
   final VoidCallback onShufflePressed;
   final VoidCallback onMenuPressed;
+  final bool showMenu;
 
   @override
   Widget build(BuildContext context) {
-    final buttonStyle = IconButton.styleFrom(
-      minimumSize: const Size(52, 52),
-      fixedSize: const Size(52, 52),
-      padding: EdgeInsets.zero,
-      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-    );
-
     return Row(
-      mainAxisSize: MainAxisSize.min,
       children: [
-        IconButton(
-          tooltip: 'Playlist options',
-          onPressed: onMenuPressed,
-          style: buttonStyle,
-          iconSize: 28,
-          color: textPrimary,
-          icon: const Icon(Icons.more_vert_rounded),
-        ),
-        const SizedBox(width: 10),
+        if (showMenu)
+          IconButton(
+            onPressed: onMenuPressed,
+            iconSize: 26,
+            color: textSecondary,
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            icon: const Icon(Icons.more_vert_rounded),
+          ),
+        const Spacer(),
         IconButton(
           onPressed: hasTracks ? onShufflePressed : null,
-          style: buttonStyle,
-          iconSize: 28,
-          color: shuffleEnabled ? accentPrimary : textPrimary,
+          iconSize: 26,
+          color: shuffleEnabled ? accentPrimary : textSecondary,
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
           icon: const Icon(Icons.shuffle_rounded),
         ),
-        const SizedBox(width: 10),
+        const SizedBox(width: 20),
         FilledButton(
           onPressed: hasTracks ? onPlayPressed : null,
           style: FilledButton.styleFrom(
             backgroundColor: accentPrimary,
-            foregroundColor: bgBase,
-            minimumSize: const Size(52, 52),
+            foregroundColor: Colors.black,
+            minimumSize: const Size(56, 56),
             padding: EdgeInsets.zero,
             shape: const CircleBorder(),
+            elevation: 0,
           ),
-          child: const Icon(Icons.play_arrow_rounded, size: 28),
+          child: const Icon(Icons.play_arrow_rounded, size: 38),
         ),
       ],
     );

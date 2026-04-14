@@ -16,7 +16,9 @@ class HomeCollectionGrid extends StatelessWidget {
     final visibleItems = items.take(8).toList();
     final width = MediaQuery.of(context).size.width - 32;
     final isCompact = width < 380;
-    final bannerAspectRatio = isCompact ? 2.8 : 3.2;
+    // Current aspect ratio results in 4 rows taking space of 4 rows.
+    // To make 4 rows take space of 3 rows, we increase aspect ratio by 4/3.
+    final bannerAspectRatio = isCompact ? (2.8 * 4 / 3) : (3.2 * 4 / 3);
 
     return GridView.builder(
       shrinkWrap: true,
@@ -25,7 +27,7 @@ class HomeCollectionGrid extends StatelessWidget {
       gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
         crossAxisSpacing: 8,
-        mainAxisSpacing: 8,
+        mainAxisSpacing: 6, // Slightly reduced spacing
         childAspectRatio: bannerAspectRatio,
       ),
       itemBuilder: (context, index) {

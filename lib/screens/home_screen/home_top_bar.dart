@@ -8,18 +8,22 @@ class HomeTopBar extends StatelessWidget {
   const HomeTopBar({
     super.key,
     required this.onProfileTap,
+    required this.onDownloadsTap,
+    required this.onSettingsTap,
     required this.displayName,
     required this.profileImage,
   });
 
   final VoidCallback onProfileTap;
+  final VoidCallback onDownloadsTap;
+  final VoidCallback onSettingsTap;
   final String displayName;
   final ProfileImageState profileImage;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
+      padding: const EdgeInsets.fromLTRB(16, 14, 8, 2),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
@@ -68,7 +72,22 @@ class HomeTopBar extends StatelessWidget {
                     fontSize: 22,
                     letterSpacing: 0,
                   ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
+          ),
+          const SizedBox(width: 4),
+          IconButton(
+            onPressed: onDownloadsTap,
+            icon: const Icon(Icons.download_rounded, size: 24),
+            color: textPrimary,
+            tooltip: 'Downloads',
+          ),
+          IconButton(
+            onPressed: onSettingsTap,
+            icon: const Icon(Icons.tune_rounded, size: 24),
+            color: textPrimary,
+            tooltip: 'Settings',
           ),
         ],
       ),

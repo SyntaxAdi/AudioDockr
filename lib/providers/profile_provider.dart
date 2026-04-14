@@ -126,12 +126,12 @@ class ProfileImageNotifier extends StateNotifier<ProfileImageState> {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(
       _profileImageModeKey,
-      ProfileImageMode.none.name,
+      ProfileImageMode.defaultAsset.name,
     );
     await preferences.remove(_profileImagePathKey);
 
     state = const ProfileImageState(
-      mode: ProfileImageMode.none,
+      mode: ProfileImageMode.defaultAsset,
     );
   }
 

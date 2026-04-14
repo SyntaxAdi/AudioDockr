@@ -30,17 +30,34 @@ class _AppShellState extends ConsumerState<AppShell> {
   int _openRecentsToken = 0;
   bool _isMenuOpen = false;
   late final Map<int, Widget> _pageCache;
+  late final PageController _pageController;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+    _pageController = PageController(initialPage: widget.initialIndex);
     _pageCache = {
       widget.initialIndex: _buildPage(widget.initialIndex),
     };
   }
 
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   void _onTabTapped(int index) {
+    if (index == _currentIndex) return;
+    _pageController.animateToPage(
+      index,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _onPageChanged(int index) {
     setState(() {
       _isMenuOpen = false;
       _currentIndex = index;
@@ -54,6 +71,7 @@ class _AppShellState extends ConsumerState<AppShell> {
       _openRecentsToken++;
       _currentIndex = 2;
       _pageCache[2] = _buildPage(2);
+      _pageController.jumpToPage(2);
     });
   }
 
@@ -93,6 +111,12 @@ class _AppShellState extends ConsumerState<AppShell> {
         return HomeScreen(
           onViewMore: _openLibraryTracks,
           onOpenMenu: _toggleMenu,
+          onDownloadsTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const DownloadsScreen()),
+          ),
+          onSettingsTap: () => Navigator.of(context).push(
+            MaterialPageRoute(builder: (_) => const SettingsScreen()),
+          ),
         );
       case 1:
         return const SearchScreen();
@@ -102,10 +126,6 @@ class _AppShellState extends ConsumerState<AppShell> {
           onNavigateToTab: _onTabTapped,
           openRecentsToken: _openRecentsToken,
         );
-      case 3:
-        return const DownloadsScreen();
-      case 4:
-        return const SettingsScreen();
       default:
         return const SizedBox.shrink();
     }
@@ -163,11 +183,17 @@ class _AppShellState extends ConsumerState<AppShell> {
                   child: MediaQuery.removePadding(
                     context: context,
                     removeBottom: true,
-                    child: IndexedStack(
-                      index: _currentIndex,
+                    child: PageView(
+                      controller: _pageController,
+                      onPageChanged: _onPageChanged,
+                      physics: const ClampingScrollPhysics(),
                       children: List<Widget>.generate(
-                        5,
-                        (index) => _pageCache[index] ?? const SizedBox.shrink(),
+                        3,
+                        (index) => _KeepAlivePage(
+                          child: RepaintBoundary(
+                            child: _pageCache[index] ?? const SizedBox.shrink(),
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -192,6 +218,26 @@ class _AppShellState extends ConsumerState<AppShell> {
       ),
     );
   }
+}
+
+class _KeepAlivePage extends StatefulWidget {
+  const _KeepAlivePage({required this.child});
+  final Widget child;
+
+  @override
+  State<_KeepAlivePage> createState() => _KeepAlivePageState();
+}
+
+class _KeepAlivePageState extends State<_KeepAlivePage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  Widget build(BuildContext context) {
+    super.build(context);
+    return widget.child;
+  }
+
+  @override
+  bool get wantKeepAlive => true;
 }
 
 class _ShellSideMenu extends StatelessWidget {

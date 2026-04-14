@@ -21,10 +21,14 @@ class HomeScreen extends ConsumerWidget {
     super.key,
     required this.onViewMore,
     required this.onOpenMenu,
+    required this.onDownloadsTap,
+    required this.onSettingsTap,
   });
 
   final VoidCallback onViewMore;
   final VoidCallback onOpenMenu;
+  final VoidCallback onDownloadsTap;
+  final VoidCallback onSettingsTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -62,6 +66,8 @@ class HomeScreen extends ConsumerWidget {
             final children = <Widget>[
               HomeTopBar(
                 onProfileTap: onOpenMenu,
+                onDownloadsTap: onDownloadsTap,
+                onSettingsTap: onSettingsTap,
                 displayName: displayName,
                 profileImage: profileImage,
               ),
