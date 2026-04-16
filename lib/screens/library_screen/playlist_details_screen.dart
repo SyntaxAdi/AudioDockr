@@ -875,8 +875,9 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
               ),
               if (playlistTracks.isEmpty)
                 const SliverFillRemaining(
+                  hasScrollBody: false,
                   child: Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 20),
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
                     child: LibraryEmptyPlaylistState(),
                   ),
                 )
