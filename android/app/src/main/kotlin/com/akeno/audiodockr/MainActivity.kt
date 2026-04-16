@@ -2,6 +2,10 @@ package com.akeno.audiodockr
 
 import android.app.ForegroundServiceStartNotAllowedException
 import android.content.Intent
+import android.os.Build
+import android.os.Bundle
+import android.view.Display
+import android.view.WindowManager
 import androidx.core.content.ContextCompat
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -19,6 +23,24 @@ class MainActivity : FlutterActivity() {
     private val playerCommandsChannel = "com.akeno.audiodockr/player_commands"
     private val playerEventsChannel = "com.akeno.audiodockr/player_events"
     private var playbackListener: ((Map<String, Any?>) -> Unit)? = null
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            val params = window.attributes
+            val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                display
+            } else {
+                @Suppress("DEPRECATION")
+                windowManager.defaultDisplay
+            }
+            val modes = display?.supportedModes
+            val highestRefreshRateMode = modes?.maxByOrNull { it.refreshRate }
+            params.preferredDisplayModeId = highestRefreshRateMode?.modeId ?: 0
+            
+            window.attributes = params
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
