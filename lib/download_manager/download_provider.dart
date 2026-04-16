@@ -44,6 +44,8 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
 
   final DownloadService _downloadService;
   final Map<String, DownloadCancellationHandle> _cancellations = {};
+  
+  bool _isProcessingQueue = false;
 
   Future<void> startDownload({
     required String videoId,
@@ -51,15 +53,16 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
     required String title,
     required String artist,
     required String thumbnailUrl,
+    String? playlistId,
+    String? playlistTitle,
+    String? playlistThumbnailUrl,
   }) async {
     final existing = state.recordForTrack(videoId);
-    if (existing?.isDownloading == true || existing?.isCompleted == true) {
+    if (existing?.isDownloading == true || existing?.isCompleted == true || existing?.isQueued == true) {
       return;
     }
 
     final startedAt = DateTime.now().millisecondsSinceEpoch;
-    final cancellationHandle = DownloadCancellationHandle();
-    _cancellations[videoId] = cancellationHandle;
 
     state = state.copyWith(
       activeDownloads: {
@@ -70,36 +73,98 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
           title: title,
           artist: artist,
           thumbnailUrl: thumbnailUrl,
-          status: DownloadStatus.downloading,
+          status: DownloadStatus.queued,
           progress: 0,
           startedAt: startedAt,
+          playlistId: playlistId,
+          playlistTitle: playlistTitle,
+          playlistThumbnailUrl: playlistThumbnailUrl,
         ),
       },
     );
+
+    unawaited(_processQueue());
+  }
+
+  Future<void> _processQueue() async {
+    if (_isProcessingQueue) return;
+    _isProcessingQueue = true;
+
+    try {
+      while (true) {
+        final nextId = _getNextQueuedTrackId();
+        if (nextId == null) break;
+
+        await _performDownload(nextId);
+      }
+    } finally {
+      _isProcessingQueue = false;
+    }
+  }
+
+  String? _getNextQueuedTrackId() {
+    final queued = state.activeDownloads.values
+        .where((r) => r.status == DownloadStatus.queued)
+        .toList();
+    
+    if (queued.isEmpty) return null;
+
+    // Sort by startedAt to process in order
+    queued.sort((a, b) => (a.startedAt ?? 0).compareTo(b.startedAt ?? 0));
+    return queued.first.videoId;
+  }
+
+  Future<void> _performDownload(String videoId) async {
+    final record = state.activeDownloads[videoId];
+    if (record == null) return;
+
+    final cancellationHandle = DownloadCancellationHandle();
+    _cancellations[videoId] = cancellationHandle;
+
+    state = state.copyWith(
+      activeDownloads: {
+        ...state.activeDownloads,
+        videoId: record.copyWith(status: DownloadStatus.downloading),
+      },
+    );
+
+    final playlistId = record.playlistId;
 
     try {
       await DownloadService.ensureDownloadPermissions();
       final downloadPath = await AppPreferences.loadDownloadPath();
       final result = await _downloadService.downloadTrack(
         videoId: videoId,
-        videoUrl: videoUrl,
-        title: title,
-        artist: artist,
-        thumbnailUrl: thumbnailUrl,
+        videoUrl: record.videoUrl,
+        title: record.title,
+        artist: record.artist,
+        thumbnailUrl: record.thumbnailUrl,
         downloadDirectoryPath: downloadPath,
         cancellationHandle: cancellationHandle,
         onProgress: (progress) {
           final current = state.activeDownloads[videoId];
-          if (current == null) {
-            return;
+          if (current == null) return;
+
+          final updatedRecord = current.copyWith(progress: progress);
+          final updatedActiveDownloads = {
+            ...state.activeDownloads,
+            videoId: updatedRecord,
+          };
+          
+          Map<String, PlaylistDownloadRecord>? updatedPlaylistDownloads;
+          if (playlistId != null) {
+            final playlistRecord = state.activePlaylistDownloads[playlistId];
+            if (playlistRecord != null) {
+              updatedPlaylistDownloads = {
+                ...state.activePlaylistDownloads,
+                playlistId: _calculatePlaylistProgress(playlistId, updatedActiveDownloads),
+              };
+            }
           }
+
           state = state.copyWith(
-            activeDownloads: {
-              ...state.activeDownloads,
-              videoId: current.copyWith(
-                progress: progress,
-              ),
-            },
+            activeDownloads: updatedActiveDownloads,
+            activePlaylistDownloads: updatedPlaylistDownloads,
           );
         },
       );
@@ -110,44 +175,257 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
       final completedRecord = DownloadRecord(
         videoId: videoId,
         videoUrl: result.videoUrl,
-        title: title,
-        artist: artist,
-        thumbnailUrl: thumbnailUrl,
+        title: record.title,
+        artist: record.artist,
+        thumbnailUrl: record.thumbnailUrl,
         status: DownloadStatus.completed,
         progress: 1,
         localPath: result.localPath,
-        startedAt: startedAt,
+        startedAt: record.startedAt,
         completedAt: completedAt,
+        playlistId: record.playlistId,
+        playlistTitle: record.playlistTitle,
       );
 
       final completedDownloads = [
         completedRecord,
-        ...state.completedDownloads.where((record) => record.videoId != videoId),
+        ...state.completedDownloads.where((r) => r.videoId != videoId),
       ];
+
+      Map<String, PlaylistDownloadRecord>? updatedPlaylistDownloads;
+      if (playlistId != null) {
+        final playlistRecord = state.activePlaylistDownloads[playlistId];
+        if (playlistRecord != null) {
+          final updatedPlaylist = _calculatePlaylistProgress(playlistId, activeDownloads);
+          if (updatedPlaylist.completedCount == updatedPlaylist.trackCount) {
+            updatedPlaylistDownloads = Map.from(state.activePlaylistDownloads)..remove(playlistId);
+          } else {
+            updatedPlaylistDownloads = {
+              ...state.activePlaylistDownloads,
+              playlistId: updatedPlaylist,
+            };
+          }
+        }
+      }
 
       state = state.copyWith(
         activeDownloads: activeDownloads,
+        activePlaylistDownloads: updatedPlaylistDownloads,
         completedDownloads: completedDownloads,
         isLoaded: true,
       );
       await _persistCompletedDownloads(completedDownloads);
     } on DownloadFailure catch (error) {
+      if (error.code == 'download_cancelled') {
+        return; // The cancelling action already updated the state, just terminate
+      }
+
       final activeDownloads = Map<String, DownloadRecord>.from(state.activeDownloads)
         ..remove(videoId);
-      state = state.copyWith(activeDownloads: activeDownloads);
-      if (error.code != 'download_cancelled') {
-        rethrow;
+      
+      Map<String, PlaylistDownloadRecord>? updatedPlaylistDownloads;
+      if (playlistId != null) {
+        final playlistRecord = state.activePlaylistDownloads[playlistId];
+        if (playlistRecord != null) {
+           final updatedPlaylist = _calculatePlaylistProgress(playlistId, activeDownloads);
+           updatedPlaylistDownloads = {
+              ...state.activePlaylistDownloads,
+              playlistId: updatedPlaylist.copyWith(
+                trackCount: playlistRecord.trackCount - 1,
+              ),
+            };
+            if (updatedPlaylistDownloads[playlistId]!.trackCount <= updatedPlaylistDownloads[playlistId]!.completedCount) {
+               updatedPlaylistDownloads.remove(playlistId);
+            }
+        }
       }
+
+      state = state.copyWith(
+        activeDownloads: activeDownloads,
+        activePlaylistDownloads: updatedPlaylistDownloads,
+      );
     } finally {
       _cancellations.remove(videoId);
     }
   }
 
+  Future<void> startPlaylistDownload({
+    required String playlistId,
+    required String title,
+    required String thumbnailUrl,
+    required List<({String videoId, String videoUrl, String title, String artist, String thumbnailUrl})> tracks,
+  }) async {
+    if (state.activePlaylistDownloads.containsKey(playlistId)) {
+      return;
+    }
+
+    state = state.copyWith(
+      activePlaylistDownloads: {
+        ...state.activePlaylistDownloads,
+        playlistId: PlaylistDownloadRecord(
+          playlistId: playlistId,
+          title: title,
+          thumbnailUrl: thumbnailUrl,
+          trackCount: tracks.length,
+          completedCount: 0,
+          averageProgress: 0,
+          startedAt: DateTime.now().millisecondsSinceEpoch,
+          trackIds: tracks.map((t) => t.videoId).toList(),
+        ),
+      },
+    );
+
+    for (final track in tracks) {
+      // These will be added as 'queued' and _processQueue will be called
+      unawaited(startDownload(
+        videoId: track.videoId,
+        videoUrl: track.videoUrl,
+        title: track.title,
+        artist: track.artist,
+        thumbnailUrl: track.thumbnailUrl,
+        playlistId: playlistId,
+        playlistTitle: title,
+        playlistThumbnailUrl: thumbnailUrl,
+      ));
+    }
+  }
+
+  PlaylistDownloadRecord _calculatePlaylistProgress(String playlistId, Map<String, DownloadRecord> activeDownloads) {
+    final playlistRecord = state.activePlaylistDownloads[playlistId]!;
+    
+    final playlistTracksInActive = activeDownloads.values.where((r) => r.playlistId == playlistId).toList();
+    final activeCount = playlistTracksInActive.length;
+    final completedCount = playlistRecord.trackCount - activeCount;
+    
+    double totalProgress = completedCount.toDouble();
+    for (final r in playlistTracksInActive) {
+      totalProgress += r.progress;
+    }
+    
+    final averageProgress = totalProgress / playlistRecord.trackCount;
+    
+    return playlistRecord.copyWith(
+      completedCount: completedCount,
+      averageProgress: averageProgress,
+    );
+  }
+
   Future<void> cancelDownload(String videoId) async {
+    final record = state.activeDownloads[videoId];
     _cancellations.remove(videoId)?.cancel();
     final activeDownloads = Map<String, DownloadRecord>.from(state.activeDownloads)
       ..remove(videoId);
-    state = state.copyWith(activeDownloads: activeDownloads);
+    
+    Map<String, PlaylistDownloadRecord>? updatedPlaylistDownloads;
+    if (record?.playlistId != null) {
+      final playlistId = record!.playlistId!;
+      final playlistRecord = state.activePlaylistDownloads[playlistId];
+      if (playlistRecord != null) {
+        final updatedPlaylist = _calculatePlaylistProgress(playlistId, activeDownloads);
+        updatedPlaylistDownloads = {
+          ...state.activePlaylistDownloads,
+          playlistId: updatedPlaylist.copyWith(
+            trackCount: playlistRecord.trackCount - 1,
+            trackIds: List.from(playlistRecord.trackIds)..remove(videoId),
+          ),
+        };
+        if (updatedPlaylistDownloads[playlistId]!.trackCount <= updatedPlaylistDownloads[playlistId]!.completedCount) {
+          updatedPlaylistDownloads.remove(playlistId);
+        }
+      }
+    }
+
+    state = state.copyWith(
+      activeDownloads: activeDownloads,
+      activePlaylistDownloads: updatedPlaylistDownloads,
+    );
+  }
+
+  Future<void> cancelPlaylistDownload(String playlistId) async {
+    final playlistRecord = state.activePlaylistDownloads[playlistId];
+    if (playlistRecord == null) return;
+
+    for (final videoId in playlistRecord.trackIds) {
+      _cancellations.remove(videoId)?.cancel();
+    }
+
+    final activeDownloads = Map<String, DownloadRecord>.from(state.activeDownloads)
+      ..removeWhere((key, value) => value.playlistId == playlistId);
+    
+    final activePlaylistDownloads = Map<String, PlaylistDownloadRecord>.from(state.activePlaylistDownloads)
+      ..remove(playlistId);
+
+    state = state.copyWith(
+      activeDownloads: activeDownloads,
+      activePlaylistDownloads: activePlaylistDownloads,
+    );
+  }
+
+  Future<void> cancelAllDownloads() async {
+    for (final cancellation in _cancellations.values) {
+      cancellation.cancel();
+    }
+    _cancellations.clear();
+    state = state.copyWith(
+      activeDownloads: {},
+      activePlaylistDownloads: {},
+    );
+  }
+
+  Future<void> togglePauseDownload(String videoId) async {
+    final record = state.activeDownloads[videoId];
+    if (record == null) return;
+
+    if (record.isPaused) {
+      state = state.copyWith(
+        activeDownloads: {
+          ...state.activeDownloads,
+          videoId: record.copyWith(status: DownloadStatus.queued),
+        },
+      );
+      unawaited(_processQueue());
+    } else {
+      _cancellations.remove(videoId)?.cancel();
+      // Keep it in activeDownloads but paused
+      state = state.copyWith(
+        activeDownloads: {
+          ...state.activeDownloads,
+          videoId: record.copyWith(status: DownloadStatus.paused),
+        },
+      );
+    }
+  }
+
+  Future<void> togglePausePlaylistDownload(String playlistId) async {
+    final playlistRecord = state.activePlaylistDownloads[playlistId];
+    if (playlistRecord == null) return;
+
+    final isNowPaused = !playlistRecord.isPaused;
+    
+    final updatedActiveDownloads = Map<String, DownloadRecord>.from(state.activeDownloads);
+    for (final videoId in playlistRecord.trackIds) {
+      final track = updatedActiveDownloads[videoId];
+      if (track != null) {
+        if (isNowPaused) {
+          _cancellations.remove(videoId)?.cancel();
+          updatedActiveDownloads[videoId] = track.copyWith(status: DownloadStatus.paused);
+        } else {
+          updatedActiveDownloads[videoId] = track.copyWith(status: DownloadStatus.queued);
+        }
+      }
+    }
+
+    state = state.copyWith(
+      activeDownloads: updatedActiveDownloads,
+      activePlaylistDownloads: {
+        ...state.activePlaylistDownloads,
+        playlistId: playlistRecord.copyWith(isPaused: isNowPaused),
+      },
+    );
+
+    if (!isNowPaused) {
+      unawaited(_processQueue());
+    }
   }
 
   Future<void> deleteDownload(String videoId) async {
@@ -169,6 +447,23 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
         .toList(growable: false);
     state = state.copyWith(completedDownloads: updated);
     await _persistCompletedDownloads(updated);
+  }
+
+  Future<void> deleteAllDownloads() async {
+    for (final record in state.completedDownloads) {
+      final path = record.localPath;
+      if (path != null && path.isNotEmpty) {
+        final file = File(path);
+        if (await file.exists()) {
+          try {
+            await file.delete();
+          } catch (_) {}
+        }
+      }
+    }
+
+    state = state.copyWith(completedDownloads: []);
+    await _persistCompletedDownloads([]);
   }
 
   Future<void> _loadCompletedDownloads() async {

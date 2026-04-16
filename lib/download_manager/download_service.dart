@@ -140,27 +140,12 @@ class DownloadService {
     required void Function(double progress) onProgress,
   }) async {
     final uri = Uri.parse(streamUrl);
-    final client = HttpClient();
+    final client = HttpClient()..autoUncompress = false;
     cancellationHandle.attachClient(client);
 
     File? partFile;
-    IOSink? sink;
 
     try {
-      final request = await client.getUrl(uri);
-      final headers = PlaybackUrlResolver.buildPlaybackHeaders();
-      headers.forEach((key, value) {
-        request.headers.set(key, value);
-      });
-
-      final response = await request.close();
-      if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw DownloadFailure(
-          'download_failed',
-          'Download failed with status ${response.statusCode}.',
-        );
-      }
-
       final baseName = _sanitizeFileName('$artist - $title');
       final finalPath = await _nextAvailablePath(
         directoryPath: downloadDirectoryPath,
@@ -170,34 +155,91 @@ class DownloadService {
       final partPath = '$finalPath.part';
 
       partFile = File(partPath);
-      if (await partFile.exists()) {
-        await partFile.delete();
-      }
-
-      sink = partFile.openWrite();
-
       var receivedBytes = 0;
-      final totalBytes = response.contentLength;
-
-      await for (final chunk in response) {
-        if (cancellationHandle.isCancelled) {
-          throw const DownloadFailure(
-            'download_cancelled',
-            'Download cancelled.',
-          );
-        }
-
-        sink.add(chunk);
-        receivedBytes += chunk.length;
-
-        if (totalBytes > 0) {
-          onProgress((receivedBytes / totalBytes).clamp(0, 1).toDouble());
-        }
+      if (await partFile.exists()) {
+        receivedBytes = await partFile.length();
       }
 
-      await sink.flush();
-      await sink.close();
-      sink = null;
+      int? totalBytesKnown;
+      IOSink? sink;
+
+      try {
+        while (true) {
+          if (cancellationHandle.isCancelled) {
+            throw const DownloadFailure('download_cancelled', 'Download cancelled.');
+          }
+
+          final request = await client.getUrl(uri);
+          final headers = PlaybackUrlResolver.buildPlaybackHeaders();
+          headers.forEach((key, value) {
+            request.headers.set(key, value);
+          });
+          
+          const int chunkSize = 9 * 1024 * 1024; // 9MB chunks to bypass YT throttling
+          final startByte = receivedBytes;
+          final endByte = totalBytesKnown != null 
+              ? ((startByte + chunkSize - 1) < totalBytesKnown ? (startByte + chunkSize - 1) : totalBytesKnown - 1)
+              : (startByte + chunkSize - 1);
+
+          request.headers.set(HttpHeaders.rangeHeader, 'bytes=$startByte-$endByte');
+
+          final response = await request.close();
+
+          if (response.statusCode == 416) {
+            // Reached Edge of File EOF. Perfect.
+            break;
+          }
+          
+          if (response.statusCode < 200 || response.statusCode >= 300) {
+            throw DownloadFailure(
+              'download_failed',
+              'Download failed with status ${response.statusCode}.',
+            );
+          }
+
+          if (totalBytesKnown == null) {
+            final contentRange = response.headers.value(HttpHeaders.contentRangeHeader);
+            if (contentRange != null && contentRange.contains('/')) {
+              totalBytesKnown = int.tryParse(contentRange.split('/')[1]);
+            } else if (response.statusCode == 200) {
+              totalBytesKnown = response.contentLength; 
+            }
+          }
+
+          final isPartial = response.statusCode == 206;
+          if (!isPartial && startByte > 0) {
+            receivedBytes = 0;
+            if (await partFile.exists()) {
+              await partFile.delete();
+            }
+          }
+
+          sink ??= partFile.openWrite(mode: (isPartial || startByte > 0) ? FileMode.append : FileMode.write);
+
+          int chunkReceived = 0;
+          await for (final chunk in response) {
+            if (cancellationHandle.isCancelled) {
+              throw const DownloadFailure('download_cancelled', 'Download cancelled.');
+            }
+
+            sink.add(chunk);
+            receivedBytes += chunk.length;
+            chunkReceived += chunk.length;
+
+            if (totalBytesKnown != null && totalBytesKnown > 0) {
+              onProgress((receivedBytes / totalBytesKnown).clamp(0, 1).toDouble());
+            }
+          }
+
+          if (chunkReceived == 0 || (totalBytesKnown != null && receivedBytes >= totalBytesKnown)) {
+            break;
+          }
+        }
+      } finally {
+        await sink?.flush();
+        await sink?.close();
+        sink = null;
+      }
 
       if (cancellationHandle.isCancelled) {
         throw const DownloadFailure(
@@ -250,6 +292,10 @@ class DownloadService {
         throw DownloadFailure('transcode_failed', 'FFmpeg failed code ${returnCode?.getValue()}: \n$logs');
       }
 
+      if (await partFile.exists()) {
+        await partFile.delete();
+      }
+
       onProgress(1);
       return finalPath;
     } on HttpException {
@@ -281,10 +327,6 @@ class DownloadService {
             : error.message,
       );
     } finally {
-      await sink?.close();
-      if (partFile != null && await partFile.exists()) {
-        await partFile.delete();
-      }
       client.close(force: true);
     }
   }

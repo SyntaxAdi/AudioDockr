@@ -583,15 +583,20 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
       ),
     );
 
-    for (final track in tracks) {
-      unawaited(ref.read(downloadNotifierProvider.notifier).startDownload(
-            videoId: track.videoId,
-            videoUrl: track.videoUrl,
-            title: track.title,
-            artist: track.artist,
-            thumbnailUrl: track.thumbnailUrl,
-          ));
-    }
+    await ref.read(downloadNotifierProvider.notifier).startPlaylistDownload(
+          playlistId: playlist.id,
+          title: playlist.name,
+          thumbnailUrl: playlist.coverImagePath,
+          tracks: tracks
+              .map((t) => (
+                    videoId: t.videoId,
+                    videoUrl: t.videoUrl,
+                    title: t.title,
+                    artist: t.artist,
+                    thumbnailUrl: t.thumbnailUrl,
+                  ))
+              .toList(),
+        );
   }
 
   Future<void> _handlePlaylistMenuAction(
