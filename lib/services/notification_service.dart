@@ -8,10 +8,10 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
-  static const String _downloadChannelId = 'download_channel_v6';
+  static const String _downloadChannelId = 'download_channel_v7';
   static const String _downloadChannelName = 'Downloads';
   static const String _downloadChannelDescription =
-      'Notifications for track download progress';
+      'Silent notifications for track download progress';
 
   // Specific IDs for notifications
   static const int downloadNotificationId = 888;
@@ -32,9 +32,10 @@ class NotificationService {
           _downloadChannelId,
           _downloadChannelName,
           description: _downloadChannelDescription,
-          importance: Importance.defaultImportance,
+          importance: Importance.low, // LOW importance prevents pop-up/sound
           showBadge: false,
           playSound: false,
+          enableVibration: false,
         ),
       );
     }
@@ -49,19 +50,20 @@ class NotificationService {
       _downloadChannelId,
       _downloadChannelName,
       channelDescription: _downloadChannelDescription,
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
-      onlyAlertOnce: true,
+      importance: Importance.low, // Silent
+      priority: Priority.low,     // Quiet
+      onlyAlertOnce: true,        // Don't alert on every progress update
       playSound: false,
       enableVibration: false,
       showProgress: !isCompleted,
       maxProgress: 100,
       progress: progress,
-      ongoing: !isCompleted,
+      ongoing: !isCompleted,      // FLAG_ONGOING_EVENT
       autoCancel: isCompleted,
       showWhen: true,
       subText: isCompleted ? null : '$progress%',
       category: AndroidNotificationCategory.progress,
+      styleInformation: const BigTextStyleInformation(''), 
     );
 
     final notificationDetails = NotificationDetails(android: androidDetails);
@@ -69,7 +71,7 @@ class NotificationService {
     await _notificationsPlugin.show(
       downloadNotificationId,
       isCompleted ? 'Download Complete' : 'Downloading $title',
-      isCompleted ? title : null,
+      null, 
       notificationDetails,
     );
   }
@@ -86,19 +88,20 @@ class NotificationService {
       _downloadChannelId,
       _downloadChannelName,
       channelDescription: _downloadChannelDescription,
-      importance: Importance.defaultImportance,
-      priority: Priority.defaultPriority,
+      importance: Importance.low, // Silent
+      priority: Priority.low,     // Quiet
       onlyAlertOnce: true,
       playSound: false,
       enableVibration: false,
       showProgress: !isFinished,
       maxProgress: 100,
       progress: averageProgress,
-      ongoing: !isFinished,
+      ongoing: !isFinished,      // FLAG_ONGOING_EVENT
       autoCancel: isFinished,
       showWhen: true,
       subText: isFinished ? null : '$averageProgress%',
       category: AndroidNotificationCategory.progress,
+      styleInformation: const BigTextStyleInformation(''),
     );
 
     final notificationDetails = NotificationDetails(android: androidDetails);
@@ -108,9 +111,7 @@ class NotificationService {
       isFinished 
           ? 'Playlist Download Complete' 
           : 'Downloading $playlistName',
-      isFinished 
-          ? playlistName 
-          : null,
+      null, 
       notificationDetails,
     );
   }

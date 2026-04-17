@@ -4,10 +4,8 @@ import android.app.ForegroundServiceStartNotAllowedException
 import android.content.Intent
 import android.os.Build
 import android.os.Bundle
-import android.view.Display
-import android.view.WindowManager
 import androidx.core.content.ContextCompat
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
@@ -18,31 +16,14 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-class MainActivity : FlutterActivity() {
+class MainActivity : FlutterFragmentActivity() {
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val playerCommandsChannel = "com.akeno.audiodockr/player_commands"
     private val playerEventsChannel = "com.akeno.audiodockr/player_events"
     private var playbackListener: ((Map<String, Any?>) -> Unit)? = null
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val params = window.attributes
-            val display = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                display
-            } else {
-                @Suppress("DEPRECATION")
-                windowManager.defaultDisplay
-            }
-            val modes = display?.supportedModes
-            val highestRefreshRateMode = modes?.maxByOrNull { it.refreshRate }
-            params.preferredDisplayModeId = highestRefreshRateMode?.modeId ?: 0
-            
-            window.attributes = params
-        }
-    }
-
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
+        // Automatic plugin registration is handled by super.configureFlutterEngine(flutterEngine)
         super.configureFlutterEngine(flutterEngine)
 
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, playerEventsChannel)
