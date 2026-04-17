@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../database_helper.dart';
@@ -54,21 +55,27 @@ class LibraryNotifier extends LibraryNotifierBase
   // ── Initial load ──────────────────────────────────────────────────────────
 
   Future<void> _loadLibrary() async {
-    final results = await Future.wait([
-      db.fetchAllTracks(),
-      db.fetchLikedTracks(),
-      db.fetchPlaylists(),
-      db.fetchRecentlyPlayed(),
-      db.fetchRecentlyOpenedPlaylists(),
-    ]);
-    state = state.copyWith(
-      isLoading: false,
-      allTracks: mapTracks(results[0] as List<StoredTrack>),
-      likedTracks: mapTracks(results[1] as List<StoredTrack>),
-      playlists: mapPlaylists(results[2] as List<StoredPlaylist>),
-      recentTracks: mapTracks(results[3] as List<StoredTrack>),
-      recentPlaylists: mapPlaylists(results[4] as List<StoredPlaylist>),
-    );
+    try {
+      final results = await Future.wait([
+        db.fetchAllTracks(),
+        db.fetchLikedTracks(),
+        db.fetchPlaylists(),
+        db.fetchRecentlyPlayed(),
+        db.fetchRecentlyOpenedPlaylists(),
+      ]);
+      state = state.copyWith(
+        allTracks: mapTracks(results[0] as List<StoredTrack>),
+        likedTracks: mapTracks(results[1] as List<StoredTrack>),
+        playlists: mapPlaylists(results[2] as List<StoredPlaylist>),
+        recentTracks: mapTracks(results[3] as List<StoredTrack>),
+        recentPlaylists: mapPlaylists(results[4] as List<StoredPlaylist>),
+      );
+    } catch (e, stack) {
+      // Log the error for debugging
+      debugPrint('Error loading library: $e\n$stack');
+    } finally {
+      state = state.copyWith(isLoading: false);
+    }
   }
 
   // ── Mapping helpers (shared across mixins) ────────────────────────────────

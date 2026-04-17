@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,10 +9,12 @@ import 'services/notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService.instance.init();
 
+  // Initialize services in the background without blocking the initial frame
+  unawaited(NotificationService.instance.init());
+  
   try {
-    await FlutterDisplayMode.setHighRefreshRate();
+    unawaited(FlutterDisplayMode.setHighRefreshRate());
   } catch (_) {
     // Fallback if display mode setting is not supported
   }
@@ -50,13 +53,17 @@ class _StartupGateState extends State<_StartupGate> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _showShell = true;
-      });
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    // Artificial delay to ensure splash is visible and engine is ready
+    await Future.delayed(const Duration(milliseconds: 1200));
+    
+    if (!mounted) return;
+    
+    setState(() {
+      _showShell = true;
     });
   }
 

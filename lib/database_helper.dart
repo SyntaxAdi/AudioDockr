@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -86,29 +87,44 @@ class TrackWriteData {
 class DatabaseHelper {
   static final DatabaseHelper instance = DatabaseHelper._init();
   static Database? _database;
+  static Completer<Database>? _initCompleter;
 
   DatabaseHelper._init();
 
   Future<Database> get database async {
-    if (_database != null) {
-      await _ensureDatabaseSchema(_database!);
-      return _database!;
+    if (_database != null) return _database!;
+
+    if (_initCompleter != null) return _initCompleter!.future;
+
+    final completer = Completer<Database>();
+    _initCompleter = completer;
+
+    try {
+      final db = await _initDB('audiodockr.db');
+      _database = db;
+      completer.complete(db);
+      return db;
+    } catch (e, stack) {
+      _initCompleter = null;
+      completer.completeError(e, stack);
+      rethrow;
     }
-    _database = await _initDB('audiodockr.db');
-    await _ensureDatabaseSchema(_database!);
-    return _database!;
   }
 
   Future<Database> _initDB(String filePath) async {
     final dbPath = await getDatabasesPath();
     final path = join(dbPath, filePath);
 
-    return openDatabase(
+    final db = await openDatabase(
       path,
       version: 9,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
+    
+    await _ensureBuiltinPlaylists(db);
+    
+    return db;
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -276,32 +292,6 @@ class DatabaseHelper {
         'created_at': DateTime.now().millisecondsSinceEpoch,
       },
       conflictAlgorithm: ConflictAlgorithm.ignore,
-    );
-  }
-
-  Future<void> _ensureDatabaseSchema(Database db) async {
-    await _ensureBuiltinPlaylists(db);
-    await _ensureColumn(
-      db,
-      'playlist_tracks',
-      'hidden',
-      'INTEGER DEFAULT 0',
-    );
-    await _ensureColumn(
-      db,
-      'playlists',
-      'is_pinned',
-      'INTEGER DEFAULT 0',
-    );
-    await db.execute('''
-      CREATE TABLE IF NOT EXISTS recent_playlists (
-        playlist_id TEXT PRIMARY KEY,
-        last_opened_at INTEGER
-      )
-    ''');
-    await db.execute(
-      'CREATE INDEX IF NOT EXISTS idx_recent_playlists_last_opened_at '
-      'ON recent_playlists(last_opened_at)',
     );
   }
 
