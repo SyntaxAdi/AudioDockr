@@ -9,6 +9,7 @@ import '../api/youtube_service.dart';
 import '../library/library_provider.dart';
 import '../playback/playback_url_resolver.dart';
 import '../settings/app_preferences.dart';
+import '../services/notification_service.dart';
 import 'download_models.dart';
 import 'download_service.dart';
 
@@ -132,6 +133,25 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
 
     try {
       await DownloadService.ensureDownloadPermissions();
+      
+      // Trigger initial notification immediately before actual download starts
+      if (playlistId != null) {
+        final playlistRecord = state.activePlaylistDownloads[playlistId];
+        if (playlistRecord != null) {
+          NotificationService.instance.showPlaylistProgress(
+            playlistName: playlistRecord.title,
+            totalTracks: playlistRecord.trackCount,
+            completedTracks: playlistRecord.completedCount,
+            averageProgress: (playlistRecord.averageProgress * 100).toInt(),
+          );
+        }
+      } else {
+        NotificationService.instance.showDownloadProgress(
+          title: record.title,
+          progress: 0,
+        );
+      }
+
       final downloadPath = await AppPreferences.loadDownloadPath();
       final result = await _downloadService.downloadTrack(
         videoId: videoId,
@@ -155,11 +175,26 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
           if (playlistId != null) {
             final playlistRecord = state.activePlaylistDownloads[playlistId];
             if (playlistRecord != null) {
+              final updatedPlaylist = _calculatePlaylistProgress(playlistId, updatedActiveDownloads);
               updatedPlaylistDownloads = {
                 ...state.activePlaylistDownloads,
-                playlistId: _calculatePlaylistProgress(playlistId, updatedActiveDownloads),
+                playlistId: updatedPlaylist,
               };
+
+              // Notification for playlist
+              NotificationService.instance.showPlaylistProgress(
+                playlistName: playlistRecord.title,
+                totalTracks: playlistRecord.trackCount,
+                completedTracks: updatedPlaylist.completedCount,
+                averageProgress: (updatedPlaylist.averageProgress * 100).toInt(),
+              );
             }
+          } else {
+            // Notification for single track
+            NotificationService.instance.showDownloadProgress(
+              title: current.title,
+              progress: (progress * 100).toInt(),
+            );
           }
 
           state = state.copyWith(
@@ -172,6 +207,25 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
       final completedAt = DateTime.now().millisecondsSinceEpoch;
       final activeDownloads = Map<String, DownloadRecord>.from(state.activeDownloads)
         ..remove(videoId);
+
+      if (playlistId != null) {
+        final playlistRecord = state.activePlaylistDownloads[playlistId];
+        if (playlistRecord != null) {
+          final updatedPlaylist = _calculatePlaylistProgress(playlistId, activeDownloads);
+          NotificationService.instance.showPlaylistProgress(
+            playlistName: playlistRecord.title,
+            totalTracks: playlistRecord.trackCount,
+            completedTracks: updatedPlaylist.completedCount,
+            averageProgress: (updatedPlaylist.averageProgress * 100).toInt(),
+          );
+        }
+      } else {
+        NotificationService.instance.showDownloadProgress(
+          title: record.title,
+          progress: 100,
+          isCompleted: true,
+        );
+      }
       final completedRecord = DownloadRecord(
         videoId: videoId,
         videoUrl: result.videoUrl,
@@ -216,6 +270,9 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
       );
       await _persistCompletedDownloads(completedDownloads);
     } on DownloadFailure catch (error) {
+      // Cancel notification if it failed or was manually cancelled
+      NotificationService.instance.cancelDownloadNotification();
+
       if (error.code == 'download_cancelled') {
         return; // The cancelling action already updated the state, just terminate
       }

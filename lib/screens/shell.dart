@@ -133,13 +133,14 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
+    final screenWidth = MediaQuery.sizeOf(context).width;
     final menuWidth = screenWidth * _menuWidthFraction;
     final slideOffset = _isMenuOpen && _currentIndex == 0 ? menuWidth : 0.0;
     final foregroundScale = _isMenuOpen && _currentIndex == 0 ? 0.94 : 1.0;
     final foregroundRadius = _isMenuOpen && _currentIndex == 0 ? 28.0 : 0.0;
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       backgroundColor: bgBase,
       body: Stack(
         children: [
@@ -191,6 +192,7 @@ class _AppShellState extends ConsumerState<AppShell> {
                         3,
                         (index) => _KeepAlivePage(
                           child: RepaintBoundary(
+                            key: ValueKey('page-boundary-$index'),
                             child: _pageCache[index] ?? const SizedBox.shrink(),
                           ),
                         ),

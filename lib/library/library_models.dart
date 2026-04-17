@@ -49,6 +49,7 @@ class LibraryPlaylist {
     required this.trackCount,
     this.coverImagePath = '',
     this.lastOpenedAt = 0,
+    this.isPinned = false,
   });
 
   final String id;
@@ -56,6 +57,7 @@ class LibraryPlaylist {
   final int trackCount;
   final String coverImagePath;
   final int lastOpenedAt;
+  final bool isPinned;
 
   factory LibraryPlaylist.fromStoredPlaylist(StoredPlaylist playlist) {
     return LibraryPlaylist(
@@ -64,6 +66,7 @@ class LibraryPlaylist {
       trackCount: playlist.trackCount,
       coverImagePath: playlist.coverImagePath,
       lastOpenedAt: playlist.lastOpenedAt,
+      isPinned: playlist.isPinned,
     );
   }
 }

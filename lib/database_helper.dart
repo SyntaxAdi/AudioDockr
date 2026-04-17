@@ -52,6 +52,7 @@ class StoredPlaylist {
     required this.trackCount,
     required this.coverImagePath,
     this.lastOpenedAt = 0,
+    this.isPinned = false,
   });
 
   final String id;
@@ -59,6 +60,7 @@ class StoredPlaylist {
   final int trackCount;
   final String coverImagePath;
   final int lastOpenedAt;
+  final bool isPinned;
 }
 
 class TrackWriteData {
@@ -103,7 +105,7 @@ class DatabaseHelper {
 
     return openDatabase(
       path,
-      version: 8,
+      version: 9,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -129,6 +131,7 @@ class DatabaseHelper {
         id TEXT PRIMARY KEY,
         name TEXT,
         cover_image_path TEXT DEFAULT '',
+        is_pinned INTEGER DEFAULT 0,
         created_at INTEGER
       )
     ''');
@@ -240,6 +243,14 @@ class DatabaseHelper {
         'ON recent_playlists(last_opened_at)',
       );
     }
+    if (oldVersion < 9) {
+      await _ensureColumn(
+        db,
+        'playlists',
+        'is_pinned',
+        'INTEGER DEFAULT 0',
+      );
+    }
   }
 
   Future<void> _ensureColumn(
@@ -274,6 +285,12 @@ class DatabaseHelper {
       db,
       'playlist_tracks',
       'hidden',
+      'INTEGER DEFAULT 0',
+    );
+    await _ensureColumn(
+      db,
+      'playlists',
+      'is_pinned',
       'INTEGER DEFAULT 0',
     );
     await db.execute('''
@@ -327,6 +344,16 @@ class DatabaseHelper {
         'name': trimmedName,
         'cover_image_path': coverImagePath,
       },
+      where: 'id = ?',
+      whereArgs: [playlistId],
+    );
+  }
+
+  Future<void> togglePinPlaylist(String playlistId, bool isPinned) async {
+    final db = await database;
+    await db.update(
+      'playlists',
+      {'is_pinned': isPinned ? 1 : 0},
       where: 'id = ?',
       whereArgs: [playlistId],
     );
@@ -682,11 +709,14 @@ class DatabaseHelper {
   Future<List<StoredPlaylist>> fetchPlaylists() async {
     final db = await database;
     final result = await db.rawQuery('''
-      SELECT p.id, p.name, p.cover_image_path, COUNT(pt.video_id) AS track_count
+      SELECT p.id, p.name, p.cover_image_path, p.is_pinned, COUNT(pt.video_id) AS track_count
       FROM playlists p
       LEFT JOIN playlist_tracks pt ON pt.playlist_id = p.id
-      GROUP BY p.id, p.name, p.cover_image_path
-      ORDER BY CASE WHEN p.id = ? THEN 0 ELSE 1 END, p.created_at ASC
+      GROUP BY p.id, p.name, p.cover_image_path, p.is_pinned
+      ORDER BY 
+        CASE WHEN p.id = ? THEN 0 ELSE 1 END,
+        p.is_pinned DESC,
+        p.created_at ASC
     ''', [likedPlaylistId]);
 
     return result
@@ -696,6 +726,7 @@ class DatabaseHelper {
             name: (map['name'] as String?) ?? '',
             trackCount: (map['track_count'] as int?) ?? 0,
             coverImagePath: (map['cover_image_path'] as String?) ?? '',
+            isPinned: ((map['is_pinned'] as int?) ?? 0) == 1,
             lastOpenedAt: 0,
           ),
         )

@@ -18,6 +18,7 @@ abstract class LibraryNotifierBase extends StateNotifier<LibraryState> {
   
   Future<void> reloadPlaylistsAndRecent();
   Future<void> reloadAll();
+  Future<void> togglePinPlaylist(String playlistId, bool isPinned);
   
   LibraryTrack? trackById(String? videoId);
   LibraryPlaylist? playlistById(String? playlistId);

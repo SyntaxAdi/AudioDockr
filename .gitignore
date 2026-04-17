@@ -129,3 +129,8 @@ downloads/
 # pubspec.lock   ← Keep committed for apps (it is committed here)
 # Added by code-review-graph
 .code-review-graph/
+CLAUDE.md
+GEMINI.md
+AGENTS.md
+.windsurfrules
+.cursorrules

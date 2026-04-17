@@ -12,6 +12,7 @@ class LibraryPlaylistCard extends StatelessWidget {
     required this.icon,
     this.leading,
     required this.onTap,
+    this.onLongPress,
     this.height = 88,
   });
 
@@ -20,6 +21,7 @@ class LibraryPlaylistCard extends StatelessWidget {
   final IconData icon;
   final Widget? leading;
   final VoidCallback onTap;
+  final VoidCallback? onLongPress;
   final double height;
 
   @override
@@ -32,6 +34,7 @@ class LibraryPlaylistCard extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
+      onLongPress: onLongPress,
       borderRadius: BorderRadius.circular(isCompact ? 10 : 14),
       child: Container(
         height: height,
@@ -58,25 +61,30 @@ class LibraryPlaylistCard extends StatelessWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w700,
-                          fontSize: titleFontSize,
-                        ),
+                  Flexible(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            fontSize: titleFontSize,
+                          ),
+                    ),
                   ),
                   if (subtitle.isNotEmpty) ...[
                     SizedBox(height: isCompact ? 2 : 4),
-                    Text(
-                      subtitle.toUpperCase(),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            fontSize: isCompact ? 9 : 11,
-                          ),
+                    Flexible(
+                      child: Text(
+                        subtitle.toUpperCase(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              fontSize: isCompact ? 9 : 11,
+                            ),
+                      ),
                     ),
                   ],
                 ],

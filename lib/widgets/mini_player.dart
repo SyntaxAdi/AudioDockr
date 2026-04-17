@@ -57,11 +57,10 @@ class MiniPlayer extends ConsumerWidget {
       return const SizedBox.shrink();
     }
 
-    final mediaQuery = MediaQuery.of(context);
     final bottomInset = avoidBottomInset
-        ? (mediaQuery.viewInsets.bottom > 0
-            ? mediaQuery.viewInsets.bottom
-            : mediaQuery.viewPadding.bottom)
+        ? (MediaQuery.viewInsetsOf(context).bottom > 0
+            ? MediaQuery.viewInsetsOf(context).bottom
+            : MediaQuery.viewPaddingOf(context).bottom)
         : 0.0;
 
     return AnimatedPadding(

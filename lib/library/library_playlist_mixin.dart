@@ -24,6 +24,12 @@ mixin LibraryPlaylistMixin on LibraryNotifierBase {
     await reloadPlaylistsAndRecent();
   }
 
+  @override
+  Future<void> togglePinPlaylist(String playlistId, bool isPinned) async {
+    await db.togglePinPlaylist(playlistId, isPinned);
+    await reloadPlaylistsAndRecent();
+  }
+
   Future<void> deletePlaylist(String playlistId) async {
     await db.deletePlaylist(playlistId);
     await reloadAll();

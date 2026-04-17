@@ -175,13 +175,14 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
   @override
   Widget build(BuildContext context) {
     final libraryState = ref.watch(libraryProvider);
-    final screenWidth = MediaQuery.of(context).size.width;
+    final screenWidth = MediaQuery.sizeOf(context).width;
     final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
           fontSize: screenWidth < 360 ? 18 : 20,
           letterSpacing: 1.2,
         );
 
     return Scaffold(
+      resizeToAvoidBottomInset: false,
       appBar: AppBar(
         backgroundColor: bgBase,
         elevation: 0,
@@ -205,7 +206,7 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
                 const targetVisible = 7.0;
                 const itemSpacing = 8.0;
                 const spacingHeight = (targetVisible - 1) * itemSpacing;
-                final dynamicCardHeight = (availableHeight - spacingHeight) / targetVisible;
+                final dynamicCardHeight = ((availableHeight - spacingHeight) / targetVisible).clamp(64.0, 100.0);
 
                 final leadingSize = (dynamicCardHeight * 0.76).clamp(42.0, 58.0);
 
@@ -249,14 +250,35 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
                       const SizedBox(height: itemSpacing),
                       LibraryPlaylistCard(
                         title: playlist.name,
-                        subtitle: '',
+                        subtitle: playlist.isPinned ? 'PINNED' : '',
                         icon: Icons.queue_music_rounded,
                         height: dynamicCardHeight,
-                        leading: LibraryPlaylistCoverArt(
-                          imagePath: playlist.coverImagePath,
-                          imageUrl: '',
-                          size: leadingSize,
-                          borderRadius: 8,
+                        leading: Stack(
+                          children: [
+                            LibraryPlaylistCoverArt(
+                              imagePath: playlist.coverImagePath,
+                              imageUrl: '',
+                              size: leadingSize,
+                              borderRadius: 8,
+                            ),
+                            if (playlist.isPinned)
+                              Positioned(
+                                top: 2,
+                                right: 2,
+                                child: Container(
+                                  padding: const EdgeInsets.all(2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withValues(alpha: 0.6),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.push_pin_rounded,
+                                    size: 10,
+                                    color: accentPrimary,
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         onTap: () {
                           Navigator.of(context).push(
@@ -269,6 +291,11 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
                             ),
                           );
                         },
+                        onLongPress: () => showPlaylistActionsSheet(
+                          context,
+                          ref,
+                          playlist,
+                        ),
                       ),
                     ],
                   ],

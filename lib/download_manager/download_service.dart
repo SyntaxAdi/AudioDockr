@@ -62,17 +62,24 @@ class DownloadService {
       return;
     }
 
-    final status = await Permission.manageExternalStorage.status;
-    if (status.isGranted) {
-      return;
+    // Storage permission
+    final storageStatus = await Permission.manageExternalStorage.status;
+    if (!storageStatus.isGranted) {
+      final requested = await Permission.manageExternalStorage.request();
+      if (!requested.isGranted) {
+        throw const DownloadFailure(
+          'storage_permission_denied',
+          'Storage access required before saving downloads to Music folder.',
+        );
+      }
     }
 
-    final requested = await Permission.manageExternalStorage.request();
-    if (!requested.isGranted) {
-      throw const DownloadFailure(
-        'storage_permission_denied',
-        'Storage access required before saving downloads to Music folder.',
-      );
+    // Notification permission (Android 13+)
+    final notificationStatus = await Permission.notification.status;
+    if (notificationStatus.isDenied) {
+      await Permission.notification.request();
+      // We don't throw here because notifications are secondary to the download itself,
+      // but requesting it ensures it's visible if granted.
     }
   }
 
