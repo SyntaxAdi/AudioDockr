@@ -12,6 +12,11 @@
 -keep class androidx.media3.exoplayer.** { *; }
 -keep class org.schabi.newpipe.extractor.** { *; }
 
+-keepattributes Signature
+-keepattributes *Annotation*
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
+
 -keep class io.flutter.app.FlutterApplication { *; }
 -keep class io.flutter.plugins.** { *; }
 -keep class com.dexterous.flutterlocalnotifications.** { *; }

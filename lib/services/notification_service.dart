@@ -16,7 +16,7 @@ class NotificationService {
   static const String _downloadChannelDescription =
       'Silent notifications for track download progress';
   static const String _downloadContentTitle = 'Downloading Song';
-  static const String _completionChannelId = 'download_complete_channel_v2';
+  static const String _completionChannelId = 'download_complete_channel_v4';
   static const String _completionChannelName = 'Download Complete';
   static const String _completionChannelDescription =
       'Heads-up notifications for completed downloads';
@@ -188,8 +188,8 @@ class NotificationService {
 
     await _notificationsPlugin.show(
       downloadCompleteNotificationId,
-      'AudioDockr',
-      'All downloads completed.',
+      'Downloads Complete',
+      null,
       notificationDetails,
     );
   }

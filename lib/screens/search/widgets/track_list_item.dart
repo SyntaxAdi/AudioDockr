@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../library/library_provider.dart';
 import '../../../playback/playback_provider.dart';
 import '../../../providers/search_provider.dart';
+import '../../../settings/app_preferences.dart';
 import '../../../theme.dart';
 
 class TrackListItem extends ConsumerWidget {
@@ -14,11 +15,13 @@ class TrackListItem extends ConsumerWidget {
     super.key,
     required this.searchQuery,
     required this.track,
+    required this.thumbnailQuality,
     required this.onTap,
   });
 
   final String searchQuery;
   final SearchResult track;
+  final SearchThumbnailQuality thumbnailQuality;
   final VoidCallback onTap;
 
   String _formatDuration(Duration duration) {
@@ -32,6 +35,7 @@ class TrackListItem extends ConsumerWidget {
     final metrics = TrackListItemMetrics.of(context);
     final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
     final artworkCacheSize = (metrics.artworkSize * devicePixelRatio).round();
+    final thumbnailUrl = track.thumbnailUrlFor(thumbnailQuality);
     final currentTrackId = ref.watch(
       playbackNotifierProvider.select((state) => state.currentTrackId),
     );
@@ -59,7 +63,7 @@ class TrackListItem extends ConsumerWidget {
                     track.videoUrl,
                     track.title,
                     track.artist,
-                    track.thumbnailUrl,
+                    thumbnailUrl,
                   );
               if (!context.mounted) {
                 return;
@@ -86,7 +90,7 @@ class TrackListItem extends ConsumerWidget {
                 videoUrl: track.videoUrl,
                 title: track.title,
                 artist: track.artist,
-                thumbnailUrl: track.thumbnailUrl,
+                thumbnailUrl: thumbnailUrl,
               );
           if (!context.mounted) {
             return;
@@ -106,19 +110,20 @@ class TrackListItem extends ConsumerWidget {
           onTap: onTap,
           child: Container(
             height: metrics.rowHeight,
-            padding: EdgeInsets.symmetric(horizontal: metrics.horizontalPadding),
+            padding:
+                EdgeInsets.symmetric(horizontal: metrics.horizontalPadding),
             child: Row(
               children: [
                 Container(
                   width: metrics.artworkSize,
                   height: metrics.artworkSize,
                   color: bgDivider,
-                  child: track.thumbnailUrl.isEmpty
+                  child: thumbnailUrl.isEmpty
                       ? const Center(
                           child: Icon(Icons.music_video, color: textSecondary),
                         )
                       : CachedNetworkImage(
-                          imageUrl: track.thumbnailUrl,
+                          imageUrl: thumbnailUrl,
                           memCacheWidth: artworkCacheSize,
                           memCacheHeight: artworkCacheSize,
                           maxWidthDiskCache: artworkCacheSize,
@@ -135,7 +140,8 @@ class TrackListItem extends ConsumerWidget {
                             ),
                           ),
                           errorWidget: (_, __, ___) => const Center(
-                            child: Icon(Icons.music_video, color: textSecondary),
+                            child:
+                                Icon(Icons.music_video, color: textSecondary),
                           ),
                         ),
                 ),
@@ -174,12 +180,14 @@ class TrackListItem extends ConsumerWidget {
                           videoUrl: track.videoUrl,
                           title: track.title,
                           artist: track.artist,
-                          thumbnailUrl: track.thumbnailUrl,
+                          thumbnailUrl: thumbnailUrl,
                           durationSeconds: track.duration.inSeconds,
                         );
                   },
                   icon: Icon(
-                    isLiked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                    isLiked
+                        ? Icons.favorite_rounded
+                        : Icons.favorite_border_rounded,
                     color: isLiked ? accentPrimary : textSecondary,
                     size: metrics.iconSize,
                   ),
@@ -189,7 +197,9 @@ class TrackListItem extends ConsumerWidget {
                     height: metrics.iconButtonSize,
                   ),
                   splashRadius: metrics.iconButtonSize / 2,
-                  tooltip: isLiked ? 'Remove from liked songs' : 'Add to liked songs',
+                  tooltip: isLiked
+                      ? 'Remove from liked songs'
+                      : 'Add to liked songs',
                 ),
               ],
             ),
@@ -261,12 +271,14 @@ class _QueueSwipeWrapperState extends State<_QueueSwipeWrapper> {
             },
             onHorizontalDragUpdate: (details) {
               setState(() {
-                _dragOffset =
-                    (_dragOffset + details.delta.dx).clamp(0.0, maxReveal).toDouble();
+                _dragOffset = (_dragOffset + details.delta.dx)
+                    .clamp(0.0, maxReveal)
+                    .toDouble();
               });
             },
             onHorizontalDragEnd: (_) {
-              final shouldQueue = _dragOffset >= triggerThreshold && !_queueTriggered;
+              final shouldQueue =
+                  _dragOffset >= triggerThreshold && !_queueTriggered;
               if (shouldQueue) {
                 _queueTriggered = true;
                 unawaited(widget.onQueued());

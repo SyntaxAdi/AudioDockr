@@ -24,7 +24,9 @@ class YoutubeSearchItem {
     required this.title,
     required this.uploader,
     required this.duration,
-    required this.thumbnailUrl,
+    required this.lowThumbnailUrl,
+    required this.mediumThumbnailUrl,
+    required this.highThumbnailUrl,
   });
 
   final String id;
@@ -32,11 +34,16 @@ class YoutubeSearchItem {
   final String title;
   final String uploader;
   final Duration duration;
-  final String thumbnailUrl;
+  final String lowThumbnailUrl;
+  final String mediumThumbnailUrl;
+  final String highThumbnailUrl;
+
+  String get thumbnailUrl => highThumbnailUrl;
 }
 
 class YoutubeService {
-  YoutubeService({YoutubeExplode? client}) : _client = client ?? YoutubeExplode();
+  YoutubeService({YoutubeExplode? client})
+      : _client = client ?? YoutubeExplode();
 
   final YoutubeExplode _client;
 
@@ -51,7 +58,9 @@ class YoutubeService {
               title: video.title,
               uploader: video.author,
               duration: video.duration ?? Duration.zero,
-              thumbnailUrl: video.thumbnails.highResUrl,
+              lowThumbnailUrl: video.thumbnails.lowResUrl,
+              mediumThumbnailUrl: video.thumbnails.mediumResUrl,
+              highThumbnailUrl: video.thumbnails.highResUrl,
             ),
           )
           .where((item) => item.id.isNotEmpty && item.url.isNotEmpty)

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../download_manager/download_provider.dart';
+import '../../providers/search_provider.dart';
 import '../../settings/app_preferences.dart';
 import '../../services/notification_service.dart';
 import '../../theme.dart';
@@ -11,6 +12,7 @@ import 'pages/library_data_page.dart';
 import 'pages/notifications_page.dart';
 import 'pages/playback_page.dart';
 import 'pages/profile_pages.dart';
+import 'pages/search_page.dart';
 import 'pages/storage_page.dart';
 import 'pages/support_pages.dart';
 import 'widgets/section_label.dart';
@@ -35,6 +37,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _downloadOngoingNotifications = true;
   bool _downloadCompletedNotifications = true;
   bool _releaseNotifications = false;
+  int _searchResultLimit = AppPreferences.defaultSearchResultLimit;
+  SearchThumbnailQuality _searchThumbnailQuality =
+      AppPreferences.defaultSearchThumbnailQuality;
 
   @override
   void initState() {
@@ -58,6 +63,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           AppPreferences.readDownloadCompletedNotifications(preferences);
       _releaseNotifications =
           preferences.getBool(_releaseNotificationsKey) ?? false;
+      _searchResultLimit = AppPreferences.readSearchResultLimit(preferences);
+      _searchThumbnailQuality =
+          AppPreferences.readSearchThumbnailQuality(preferences);
     });
   }
 
@@ -95,7 +103,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final normalized = trimmed.endsWith('/') && trimmed.length > 1
         ? trimmed.substring(0, trimmed.length - 1)
         : trimmed;
-    final segments = normalized.split('/').where((segment) => segment.isNotEmpty);
+    final segments =
+        normalized.split('/').where((segment) => segment.isNotEmpty);
     if (segments.isEmpty) {
       return normalized;
     }
@@ -199,6 +208,29 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         _updateBoolPreference(_backgroundPlaybackKey, value);
                       },
                       onShowComingSoon: _showComingSoonMessage,
+                    ),
+                  ),
+                ),
+                SettingsActionTile(
+                  icon: Icons.search_rounded,
+                  title: 'Search',
+                  subtitle: 'Results limit and thumbnail quality',
+                  onTap: () => _openSettingsPage(
+                    SearchPage(
+                      resultLimit: _searchResultLimit,
+                      thumbnailQuality: _searchThumbnailQuality,
+                      onResultLimitChanged: (value) {
+                        setState(() => _searchResultLimit = value);
+                        ref
+                            .read(searchPreferencesProvider.notifier)
+                            .setResultLimit(value);
+                      },
+                      onThumbnailQualityChanged: (value) {
+                        setState(() => _searchThumbnailQuality = value);
+                        ref
+                            .read(searchPreferencesProvider.notifier)
+                            .setThumbnailQuality(value);
+                      },
                     ),
                   ),
                 ),

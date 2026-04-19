@@ -1,10 +1,13 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../database_helper.dart';
 import '../api/youtube_service.dart';
+import '../settings/app_preferences.dart';
 
 final searchProvider =
-    StateNotifierProvider<SearchNotifier, AsyncValue<List<SearchResult>>>((ref) {
+    StateNotifierProvider<SearchNotifier, AsyncValue<List<SearchResult>>>(
+        (ref) {
   final youtubeService = ref.read(youtubeServiceProvider);
   final databaseHelper = DatabaseHelper.instance;
   return SearchNotifier(youtubeService, databaseHelper);
@@ -13,6 +16,11 @@ final searchProvider =
 final searchHistoryProvider =
     StateNotifierProvider<SearchHistoryNotifier, List<String>>((ref) {
   return SearchHistoryNotifier(DatabaseHelper.instance);
+});
+
+final searchPreferencesProvider =
+    StateNotifierProvider<SearchPreferencesNotifier, SearchPreferences>((ref) {
+  return SearchPreferencesNotifier();
 });
 
 class SearchFailure implements Exception {
@@ -32,7 +40,9 @@ class SearchResult {
     required this.title,
     required this.artist,
     required this.duration,
-    required this.thumbnailUrl,
+    required this.lowThumbnailUrl,
+    required this.mediumThumbnailUrl,
+    required this.highThumbnailUrl,
   });
 
   final String videoId;
@@ -40,32 +50,121 @@ class SearchResult {
   final String title;
   final String artist;
   final Duration duration;
-  final String thumbnailUrl;
+  final String lowThumbnailUrl;
+  final String mediumThumbnailUrl;
+  final String highThumbnailUrl;
+
+  String get thumbnailUrl => highThumbnailUrl;
+
+  String thumbnailUrlFor(SearchThumbnailQuality quality) {
+    switch (quality) {
+      case SearchThumbnailQuality.low:
+        return lowThumbnailUrl;
+      case SearchThumbnailQuality.medium:
+        return mediumThumbnailUrl;
+      case SearchThumbnailQuality.high:
+        return highThumbnailUrl;
+    }
+  }
 
   factory SearchResult.fromJson(Map<String, dynamic> json) {
     final thumbnails = json['thumbnails'];
-    String thumbnailUrl = '';
+    final thumbnailUrls = <String>[];
 
     if (thumbnails is List && thumbnails.isNotEmpty) {
-      final last = thumbnails.last;
-      if (last is Map<String, dynamic>) {
-        thumbnailUrl = (last['url'] as String?) ?? '';
-      } else if (last is Map) {
-        thumbnailUrl = (last['url']?.toString()) ?? '';
+      for (final thumbnail in thumbnails) {
+        if (thumbnail is Map<String, dynamic>) {
+          thumbnailUrls.add((thumbnail['url'] as String?) ?? '');
+        } else if (thumbnail is Map) {
+          thumbnailUrls.add((thumbnail['url']?.toString()) ?? '');
+        }
       }
     }
 
     final durationSeconds =
         int.tryParse(json['duration']?.toString() ?? '') ?? 0;
+    final videoId = (json['id']?.toString()) ?? '';
+    final fallbackThumbnailUrl = thumbnailUrls.isNotEmpty
+        ? thumbnailUrls.last
+        : _youtubeThumbnailUrl(videoId, 'hqdefault');
 
     return SearchResult(
-      videoId: (json['id']?.toString()) ?? '',
+      videoId: videoId,
       videoUrl: (json['url']?.toString()) ?? '',
       title: (json['title']?.toString()) ?? 'Unknown title',
       artist: (json['uploader']?.toString()) ?? 'Unknown uploader',
       duration: Duration(seconds: durationSeconds),
-      thumbnailUrl: thumbnailUrl,
+      lowThumbnailUrl: thumbnailUrls.isNotEmpty
+          ? thumbnailUrls.first
+          : _youtubeThumbnailUrl(videoId, 'default'),
+      mediumThumbnailUrl: thumbnailUrls.length > 1
+          ? thumbnailUrls[1]
+          : _youtubeThumbnailUrl(videoId, 'mqdefault'),
+      highThumbnailUrl: fallbackThumbnailUrl,
     );
+  }
+}
+
+String _youtubeThumbnailUrl(String videoId, String fileName) {
+  if (videoId.isEmpty) {
+    return '';
+  }
+  return 'https://img.youtube.com/vi/$videoId/$fileName.jpg';
+}
+
+class SearchPreferences {
+  const SearchPreferences({
+    required this.resultLimit,
+    required this.thumbnailQuality,
+  });
+
+  factory SearchPreferences.defaults() {
+    return const SearchPreferences(
+      resultLimit: AppPreferences.defaultSearchResultLimit,
+      thumbnailQuality: AppPreferences.defaultSearchThumbnailQuality,
+    );
+  }
+
+  final int resultLimit;
+  final SearchThumbnailQuality thumbnailQuality;
+
+  SearchPreferences copyWith({
+    int? resultLimit,
+    SearchThumbnailQuality? thumbnailQuality,
+  }) {
+    return SearchPreferences(
+      resultLimit: resultLimit ?? this.resultLimit,
+      thumbnailQuality: thumbnailQuality ?? this.thumbnailQuality,
+    );
+  }
+}
+
+class SearchPreferencesNotifier extends StateNotifier<SearchPreferences> {
+  SearchPreferencesNotifier() : super(SearchPreferences.defaults()) {
+    load();
+  }
+
+  Future<void> load() async {
+    final preferences = await SharedPreferences.getInstance();
+    state = SearchPreferences(
+      resultLimit: AppPreferences.readSearchResultLimit(preferences),
+      thumbnailQuality: AppPreferences.readSearchThumbnailQuality(preferences),
+    );
+  }
+
+  Future<void> setResultLimit(int value) async {
+    final limit =
+        value.clamp(1, AppPreferences.defaultSearchResultLimit).toInt();
+    state = state.copyWith(resultLimit: limit);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setInt(AppPreferences.searchResultLimitKey, limit);
+  }
+
+  Future<void> setThumbnailQuality(SearchThumbnailQuality value) async {
+    state = state.copyWith(thumbnailQuality: value);
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(
+        AppPreferences.searchThumbnailQualityKey, value.name);
   }
 }
 
@@ -110,7 +209,9 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
                 title: item.title,
                 artist: item.uploader,
                 duration: item.duration,
-                thumbnailUrl: item.thumbnailUrl,
+                lowThumbnailUrl: item.lowThumbnailUrl,
+                mediumThumbnailUrl: item.mediumThumbnailUrl,
+                highThumbnailUrl: item.highThumbnailUrl,
               ),
             )
             .toList(),

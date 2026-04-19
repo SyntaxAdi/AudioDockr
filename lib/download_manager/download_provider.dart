@@ -215,9 +215,7 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
             playlistId,
             activeDownloads,
           );
-          if (updatedPlaylist.completedCount == updatedPlaylist.trackCount) {
-            await NotificationService.instance.cancelDownloadNotification();
-          } else {
+          if (updatedPlaylist.completedCount != updatedPlaylist.trackCount) {
             NotificationService.instance.showPlaylistProgress(
               playlistName: playlistRecord.title,
               totalTracks: playlistRecord.trackCount,
@@ -226,8 +224,6 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
             );
           }
         }
-      } else {
-        await NotificationService.instance.cancelDownloadNotification();
       }
       final completedRecord = DownloadRecord(
         videoId: videoId,

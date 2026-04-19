@@ -63,6 +63,7 @@ class _SearchEntryScreenState extends ConsumerState<SearchEntryScreen> {
   Widget build(BuildContext context) {
     final searchState = ref.watch(searchProvider);
     final history = ref.watch(searchHistoryProvider);
+    final searchPreferences = ref.watch(searchPreferencesProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -138,33 +139,47 @@ class _SearchEntryScreenState extends ConsumerState<SearchEntryScreen> {
                               );
                             }
 
+                            final visibleResults = results
+                                .take(searchPreferences.resultLimit)
+                                .toList(growable: false);
+
                             return ListView.builder(
-                              itemCount: results.length,
+                              itemCount: visibleResults.length,
                               itemBuilder: (context, index) {
-                                final track = results[index];
+                                final track = visibleResults[index];
                                 return SizedBox(
-                                  height: TrackListItemMetrics.of(context).rowHeight,
+                                  height: TrackListItemMetrics.of(context)
+                                      .rowHeight,
                                   child: TrackListItem(
                                     searchQuery: query,
                                     track: track,
+                                    thumbnailQuality:
+                                        searchPreferences.thumbnailQuality,
                                     onTap: () async {
                                       try {
                                         await _recordCurrentQuery();
+                                        final thumbnailUrl =
+                                            track.thumbnailUrlFor(
+                                          searchPreferences.thumbnailQuality,
+                                        );
                                         await ref
-                                            .read(playbackNotifierProvider.notifier)
+                                            .read(playbackNotifierProvider
+                                                .notifier)
                                             .playTrack(
                                               track.videoId,
                                               track.videoUrl,
                                               track.title,
                                               track.artist,
-                                              track.thumbnailUrl,
+                                              thumbnailUrl,
                                             );
                                       } on PlaybackFailure catch (error) {
                                         if (!context.mounted) {
                                           return;
                                         }
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text(error.message)),
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          SnackBar(
+                                              content: Text(error.message)),
                                         );
                                       }
                                     },
@@ -174,11 +189,13 @@ class _SearchEntryScreenState extends ConsumerState<SearchEntryScreen> {
                             );
                           },
                           loading: () => const Center(
-                            child: CircularProgressIndicator(color: accentPrimary),
+                            child:
+                                CircularProgressIndicator(color: accentPrimary),
                           ),
                           error: (error, _) => Center(
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 24),
+                              padding:
+                                  const EdgeInsets.symmetric(horizontal: 24),
                               child: Text(
                                 error is SearchFailure
                                     ? error.message
