@@ -2,8 +2,9 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../download_manager/download_provider.dart';
 import '../../library/library_provider.dart';
-import '../../providers/spotify_import_provider.dart';
+import '../../providers/playlist_import_provider.dart';
 import '../../theme.dart';
 import '../../widgets/playlist_sheets.dart';
 import 'library_playlist_card.dart';
@@ -89,6 +90,30 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
     );
   }
 
+  void _openDownloads() {
+    Navigator.of(context).push(
+      CupertinoPageRoute(
+        builder: (_) => PlaylistDetailsScreen(
+          title: 'Downloads',
+          tracksLoader: () => ref.refresh(downloadedLibraryTracksProvider.future),
+          onNavigateToTab: widget.onNavigateToTab,
+        ),
+      ),
+    );
+  }
+
+  void _showImportResult(BuildContext parentContext) {
+    if (!parentContext.mounted) return;
+    final importState = ref.read(playlistImportProvider);
+    final message = importState.errorMessage ??
+        (importState.importedPlaylistName == null
+            ? null
+            : 'Imported into ${importState.importedPlaylistName}');
+    if (message == null) return;
+    ScaffoldMessenger.of(parentContext)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
   void _showPlaylistOptions(BuildContext context, WidgetRef ref) {
     final parentContext = context;
     showModalBottomSheet<void>(
@@ -96,74 +121,105 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (sheetContext) {
-        return FractionallySizedBox(
-          heightFactor: 0.5,
-          child: Container(
-            decoration: const BoxDecoration(
-              color: bgSurface,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 44,
-                      height: 4,
-                      margin:
-                          const EdgeInsets.only(top: 12, bottom: 20),
-                      decoration: BoxDecoration(
-                        color: bgDivider,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
+        final screenHeight = MediaQuery.sizeOf(sheetContext).height;
+        final systemBottomInset = MediaQuery.viewPaddingOf(sheetContext).bottom;
+        final bottomInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
+        final bottomOffset = bottomInset > 0 ? bottomInset : systemBottomInset;
+        final maxHeight = screenHeight * (screenHeight < 700 ? 0.72 : 0.58);
+
+        return AnimatedPadding(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: EdgeInsets.only(bottom: bottomOffset),
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxHeight),
+              child: Container(
+                decoration: const BoxDecoration(
+                  color: bgSurface,
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                ),
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 12 + systemBottomInset),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 44,
+                            height: 4,
+                            margin: const EdgeInsets.only(top: 12, bottom: 20),
+                            decoration: BoxDecoration(
+                              color: bgDivider,
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20),
+                          child: Text(
+                            'Add Playlist',
+                            style: Theme.of(context)
+                                .textTheme
+                                .titleLarge
+                                ?.copyWith(color: textPrimary),
+                          ),
+                        ),
+                        const SizedBox(height: 18),
+                        LibraryPlaylistOptionTile(
+                          icon: Icons.add_box_rounded,
+                          title: 'Create Playlist',
+                          subtitle: 'Start a fresh playlist in your library',
+                          onTap: () async {
+                            Navigator.of(sheetContext).pop();
+                            await showCreatePlaylistSheet(parentContext, ref);
+                          },
+                        ),
+                        LibraryPlaylistOptionTile(
+                          icon: Icons.queue_music_rounded,
+                          title: 'Import Playlist from Spotify',
+                          subtitle: 'Paste a Spotify playlist URL',
+                          onTap: () async {
+                            Navigator.of(sheetContext).pop();
+                            final spotifyUrl = await showSpotifyPlaylistImportSheet(
+                                parentContext);
+                            if (spotifyUrl == null || !parentContext.mounted) {
+                              return;
+                            }
+                            await ref
+                                .read(playlistImportProvider.notifier)
+                                .importSpotifyPlaylist(spotifyUrl);
+                            if (!parentContext.mounted) return;
+                            _showImportResult(parentContext);
+                          },
+                        ),
+                        LibraryPlaylistOptionTile(
+                          icon: Icons.video_library_rounded,
+                          title: 'Import Playlist from YouTube',
+                          subtitle: 'Paste a YouTube playlist URL',
+                          onTap: () async {
+                            Navigator.of(sheetContext).pop();
+                            final youtubeUrl = await showYoutubePlaylistImportSheet(
+                              parentContext,
+                            );
+                            if (youtubeUrl == null || !parentContext.mounted) {
+                              return;
+                            }
+                            await ref
+                                .read(playlistImportProvider.notifier)
+                                .importYoutubePlaylist(youtubeUrl);
+                            if (!parentContext.mounted) return;
+                            _showImportResult(parentContext);
+                          },
+                        ),
+                      ],
                     ),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Text(
-                      'Add Playlist',
-                      style: Theme.of(context)
-                          .textTheme
-                          .titleLarge
-                          ?.copyWith(color: textPrimary),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  LibraryPlaylistOptionTile(
-                    icon: Icons.add_box_rounded,
-                    title: 'Create Playlist',
-                    subtitle: 'Start a fresh playlist in your library',
-                    onTap: () async {
-                      Navigator.of(sheetContext).pop();
-                      await showCreatePlaylistSheet(parentContext, ref);
-                    },
-                  ),
-                  LibraryPlaylistOptionTile(
-                    icon: Icons.queue_music_rounded,
-                    title: 'Import Playlist from Spotify',
-                    subtitle: 'Paste a Spotify playlist URL',
-                    onTap: () async {
-                      Navigator.of(sheetContext).pop();
-                      final spotifyUrl = await showSpotifyPlaylistImportSheet(
-                          parentContext);
-                      if (spotifyUrl == null || !parentContext.mounted) return;
-                      await ref
-                          .read(spotifyImportProvider.notifier)
-                          .importPlaylist(spotifyUrl);
-                      if (!parentContext.mounted) return;
-                      final importState = ref.read(spotifyImportProvider);
-                      final message = importState.errorMessage ??
-                          (importState.importedPlaylistName == null
-                              ? null
-                              : 'Imported into ${importState.importedPlaylistName}');
-                      if (message == null) return;
-                      ScaffoldMessenger.of(parentContext)
-                          .showSnackBar(SnackBar(content: Text(message)));
-                    },
-                  ),
-                ],
+                ),
               ),
             ),
           ),
@@ -175,6 +231,7 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
   @override
   Widget build(BuildContext context) {
     final libraryState = ref.watch(libraryProvider);
+    final downloadedTracksAsync = ref.watch(downloadedLibraryTracksProvider);
     final screenWidth = MediaQuery.sizeOf(context).width;
     final titleStyle = Theme.of(context).textTheme.displayLarge?.copyWith(
           fontSize: screenWidth < 360 ? 18 : 20,
@@ -245,6 +302,19 @@ class _LibraryScreenContentState extends ConsumerState<_LibraryScreenContent> {
                         size: leadingSize,
                       ),
                       onTap: _openRecents,
+                    ),
+                    const SizedBox(height: itemSpacing),
+                    LibraryPlaylistCard(
+                      title: 'Downloads',
+                      subtitle:
+                          '${downloadedTracksAsync.valueOrNull?.length ?? 0} tracks',
+                      icon: Icons.download_done_rounded,
+                      height: dynamicCardHeight,
+                      leading: LibraryCyberpunkPlaylistBadge(
+                        variant: LibraryCyberpunkPlaylistBadgeVariant.downloads,
+                        size: leadingSize,
+                      ),
+                      onTap: _openDownloads,
                     ),
                     for (final playlist in libraryState.userPlaylists) ...[
                       const SizedBox(height: itemSpacing),

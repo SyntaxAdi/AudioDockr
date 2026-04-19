@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../download_manager/download_provider.dart';
+import '../../download_manager/download_service.dart';
 import '../../library/library_provider.dart';
 import '../../playback/playback_provider.dart';
 import '../../theme.dart';
@@ -52,6 +54,7 @@ class LibraryTrackRow extends ConsumerWidget {
             title: track.title,
             artist: track.artist,
             thumbnailUrl: track.thumbnailUrl,
+            localFilePath: track.localFilePath,
           );
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -134,31 +137,33 @@ class LibraryTrackRow extends ConsumerWidget {
                               ),
                             ),
                           ),
-                          LibraryPlaylistOptionTile(
-                            icon: Icons.playlist_add_rounded,
-                            title: 'Add to another playlist',
-                            subtitle:
-                                'Save this song to a different playlist',
-                            plain: true,
-                            onTap: () => handleAction(
-                              _PlaylistTrackMenuAction.addToAnotherPlaylist,
+                          if (onAddToAnotherPlaylist != null)
+                            LibraryPlaylistOptionTile(
+                              icon: Icons.playlist_add_rounded,
+                              title: 'Add to another playlist',
+                              subtitle:
+                                  'Save this song to a different playlist',
+                              plain: true,
+                              onTap: () => handleAction(
+                                _PlaylistTrackMenuAction.addToAnotherPlaylist,
+                              ),
                             ),
-                          ),
-                          LibraryPlaylistOptionTile(
-                            icon: isHidden
-                                ? Icons.visibility_rounded
-                                : Icons.visibility_off_rounded,
-                            title: isHidden
-                                ? 'Show in this playlist'
-                                : 'Hide in this playlist',
-                            subtitle: isHidden
-                                ? 'Bring this song back into playlist playback'
-                                : 'Gray it out and skip it during playlist playback',
-                            plain: true,
-                            onTap: () => handleAction(
-                              _PlaylistTrackMenuAction.toggleHidden,
+                          if (onToggleHidden != null)
+                            LibraryPlaylistOptionTile(
+                              icon: isHidden
+                                  ? Icons.visibility_rounded
+                                  : Icons.visibility_off_rounded,
+                              title: isHidden
+                                  ? 'Show in this playlist'
+                                  : 'Hide in this playlist',
+                              subtitle: isHidden
+                                  ? 'Bring this song back into playlist playback'
+                                  : 'Gray it out and skip it during playlist playback',
+                              plain: true,
+                              onTap: () => handleAction(
+                                _PlaylistTrackMenuAction.toggleHidden,
+                              ),
                             ),
-                          ),
                           LibraryPlaylistOptionTile(
                             icon: Icons.queue_music_rounded,
                             title: 'Add to queue',
@@ -208,6 +213,7 @@ class LibraryTrackRow extends ConsumerWidget {
                         track.title,
                         track.artist,
                         track.thumbnailUrl,
+                        localFilePath: track.localFilePath,
                       );
                 } on PlaybackFailure catch (error) {
                   if (!context.mounted) return;
@@ -224,40 +230,9 @@ class LibraryTrackRow extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(4),
                 child: Opacity(
                   opacity: isHidden ? 0.42 : 1,
-                  child: Container(
-                    width: 44,
-                    height: 44,
-                    color: bgDivider,
-                    child: track.thumbnailUrl.isEmpty
-                        ? const Center(
-                            child:
-                                Icon(Icons.music_note, color: textSecondary, size: 18),
-                          )
-                        : CachedNetworkImage(
-                            imageUrl: track.thumbnailUrl,
-                            memCacheWidth: artworkCacheSize,
-                            memCacheHeight: artworkCacheSize,
-                            maxWidthDiskCache: artworkCacheSize,
-                            maxHeightDiskCache: artworkCacheSize,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => Container(
-                              color: bgDivider,
-                              child: const Center(
-                                child: SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 1.5,
-                                    color: textSecondary,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            errorWidget: (_, __, ___) => const Center(
-                              child: Icon(Icons.music_note,
-                                  color: textSecondary, size: 18),
-                            ),
-                          ),
+                  child: _TrackArtworkThumb(
+                    track: track,
+                    artworkCacheSize: artworkCacheSize,
                   ),
                 ),
               ),
@@ -345,6 +320,91 @@ class LibraryTrackRow extends ConsumerWidget {
     if (!enableQueueActions) return row;
 
     return _LibraryQueueSwipeWrapper(onQueued: queueTrack, child: row);
+  }
+}
+
+class _TrackArtworkThumb extends StatelessWidget {
+  const _TrackArtworkThumb({
+    required this.track,
+    required this.artworkCacheSize,
+  });
+
+  final LibraryTrack track;
+  final int artworkCacheSize;
+
+  Widget _buildFallback() {
+    return Image.asset(
+      'lib/assets/app_icon.png',
+      fit: BoxFit.cover,
+      opacity: const AlwaysStoppedAnimation(0.8),
+      errorBuilder: (_, __, ___) => const Center(
+        child: Icon(Icons.music_note, color: textSecondary, size: 18),
+      ),
+    );
+  }
+
+  Widget _buildRemoteImage() {
+    return CachedNetworkImage(
+      imageUrl: track.thumbnailUrl,
+      memCacheWidth: artworkCacheSize,
+      memCacheHeight: artworkCacheSize,
+      maxWidthDiskCache: artworkCacheSize,
+      maxHeightDiskCache: artworkCacheSize,
+      fit: BoxFit.cover,
+      placeholder: (_, __) => Container(
+        color: bgDivider,
+        child: const Center(
+          child: SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              color: textSecondary,
+            ),
+          ),
+        ),
+      ),
+      errorWidget: (_, __, ___) => _buildFallback(),
+    );
+  }
+
+  Widget _buildLocalImage(String imagePath) {
+    return Image.file(
+      File(imagePath),
+      fit: BoxFit.cover,
+      errorBuilder: (_, __, ___) => _buildFallback(),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 44,
+      height: 44,
+      color: bgDivider,
+      child: track.localFilePath == null || track.localFilePath!.isEmpty
+          ? (track.thumbnailUrl.isEmpty
+              ? _buildFallback()
+              : track.thumbnailUrl.startsWith('http')
+                  ? _buildRemoteImage()
+                  : _buildLocalImage(track.thumbnailUrl))
+          : FutureBuilder<String?>(
+              future: DownloadService.extractEmbeddedArtwork(track.localFilePath!),
+              builder: (context, snapshot) {
+                final localArtwork = snapshot.data;
+                if (localArtwork != null && localArtwork.isNotEmpty) {
+                  return _buildLocalImage(localArtwork);
+                }
+                if (track.thumbnailUrl.isEmpty) {
+                  return _buildFallback();
+                }
+                if (track.thumbnailUrl.startsWith('http')) {
+                  return _buildRemoteImage();
+                }
+                return _buildLocalImage(track.thumbnailUrl);
+              },
+            ),
+    );
   }
 }
 

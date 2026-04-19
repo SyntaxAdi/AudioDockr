@@ -2,6 +2,7 @@ package com.akeno.audiodockr
 
 import android.app.ForegroundServiceStartNotAllowedException
 import android.content.Intent
+import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.os.Bundle
 import androidx.core.content.ContextCompat
@@ -20,6 +21,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val activityScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val playerCommandsChannel = "com.akeno.audiodockr/player_commands"
     private val playerEventsChannel = "com.akeno.audiodockr/player_events"
+    private val localMetadataChannel = "audiodockr/local_metadata"
     private var playbackListener: ((Map<String, Any?>) -> Unit)? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -55,6 +57,7 @@ class MainActivity : FlutterFragmentActivity() {
                         val title = call.argument<String>("title").orEmpty()
                         val artist = call.argument<String>("artist").orEmpty()
                         val artworkUrl = call.argument<String>("artworkUrl").orEmpty()
+                        val isLocalFile = call.argument<Boolean>("isLocalFile") ?: false
                         @Suppress("UNCHECKED_CAST")
                         val headers = (call.argument<Map<String, Any?>>("headers") ?: emptyMap())
                             .mapValues { it.value?.toString().orEmpty() }
@@ -71,6 +74,7 @@ class MainActivity : FlutterFragmentActivity() {
                             title,
                             artist,
                             artworkUrl,
+                            isLocalFile,
                         )
                         runCatching {
                             if (PlaybackService.isRunning()) {
@@ -155,6 +159,52 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                 }
             }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, localMetadataChannel)
+            .setMethodCallHandler { call, result ->
+                if (call.method != "readLocalMetadata") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+
+                val filePath = call.argument<String>("filePath").orEmpty()
+                if (filePath.isBlank()) {
+                    result.error("metadata_failed", "Missing local file path.", null)
+                    return@setMethodCallHandler
+                }
+
+                activityScope.launch {
+                    val metadata = withContext(Dispatchers.IO) {
+                        readLocalMetadata(filePath)
+                    }
+                    withContext(Dispatchers.Main.immediate) {
+                        result.success(metadata)
+                    }
+                }
+            }
+    }
+
+    private fun readLocalMetadata(filePath: String): Map<String, String> {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(filePath)
+            buildMap {
+                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_TITLE)
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { put("title", it) }
+                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_ARTIST)
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+                    ?.let { put("artist", it) }
+            }
+        } catch (_: Exception) {
+            emptyMap()
+        } finally {
+            try {
+                retriever.release()
+            } catch (_: Exception) {}
+        }
     }
 
     override fun onDestroy() {

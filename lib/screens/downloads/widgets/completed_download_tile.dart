@@ -70,6 +70,7 @@ class _CompletedDownloadTileState extends ConsumerState<CompletedDownloadTile> w
             title: widget.download.title,
             artist: widget.download.artist,
             thumbnailUrl: widget.download.thumbnailUrl,
+            localFilePath: widget.download.localPath,
           );
       _showSnackBar('Added "${widget.download.title}" to queue', durationSeconds: 1);
     } else if (_dragOffset < -threshold) {

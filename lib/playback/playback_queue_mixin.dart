@@ -11,6 +11,7 @@ mixin PlaybackQueueMixin on PlaybackNotifierBase {
     required String title,
     required String artist,
     required String thumbnailUrl,
+    String? localFilePath,
   }) {
     if (state.queue.any((t) => t.videoId == videoId)) return false;
 
@@ -22,6 +23,7 @@ mixin PlaybackQueueMixin on PlaybackNotifierBase {
         title: title,
         artist: artist,
         thumbnailUrl: thumbnailUrl,
+        localFilePath: localFilePath,
       ),
     ]);
     return true;
@@ -61,6 +63,7 @@ mixin PlaybackQueueMixin on PlaybackNotifierBase {
       title: previous.title,
       artist: previous.artist,
       thumbnailUrl: previous.thumbnailUrl,
+      localFilePath: previous.localFilePath,
     );
   }
 
@@ -78,6 +81,7 @@ mixin PlaybackQueueMixin on PlaybackNotifierBase {
                 title: t.title,
                 artist: t.artist,
                 thumbnailUrl: t.thumbnailUrl,
+                localFilePath: t.localFilePath,
               ))
           .toList(growable: false);
     }

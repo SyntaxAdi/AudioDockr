@@ -27,6 +27,29 @@ bool isValidSpotifyPlaylistUrl(String value) {
   return segments[1].isNotEmpty;
 }
 
+bool isValidYoutubePlaylistUrl(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) {
+    return false;
+  }
+
+  final uri = Uri.tryParse(trimmed);
+  if (uri == null || (uri.scheme != 'https' && uri.scheme != 'http')) {
+    return false;
+  }
+
+  final host = uri.host.toLowerCase();
+  final isYoutubeHost = host == 'youtube.com' ||
+      host == 'www.youtube.com' ||
+      host == 'music.youtube.com';
+  if (!isYoutubeHost) {
+    return false;
+  }
+
+  final playlistId = uri.queryParameters['list'];
+  return playlistId != null && playlistId.trim().isNotEmpty;
+}
+
 Future<bool> showCreatePlaylistSheet(
   BuildContext context,
   WidgetRef ref,
@@ -473,6 +496,177 @@ Future<String?> showSpotifyPlaylistImportSheet(BuildContext context) async {
                                   Expanded(
                                     child: TextButton(
                                       onPressed: () => Navigator.of(sheetContext).pop(),
+                                      child: const Text('CANCEL'),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: ElevatedButton(
+                                      onPressed: isValid
+                                          ? () {
+                                              importedUrl = trimmed;
+                                              Navigator.of(sheetContext).pop();
+                                            }
+                                          : null,
+                                      child: const Text('IMPORT'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      );
+    },
+  );
+
+  return importedUrl;
+}
+
+Future<String?> showYoutubePlaylistImportSheet(BuildContext context) async {
+  final controller = TextEditingController();
+  String? importedUrl;
+
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    builder: (sheetContext) {
+      final screenHeight = MediaQuery.sizeOf(sheetContext).height;
+      final bottomInset = MediaQuery.viewInsetsOf(sheetContext).bottom;
+      final systemBottomInset = MediaQuery.viewPaddingOf(sheetContext).bottom;
+      final bottomOffset = bottomInset > 0 ? bottomInset : systemBottomInset;
+      final maxHeight = screenHeight * (screenHeight < 700 ? 0.76 : 0.62);
+
+      return StatefulBuilder(
+        builder: (context, setState) {
+          final trimmed = controller.text.trim();
+          final hasText = trimmed.isNotEmpty;
+          final isValid = isValidYoutubePlaylistUrl(trimmed);
+
+          return AnimatedPadding(
+            duration: const Duration(milliseconds: 180),
+            curve: Curves.easeOutCubic,
+            padding: EdgeInsets.only(bottom: bottomOffset),
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: maxHeight,
+                  minHeight: 320,
+                ),
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: bgSurface,
+                    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+                  ),
+                  child: SafeArea(
+                    top: false,
+                    child: SingleChildScrollView(
+                      padding: EdgeInsets.fromLTRB(
+                        20,
+                        12,
+                        20,
+                        20 + systemBottomInset,
+                      ),
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: maxHeight - 32,
+                        ),
+                        child: IntrinsicHeight(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Center(
+                                child: Container(
+                                  width: 44,
+                                  height: 4,
+                                  margin: const EdgeInsets.only(bottom: 20),
+                                  decoration: BoxDecoration(
+                                    color: bgDivider,
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                ),
+                              ),
+                              Text(
+                                'Import YouTube playlist',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(color: textPrimary),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Paste a YouTube playlist URL. Example: https://www.youtube.com/playlist?list=PLT7-N9uBlU2lbo1WWvbVsgF9-XbdRAtW6',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: textSecondary,
+                                      height: 1.45,
+                                    ),
+                              ),
+                              const SizedBox(height: 24),
+                              Text(
+                                'YouTube playlist URL',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(
+                                      color: textSecondary,
+                                      letterSpacing: 0,
+                                    ),
+                              ),
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: controller,
+                                autofocus: true,
+                                keyboardType: TextInputType.url,
+                                textInputAction: TextInputAction.done,
+                                style: Theme.of(context).textTheme.bodyLarge,
+                                decoration: InputDecoration(
+                                  hintText:
+                                      'https://www.youtube.com/playlist?list=...',
+                                  filled: false,
+                                  contentPadding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  enabledBorder: const UnderlineInputBorder(
+                                    borderSide: BorderSide(color: bgDivider),
+                                  ),
+                                  focusedBorder: const UnderlineInputBorder(
+                                    borderSide:
+                                        BorderSide(color: accentPrimary),
+                                  ),
+                                  errorText: hasText && !isValid
+                                      ? 'Enter a valid YouTube playlist URL.'
+                                      : null,
+                                ),
+                                onChanged: (_) => setState(() {}),
+                                onSubmitted: (_) {
+                                  if (!isValid) {
+                                    return;
+                                  }
+                                  importedUrl = trimmed;
+                                  Navigator.of(sheetContext).pop();
+                                },
+                              ),
+                              const Spacer(),
+                              const SizedBox(height: 24),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: TextButton(
+                                      onPressed: () =>
+                                          Navigator.of(sheetContext).pop(),
                                       child: const Text('CANCEL'),
                                     ),
                                   ),

@@ -275,28 +275,36 @@ class _HomeCollectionArtwork extends StatelessWidget {
         errorBuilder: (_, __, ___) => _defaultArtwork(),
       );
     } else if (item.artworkUrl != null && item.artworkUrl!.isNotEmpty) {
-      child = CachedNetworkImage(
-        imageUrl: item.artworkUrl!,
-        memCacheWidth: artworkCacheSize,
-        memCacheHeight: artworkCacheSize,
-        maxWidthDiskCache: artworkCacheSize,
-        maxHeightDiskCache: artworkCacheSize,
-        fit: BoxFit.cover,
-        placeholder: (_, __) => const ColoredBox(
-          color: bgDivider,
-          child: Center(
-            child: SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: accentPrimary,
+      if (item.artworkUrl!.startsWith('http')) {
+        child = CachedNetworkImage(
+          imageUrl: item.artworkUrl!,
+          memCacheWidth: artworkCacheSize,
+          memCacheHeight: artworkCacheSize,
+          maxWidthDiskCache: artworkCacheSize,
+          maxHeightDiskCache: artworkCacheSize,
+          fit: BoxFit.cover,
+          placeholder: (_, __) => const ColoredBox(
+            color: bgDivider,
+            child: Center(
+              child: SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: accentPrimary,
+                ),
               ),
             ),
           ),
-        ),
-        errorWidget: (_, __, ___) => _defaultArtwork(),
-      );
+          errorWidget: (_, __, ___) => _defaultArtwork(),
+        );
+      } else {
+        child = Image.file(
+          File(item.artworkUrl!),
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _defaultArtwork(),
+        );
+      }
     } else {
       child = _defaultArtwork();
     }

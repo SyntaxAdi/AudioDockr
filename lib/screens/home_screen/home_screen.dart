@@ -195,6 +195,7 @@ class HomeScreen extends ConsumerWidget {
         subtitle: latestPlayedTrack?.artist ?? 'Your latest song will appear here',
         artworkUrl: latestPlayedTrack?.thumbnailUrl,
         icon: Icons.history_rounded,
+        usesAppLogoFallback: true,
         onTap: () {
           Navigator.of(context).push(
             CupertinoPageRoute(
@@ -247,6 +248,7 @@ class HomeScreen extends ConsumerWidget {
           subtitle: track.artist,
           artworkUrl: track.thumbnailUrl,
           icon: Icons.music_note_rounded,
+          usesAppLogoFallback: true,
           onTap: () async {
             try {
               await ref.read(playbackNotifierProvider.notifier).playTrack(

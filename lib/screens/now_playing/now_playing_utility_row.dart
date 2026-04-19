@@ -164,14 +164,15 @@ class _DownloadUtilityIcon extends StatefulWidget {
 
 class _DownloadUtilityIconState extends State<_DownloadUtilityIcon>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: const Duration(milliseconds: 700),
-  );
+  late final AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 700),
+    );
     if (widget.isAnimating) _controller.repeat();
   }
 

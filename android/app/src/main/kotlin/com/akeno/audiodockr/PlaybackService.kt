@@ -21,6 +21,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.util.LruCache
+import java.io.File
 import com.akeno.audiodockr.BuildConfig
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.AudioAttributes
@@ -29,6 +30,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -168,9 +170,10 @@ class PlaybackService : MediaSessionService() {
                 val title = intent.getStringExtra(EXTRA_TITLE).orEmpty()
                 val artist = intent.getStringExtra(EXTRA_ARTIST).orEmpty()
                 val artworkUrl = intent.getStringExtra(EXTRA_ARTWORK_URL).orEmpty()
+                val isLocalFile = intent.getBooleanExtra(EXTRA_IS_LOCAL_FILE, false)
                 val headers = decodeHeaders(intent.getStringArrayListExtra(EXTRA_HEADERS))
                 if (url.isNotBlank()) {
-                    play(url, headers, title, artist, artworkUrl)
+                    play(url, headers, title, artist, artworkUrl, isLocalFile)
                 } else {
                     publishState("Missing stream URL.")
                 }
@@ -226,20 +229,32 @@ class PlaybackService : MediaSessionService() {
         title: String,
         artist: String,
         artworkUrl: String,
+        isLocalFile: Boolean,
     ) {
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Starting playback for $url")
         }
         isSwitchingTrack = true
-        val dataSourceFactory = DefaultHttpDataSource.Factory()
-            .setDefaultRequestProperties(headers)
-            .setAllowCrossProtocolRedirects(true)
-
-        val mediaSourceFactory = DefaultMediaSourceFactory(this)
-            .setDataSourceFactory(dataSourceFactory)
+        val mediaSourceFactory = if (isLocalFile) {
+            DefaultMediaSourceFactory(
+                DefaultDataSource.Factory(this),
+            )
+        } else {
+            val dataSourceFactory = DefaultHttpDataSource.Factory()
+                .setDefaultRequestProperties(headers)
+                .setAllowCrossProtocolRedirects(true)
+            DefaultMediaSourceFactory(this)
+                .setDataSourceFactory(dataSourceFactory)
+        }
 
         val mediaItem = MediaItem.Builder()
-            .setUri(url)
+            .setUri(
+                if (isLocalFile) {
+                    android.net.Uri.fromFile(File(url))
+                } else {
+                    android.net.Uri.parse(url)
+                },
+            )
             .setMediaMetadata(
                 MediaMetadata.Builder()
                     .setIsPlayable(true)
@@ -340,6 +355,7 @@ class PlaybackService : MediaSessionService() {
         private const val EXTRA_TITLE = "title"
         private const val EXTRA_ARTIST = "artist"
         private const val EXTRA_ARTWORK_URL = "artworkUrl"
+        private const val EXTRA_IS_LOCAL_FILE = "isLocalFile"
         private const val NOTIFICATION_CHANNEL_ID = "audiodockr_playback"
         private const val NOTIFICATION_CHANNEL_NAME = "AudioDockr Playback"
         private const val NOTIFICATION_ID = 1001
@@ -391,6 +407,7 @@ class PlaybackService : MediaSessionService() {
             title: String,
             artist: String,
             artworkUrl: String,
+            isLocalFile: Boolean,
         ): Intent {
             return Intent(context, PlaybackService::class.java).apply {
                 action = ACTION_PLAY
@@ -398,6 +415,7 @@ class PlaybackService : MediaSessionService() {
                 putExtra(EXTRA_TITLE, title)
                 putExtra(EXTRA_ARTIST, artist)
                 putExtra(EXTRA_ARTWORK_URL, artworkUrl)
+                putExtra(EXTRA_IS_LOCAL_FILE, isLocalFile)
                 putStringArrayListExtra(
                     EXTRA_HEADERS,
                     ArrayList(headers.map { "${it.key}=${it.value}" }),

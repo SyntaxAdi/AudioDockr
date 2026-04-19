@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../theme.dart';
 
-enum LibraryCyberpunkPlaylistBadgeVariant { liked, recents }
+enum LibraryCyberpunkPlaylistBadgeVariant { liked, recents, downloads }
 
 class LibraryPlaylistCard extends StatelessWidget {
   const LibraryPlaylistCard({
@@ -111,9 +111,13 @@ class LibraryCyberpunkPlaylistBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isLiked = variant == LibraryCyberpunkPlaylistBadgeVariant.liked;
+    final isDownloads =
+        variant == LibraryCyberpunkPlaylistBadgeVariant.downloads;
     final icon = isLiked
         ? Icons.favorite_rounded
-        : Icons.history_toggle_off_rounded;
+        : isDownloads
+            ? Icons.download_done_rounded
+            : Icons.history_toggle_off_rounded;
     final isCompact = size < 45;
     final scale = size / 56.0; // Base size is 56
 
@@ -131,6 +135,12 @@ class LibraryCyberpunkPlaylistBadge extends StatelessWidget {
                   Color(0xFFFF003C),
                   Color(0xFF1B0A12),
                 ]
+              : isDownloads
+                  ? const [
+                      Color(0xFF53E6C1),
+                      Color(0xFF0DBA8B),
+                      Color(0xFF07231E),
+                    ]
               : const [
                   Color(0xFFF5E642),
                   Color(0xFFE0B400),
@@ -139,7 +149,12 @@ class LibraryCyberpunkPlaylistBadge extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: (isLiked ? accentRed : accentPrimary).withValues(alpha: 0.18),
+            color: (isLiked
+                    ? accentRed
+                    : isDownloads
+                        ? accentCyan
+                        : accentPrimary)
+                .withValues(alpha: 0.18),
             blurRadius: 14 * scale,
             spreadRadius: 1,
           ),
@@ -172,7 +187,9 @@ class LibraryCyberpunkPlaylistBadge extends StatelessWidget {
               decoration: BoxDecoration(
                 color: isLiked
                     ? accentPrimary.withValues(alpha: 0.75)
-                    : accentCyan.withValues(alpha: 0.95),
+                    : isDownloads
+                        ? accentPrimary.withValues(alpha: 0.95)
+                        : accentCyan.withValues(alpha: 0.95),
                 borderRadius: BorderRadius.circular(99),
               ),
             ),

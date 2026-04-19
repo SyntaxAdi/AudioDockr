@@ -197,6 +197,7 @@ mixin PlaybackEngineMixin on PlaybackNotifierBase {
           title: playableTrack.title,
           artist: playableTrack.artist,
           thumbnailUrl: playableTrack.thumbnailUrl,
+          localFilePath: playableTrack.localFilePath,
         );
         return;
       } on PlaybackFailure catch (error) {

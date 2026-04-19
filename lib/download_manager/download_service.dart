@@ -1,6 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../playback/playback_url_resolver.dart';
@@ -55,7 +58,67 @@ class DownloadService {
     required PlaybackUrlResolver resolver,
   }) : _resolver = resolver;
 
+  static const MethodChannel _localMetadataChannel =
+      MethodChannel('audiodockr/local_metadata');
   final PlaybackUrlResolver _resolver;
+
+  static Future<({String? title, String? artist})> readLocalMetadata(
+    String audioPath,
+  ) async {
+    try {
+      final result =
+          await _localMetadataChannel.invokeMapMethod<String, dynamic>(
+        'readLocalMetadata',
+        {'filePath': audioPath},
+      );
+      return (
+        title: (result?['title'] as String?)?.trim(),
+        artist: (result?['artist'] as String?)?.trim(),
+      );
+    } on PlatformException {
+      return (title: null, artist: null);
+    }
+  }
+
+  static Future<String?> extractEmbeddedArtwork(String audioPath) async {
+    final audioFile = File(audioPath);
+    if (!await audioFile.exists()) {
+      return null;
+    }
+
+    try {
+      final cacheDir = await getTemporaryDirectory();
+      final cachePath = path.join(
+        cacheDir.path,
+        'embedded_artwork_${audioPath.hashCode.abs()}.jpg',
+      );
+      final cachedFile = File(cachePath);
+      if (await cachedFile.exists()) {
+        return cachePath;
+      }
+
+      final session = await FFmpegKit.executeWithArguments([
+        '-y',
+        '-i',
+        audioPath,
+        '-an',
+        '-vcodec',
+        'copy',
+        cachePath,
+      ]);
+      final returnCode = await session.getReturnCode();
+      if (returnCode != null &&
+          ReturnCode.isSuccess(returnCode) &&
+          await cachedFile.exists()) {
+        return cachePath;
+      }
+      if (await cachedFile.exists()) {
+        await cachedFile.delete();
+      }
+    } catch (_) {}
+
+    return null;
+  }
 
   static Future<void> ensureDownloadPermissions() async {
     if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
@@ -291,9 +354,11 @@ class DownloadService {
       final returnCode = await session.getReturnCode();
       
       if (hasThumb) {
-        await File(tempThumbPath).delete();
+        try {
+          await File(tempThumbPath).delete();
+        } catch (_) {}
       }
-      
+
       if (returnCode == null || !ReturnCode.isSuccess(returnCode)) {
         final logs = await session.getLogsAsString();
         throw DownloadFailure('transcode_failed', 'FFmpeg failed code ${returnCode?.getValue()}: \n$logs');

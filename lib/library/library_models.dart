@@ -9,6 +9,7 @@ class LibraryTrack {
     required this.durationSeconds,
     required this.thumbnailUrl,
     required this.reaction,
+    this.localFilePath,
     this.lastPlayedAt = 0,
     bool? hiddenInPlaylist,
   }) : _hiddenInPlaylist = hiddenInPlaylist;
@@ -20,6 +21,7 @@ class LibraryTrack {
   final int durationSeconds;
   final String thumbnailUrl;
   final String reaction;
+  final String? localFilePath;
   final int lastPlayedAt;
   final bool? _hiddenInPlaylist;
 
@@ -36,6 +38,7 @@ class LibraryTrack {
       durationSeconds: track.durationSeconds,
       thumbnailUrl: track.thumbnailUrl,
       reaction: track.reaction,
+      localFilePath: null,
       lastPlayedAt: track.lastPlayedAt,
       hiddenInPlaylist: track.hiddenInPlaylist,
     );

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../api/youtube_service.dart';
@@ -34,6 +35,103 @@ final downloadNotifierProvider =
     downloadService: ref.read(downloadServiceProvider),
   );
 });
+
+final downloadedLibraryTracksProvider =
+    FutureProvider<List<LibraryTrack>>((ref) async {
+  final downloadState = ref.watch(downloadNotifierProvider);
+  final downloadPath = await AppPreferences.loadDownloadPath();
+
+  final tracks = <LibraryTrack>[];
+  final seenPaths = <String>{};
+
+  for (final record in downloadState.completedDownloads) {
+    final localPath = record.localPath;
+    if (localPath == null || localPath.isEmpty) {
+      continue;
+    }
+    final normalizedPath = path.normalize(localPath);
+    if (!await File(normalizedPath).exists() || !seenPaths.add(normalizedPath)) {
+      continue;
+    }
+    tracks.add(
+      LibraryTrack(
+        videoId: record.videoId,
+        videoUrl: record.videoUrl,
+        title: record.title,
+        artist: record.artist,
+        durationSeconds: 0,
+        thumbnailUrl: record.thumbnailUrl,
+        reaction: 'neutral',
+        localFilePath: normalizedPath,
+      ),
+    );
+  }
+
+  final directory = Directory(downloadPath);
+  if (await directory.exists()) {
+    await for (final entity in directory.list(recursive: true, followLinks: false)) {
+      if (entity is! File) {
+        continue;
+      }
+      final extension = path.extension(entity.path).toLowerCase();
+      if (!_supportedAudioExtensions.contains(extension)) {
+        continue;
+      }
+      final normalizedPath = path.normalize(entity.path);
+      if (!seenPaths.add(normalizedPath)) {
+        continue;
+      }
+      final metadata = await DownloadService.readLocalMetadata(normalizedPath);
+      final parsed = _parseTrackNameFromPath(normalizedPath);
+      tracks.add(
+        LibraryTrack(
+          videoId: 'local_file_$normalizedPath',
+          videoUrl: '',
+          title: metadata.title?.isNotEmpty == true ? metadata.title! : parsed.title,
+          artist:
+              metadata.artist?.isNotEmpty == true ? metadata.artist! : parsed.artist,
+          durationSeconds: 0,
+          thumbnailUrl: '',
+          reaction: 'neutral',
+          localFilePath: normalizedPath,
+        ),
+      );
+    }
+  }
+
+  tracks.sort((a, b) {
+    final aName = (a.localFilePath ?? '').toLowerCase();
+    final bName = (b.localFilePath ?? '').toLowerCase();
+    return aName.compareTo(bName);
+  });
+
+  return tracks;
+});
+
+const Set<String> _supportedAudioExtensions = {
+  '.mp3',
+  '.m4a',
+  '.aac',
+  '.wav',
+  '.flac',
+  '.ogg',
+  '.opus',
+};
+
+({String title, String artist}) _parseTrackNameFromPath(String filePath) {
+  final fileName = path.basenameWithoutExtension(filePath).trim();
+  final separatorIndex = fileName.indexOf(' - ');
+  if (separatorIndex > 0 && separatorIndex < fileName.length - 3) {
+    return (
+      artist: fileName.substring(0, separatorIndex).trim(),
+      title: fileName.substring(separatorIndex + 3).trim(),
+    );
+  }
+  return (
+    artist: 'Local file',
+    title: fileName.isEmpty ? 'Unknown track' : fileName,
+  );
+}
 
 class DownloadNotifier extends StateNotifier<DownloadState> {
   DownloadNotifier({

@@ -8,6 +8,7 @@ import 'library_reaction_mixin.dart';
 import 'library_spotify_mixin.dart';
 import 'library_state.dart';
 import 'library_track_mixin.dart';
+import 'library_youtube_mixin.dart';
 
 abstract class LibraryNotifierBase extends StateNotifier<LibraryState> {
   LibraryNotifierBase() : super(const LibraryState());
@@ -40,7 +41,8 @@ class LibraryNotifier extends LibraryNotifierBase
         LibraryTrackMixin,
         LibraryPlaylistMixin,
         LibraryReactionMixin,
-        LibrarySpotifyMixin {
+        LibrarySpotifyMixin,
+        LibraryYoutubeMixin {
   // ── Dependency (accessible to mixins) ─────────────────────────────────────
 
   @override

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
@@ -39,38 +41,32 @@ class HorizontalTrackCard extends StatelessWidget {
                   height: 112,
                   color: bgDivider,
                   child: track.thumbnailUrl.isEmpty
-                      ? const Center(
-                          child: Icon(
-                            Icons.music_note_rounded,
-                            color: textSecondary,
-                            size: 32,
-                          ),
-                        )
-                      : CachedNetworkImage(
-                          imageUrl: track.thumbnailUrl,
-                          memCacheWidth: artworkCacheSize,
-                          memCacheHeight: artworkCacheSize,
-                          maxWidthDiskCache: artworkCacheSize,
-                          maxHeightDiskCache: artworkCacheSize,
-                          fit: BoxFit.cover,
-                          placeholder: (_, __) => const Center(
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: accentPrimary,
+                      ? Image.asset('lib/assets/app_icon.png', fit: BoxFit.cover)
+                      : track.thumbnailUrl.startsWith('http')
+                          ? CachedNetworkImage(
+                              imageUrl: track.thumbnailUrl,
+                              memCacheWidth: artworkCacheSize,
+                              memCacheHeight: artworkCacheSize,
+                              maxWidthDiskCache: artworkCacheSize,
+                              maxHeightDiskCache: artworkCacheSize,
+                              fit: BoxFit.cover,
+                              placeholder: (_, __) => const Center(
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: accentPrimary,
+                                  ),
+                                ),
                               ),
+                              errorWidget: (_, __, ___) => Image.asset('lib/assets/app_icon.png', fit: BoxFit.cover),
+                            )
+                          : Image.file(
+                              File(track.thumbnailUrl),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => Image.asset('lib/assets/app_icon.png', fit: BoxFit.cover),
                             ),
-                          ),
-                          errorWidget: (_, __, ___) => const Center(
-                            child: Icon(
-                              Icons.music_note_rounded,
-                              color: textSecondary,
-                              size: 32,
-                            ),
-                          ),
-                        ),
                 ),
               ),
               const SizedBox(height: 6),

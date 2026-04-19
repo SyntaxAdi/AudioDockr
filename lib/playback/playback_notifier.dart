@@ -43,6 +43,7 @@ abstract class PlaybackNotifierBase extends StateNotifier<PlaybackState> {
     required String title,
     required String artist,
     required String thumbnailUrl,
+    String? localFilePath,
   });
   void setShuffleEnabled(bool enabled);
   void clearQueue();
@@ -124,6 +125,7 @@ class PlaybackNotifier extends PlaybackNotifierBase
                 title: t.title,
                 artist: t.artist,
                 thumbnailUrl: t.thumbnailUrl,
+                localFilePath: t.localFilePath,
               ))
           .toList(growable: false),
     );
@@ -134,6 +136,7 @@ class PlaybackNotifier extends PlaybackNotifierBase
       firstTrack.title,
       firstTrack.artist,
       firstTrack.thumbnailUrl,
+      localFilePath: firstTrack.localFilePath,
     );
   }
 

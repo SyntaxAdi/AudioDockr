@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:io';
 
 import '../library/library_provider.dart';
 import '../playback/playback_provider.dart';
@@ -92,18 +93,41 @@ class MiniPlayer extends ConsumerWidget {
                     margin: const EdgeInsets.only(left: 8),
                     color: bgDivider,
                     child: (currentThumbnailUrl ?? '').isEmpty
-                        ? const Center(
-                            child: Icon(Icons.music_note, color: textSecondary, size: 20),
-                          )
-                        : CachedNetworkImage(
-                            imageUrl: currentThumbnailUrl!,
-                            memCacheWidth: 132,
-                            memCacheHeight: 132,
+                        ? Image.asset(
+                            'lib/assets/app_icon.png',
                             fit: BoxFit.cover,
-                            errorWidget: (_, __, ___) => const Center(
+                            opacity: const AlwaysStoppedAnimation(0.8),
+                            errorBuilder: (_, __, ___) => const Center(
                               child: Icon(Icons.music_note, color: textSecondary, size: 20),
                             ),
-                          ),
+                          )
+                        : currentThumbnailUrl!.startsWith('http')
+                            ? CachedNetworkImage(
+                                imageUrl: currentThumbnailUrl,
+                                memCacheWidth: 132,
+                                memCacheHeight: 132,
+                                fit: BoxFit.cover,
+                                errorWidget: (_, __, ___) => Image.asset(
+                                  'lib/assets/app_icon.png',
+                                  fit: BoxFit.cover,
+                                  opacity: const AlwaysStoppedAnimation(0.8),
+                                  errorBuilder: (_, __, ___) => const Center(
+                                    child: Icon(Icons.music_note, color: textSecondary, size: 20),
+                                  ),
+                                ),
+                              )
+                            : Image.file(
+                                File(currentThumbnailUrl),
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => Image.asset(
+                                  'lib/assets/app_icon.png',
+                                  fit: BoxFit.cover,
+                                  opacity: const AlwaysStoppedAnimation(0.8),
+                                  errorBuilder: (_, __, ___) => const Center(
+                                    child: Icon(Icons.music_note, color: textSecondary, size: 20),
+                                  ),
+                                ),
+                              ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

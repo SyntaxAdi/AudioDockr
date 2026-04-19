@@ -26,12 +26,14 @@ class PlaylistDetailsScreen extends ConsumerStatefulWidget {
     super.key,
     required this.title,
     this.tracks,
+    this.tracksLoader,
     this.playlistId,
     this.onNavigateToTab,
   });
 
   final String title;
   final List<LibraryTrack>? tracks;
+  final Future<List<LibraryTrack>> Function()? tracksLoader;
   final String? playlistId;
   final ValueChanged<int>? onNavigateToTab;
 
@@ -96,6 +98,10 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
   }
 
   void _refreshPlaylistTracksFuture() {
+    if (widget.playlistId == null && widget.tracksLoader != null) {
+      _playlistTracksFuture = widget.tracksLoader!.call();
+      return;
+    }
     if (widget.playlistId == null) {
       _playlistTracksFuture = Future.value(widget.tracks ?? []);
       return;
@@ -720,9 +726,14 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
         }
       }
     } else {
-      // It might be Liked Songs or Recents without a playlistId
+      final generatedId = switch (widget.title) {
+        'Liked Songs' => likedPlaylistId,
+        'Recents' => 'recents',
+        'Downloads' => 'downloads',
+        _ => widget.title.toLowerCase(),
+      };
       playlist = LibraryPlaylist(
-        id: widget.title == 'Liked Songs' ? likedPlaylistId : 'recents',
+        id: generatedId,
         name: widget.title,
         coverImagePath: '',
         trackCount: displayTracks?.length ?? 0,
@@ -730,19 +741,21 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
     }
 
     final currentPlaylist = playlist!;
-    final isLikedOrRecents = currentPlaylist.id == likedPlaylistId || currentPlaylist.id == 'recents';
+    final isBuiltinPlaylist = currentPlaylist.id == likedPlaylistId ||
+        currentPlaylist.id == 'recents' ||
+        currentPlaylist.id == 'downloads';
 
     return Scaffold(
       backgroundColor: bgBase,
       body: FutureBuilder<List<LibraryTrack>>(
-        future: widget.playlistId != null 
-          ? _playlistTracksFuture 
-          : Future.value(displayTracks ?? []),
+        future: (widget.playlistId != null || widget.tracksLoader != null)
+          ? _playlistTracksFuture
+          : (_playlistTracksFuture ?? Future.value(displayTracks ?? [])),
         builder: (context, snapshot) {
           if (!snapshot.hasData) {
             return _PlaylistSkeleton(
               title: currentPlaylist.name,
-              isLikedOrRecents: isLikedOrRecents,
+              isLikedOrRecents: isBuiltinPlaylist,
               playlistId: currentPlaylist.id,
               coverImagePath: currentPlaylist.coverImagePath,
             );
@@ -787,11 +800,13 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                             File(currentPlaylist.coverImagePath),
                             fit: BoxFit.cover,
                           )
-                        else if (isLikedOrRecents)
+                        else if (isBuiltinPlaylist)
                           LibraryCyberpunkPlaylistBadge(
-                            variant: currentPlaylist.id == likedPlaylistId 
-                              ? LibraryCyberpunkPlaylistBadgeVariant.liked 
-                              : LibraryCyberpunkPlaylistBadgeVariant.recents,
+                            variant: currentPlaylist.id == likedPlaylistId
+                                ? LibraryCyberpunkPlaylistBadgeVariant.liked
+                                : currentPlaylist.id == 'downloads'
+                                    ? LibraryCyberpunkPlaylistBadgeVariant.downloads
+                                    : LibraryCyberpunkPlaylistBadgeVariant.recents,
                             size: 400,
                           )
                         else
@@ -868,10 +883,10 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                         onShufflePressed: () => ref
                             .read(playbackNotifierProvider.notifier)
                             .setShuffleEnabled(!shuffleEnabled),
-                        onMenuPressed: isLikedOrRecents 
-                          ? () {} // No menu for liked/recents or define actions
+                        onMenuPressed: isBuiltinPlaylist
+                          ? () {}
                           : () => _showPlaylistActionSheet(context, currentPlaylist),
-                        showMenu: !isLikedOrRecents,
+                        showMenu: !isBuiltinPlaylist,
                       ),
                       const SizedBox(height: 12),
                     ],
@@ -896,19 +911,22 @@ class _PlaylistDetailsScreenState extends ConsumerState<PlaylistDetailsScreen> {
                           height: 64,
                           child: LibraryTrackRow(
                             track: track,
-                            playlistId: currentPlaylist.id,
+                            playlistId: isBuiltinPlaylist ? null : currentPlaylist.id,
                             enableQueueActions: true, // Enable swipe to queue
-                            onAddToAnotherPlaylist: () =>
-                                _showAddToAnotherPlaylistSheet(
-                              context,
-                              currentPlaylistId: currentPlaylist.id,
-                              track: track,
-                            ),
-                            onToggleHidden: () => _toggleTrackHidden(
-                              context,
-                              playlistId: currentPlaylist.id,
-                              track: track,
-                            ),
+                            onAddToAnotherPlaylist: isBuiltinPlaylist
+                                ? null
+                                : () => _showAddToAnotherPlaylistSheet(
+                                      context,
+                                      currentPlaylistId: currentPlaylist.id,
+                                      track: track,
+                                    ),
+                            onToggleHidden: isBuiltinPlaylist
+                                ? null
+                                : () => _toggleTrackHidden(
+                                      context,
+                                      playlistId: currentPlaylist.id,
+                                      track: track,
+                                    ),
                             onGoToQueue: () => _showQueueSheet(context),
                           ),
                         ),
@@ -990,9 +1008,11 @@ class _PlaylistSkeletonState extends State<_PlaylistSkeleton> with SingleTickerP
                   )
                 else if (widget.isLikedOrRecents)
                   LibraryCyberpunkPlaylistBadge(
-                    variant: widget.playlistId == likedPlaylistId 
-                      ? LibraryCyberpunkPlaylistBadgeVariant.liked 
-                      : LibraryCyberpunkPlaylistBadgeVariant.recents,
+                    variant: widget.playlistId == likedPlaylistId
+                        ? LibraryCyberpunkPlaylistBadgeVariant.liked
+                        : widget.playlistId == 'downloads'
+                            ? LibraryCyberpunkPlaylistBadgeVariant.downloads
+                            : LibraryCyberpunkPlaylistBadgeVariant.recents,
                     size: 400,
                   )
                 else

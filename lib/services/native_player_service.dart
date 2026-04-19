@@ -33,6 +33,7 @@ class NativePlayerService {
           'title': title,
           'artist': artist,
           'artworkUrl': thumbnailUrl,
+          'isLocalFile': false,
         },
       );
     } on PlatformException catch (error) {
@@ -55,6 +56,7 @@ class NativePlayerService {
           'title': title,
           'artist': artist,
           'artworkUrl': thumbnailUrl,
+          'isLocalFile': true,
         },
       );
     } on PlatformException catch (error) {

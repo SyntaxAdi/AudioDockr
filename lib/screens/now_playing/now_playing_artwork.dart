@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:io';
 
 import '../../playback/playback_provider.dart';
 import '../../theme.dart';
@@ -76,25 +77,49 @@ class NowPlayingArtwork extends ConsumerWidget {
                     ? Container(
                         width: double.infinity,
                         color: bgSurface,
-                        child: const Center(
-                          child: Icon(Icons.music_video, size: 64, color: textSecondary),
-                        ),
-                      )
-                    : CachedNetworkImage(
-                        imageUrl: thumbnailUrl!,
-                        memCacheWidth: cacheSize,
-                        memCacheHeight: cacheSize,
-                        maxWidthDiskCache: cacheSize,
-                        maxHeightDiskCache: cacheSize,
-                        width: double.infinity,
-                        fit: BoxFit.cover,
-                        errorWidget: (_, __, ___) => Container(
-                          color: bgSurface,
-                          child: const Center(
-                            child: Icon(Icons.music_video, size: 64, color: textSecondary),
+                        child: Center(
+                          child: Image.asset(
+                            'lib/assets/app_icon.png',
+                            fit: BoxFit.contain,
+                            opacity: const AlwaysStoppedAnimation(0.85),
                           ),
                         ),
-                      ),
+                      )
+                    : thumbnailUrl!.startsWith('http')
+                        ? CachedNetworkImage(
+                            imageUrl: thumbnailUrl,
+                            memCacheWidth: cacheSize,
+                            memCacheHeight: cacheSize,
+                            maxWidthDiskCache: cacheSize,
+                            maxHeightDiskCache: cacheSize,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorWidget: (_, __, ___) => Container(
+                              color: bgSurface,
+                              child: Center(
+                                child: Image.asset(
+                                  'lib/assets/app_icon.png',
+                                  fit: BoxFit.contain,
+                                  opacity: const AlwaysStoppedAnimation(0.85),
+                                ),
+                              ),
+                            ),
+                          )
+                        : Image.file(
+                            File(thumbnailUrl),
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: bgSurface,
+                              child: Center(
+                                child: Image.asset(
+                                  'lib/assets/app_icon.png',
+                                  fit: BoxFit.contain,
+                                  opacity: const AlwaysStoppedAnimation(0.85),
+                                ),
+                              ),
+                            ),
+                          ),
               ),
             ),
           ],

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../providers/spotify_import_provider.dart';
+import '../providers/playlist_import_provider.dart';
 import '../theme.dart';
 import 'mini_player.dart';
 
@@ -17,7 +17,7 @@ class AppBottomBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final importState = ref.watch(spotifyImportProvider);
+    final importState = ref.watch(playlistImportProvider);
 
     return SafeArea(
       top: false,
@@ -47,7 +47,7 @@ class AppBottomBar extends ConsumerWidget {
                   const SizedBox(width: 12),
                   Expanded(
                     child: Text(
-                      'Importing songs from Spotify',
+                      'Importing songs from ${importState.importSourceLabel}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: textPrimary,
                             fontWeight: FontWeight.w600,

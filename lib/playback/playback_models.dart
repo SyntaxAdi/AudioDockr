@@ -31,6 +31,7 @@ class QueuedTrack {
     required this.title,
     required this.artist,
     required this.thumbnailUrl,
+    this.localFilePath,
   });
 
   final String videoId;
@@ -38,6 +39,7 @@ class QueuedTrack {
   final String title;
   final String artist;
   final String thumbnailUrl;
+  final String? localFilePath;
 
   QueuedTrack copyWith({
     String? videoId,
@@ -45,6 +47,7 @@ class QueuedTrack {
     String? title,
     String? artist,
     String? thumbnailUrl,
+    Object? localFilePath = _playbackUnsetField,
   }) {
     return QueuedTrack(
       videoId: videoId ?? this.videoId,
@@ -52,9 +55,14 @@ class QueuedTrack {
       title: title ?? this.title,
       artist: artist ?? this.artist,
       thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+      localFilePath: identical(localFilePath, _playbackUnsetField)
+          ? this.localFilePath
+          : localFilePath as String?,
     );
   }
 }
+
+const Object _playbackUnsetField = Object();
 
 enum PlaybackRepeatMode {
   off,
