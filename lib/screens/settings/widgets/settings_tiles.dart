@@ -40,8 +40,6 @@ class _TileLabel extends StatelessWidget {
           const SizedBox(height: 3),
           Text(
             subtitle,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: textSecondary,
                   height: 1.3,

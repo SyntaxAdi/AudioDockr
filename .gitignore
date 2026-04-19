@@ -120,7 +120,7 @@ secrets.dart
 # ── Local Cache / AudioDockr-specific ─────────
 # Local audio cache and downloads directory
 local_cache/
-downloads/
+/downloads/
 *.opus
 *.m4a
 *.mp3.cache

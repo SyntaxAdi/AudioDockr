@@ -5,6 +5,10 @@ class AppPreferences {
 
   static const String defaultDownloadPath = '/storage/emulated/0/Music';
   static const String downloadPathKey = 'download_path';
+  static const String downloadOngoingNotificationsKey =
+      'download_ongoing_notifications';
+  static const String downloadCompletedNotificationsKey =
+      'download_completed_notifications';
 
   static String readStringPreference(
     SharedPreferences preferences,
@@ -29,5 +33,23 @@ class AppPreferences {
   static Future<String> loadDownloadPath() async {
     final preferences = await SharedPreferences.getInstance();
     return readDownloadPath(preferences);
+  }
+
+  static bool readDownloadOngoingNotifications(SharedPreferences preferences) {
+    return preferences.getBool(downloadOngoingNotificationsKey) ?? true;
+  }
+
+  static bool readDownloadCompletedNotifications(SharedPreferences preferences) {
+    return preferences.getBool(downloadCompletedNotificationsKey) ?? true;
+  }
+
+  static Future<bool> loadDownloadOngoingNotifications() async {
+    final preferences = await SharedPreferences.getInstance();
+    return readDownloadOngoingNotifications(preferences);
+  }
+
+  static Future<bool> loadDownloadCompletedNotifications() async {
+    final preferences = await SharedPreferences.getInstance();
+    return readDownloadCompletedNotifications(preferences);
   }
 }

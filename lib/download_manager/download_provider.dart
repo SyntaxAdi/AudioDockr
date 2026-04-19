@@ -211,20 +211,23 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
       if (playlistId != null) {
         final playlistRecord = state.activePlaylistDownloads[playlistId];
         if (playlistRecord != null) {
-          final updatedPlaylist = _calculatePlaylistProgress(playlistId, activeDownloads);
-          NotificationService.instance.showPlaylistProgress(
-            playlistName: playlistRecord.title,
-            totalTracks: playlistRecord.trackCount,
-            completedTracks: updatedPlaylist.completedCount,
-            averageProgress: (updatedPlaylist.averageProgress * 100).toInt(),
+          final updatedPlaylist = _calculatePlaylistProgress(
+            playlistId,
+            activeDownloads,
           );
+          if (updatedPlaylist.completedCount == updatedPlaylist.trackCount) {
+            await NotificationService.instance.cancelDownloadNotification();
+          } else {
+            NotificationService.instance.showPlaylistProgress(
+              playlistName: playlistRecord.title,
+              totalTracks: playlistRecord.trackCount,
+              completedTracks: updatedPlaylist.completedCount,
+              averageProgress: (updatedPlaylist.averageProgress * 100).toInt(),
+            );
+          }
         }
       } else {
-        NotificationService.instance.showDownloadProgress(
-          title: record.title,
-          progress: 100,
-          isCompleted: true,
-        );
+        await NotificationService.instance.cancelDownloadNotification();
       }
       final completedRecord = DownloadRecord(
         videoId: videoId,
@@ -250,9 +253,13 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
       if (playlistId != null) {
         final playlistRecord = state.activePlaylistDownloads[playlistId];
         if (playlistRecord != null) {
-          final updatedPlaylist = _calculatePlaylistProgress(playlistId, activeDownloads);
+          final updatedPlaylist = _calculatePlaylistProgress(
+            playlistId,
+            activeDownloads,
+          );
           if (updatedPlaylist.completedCount == updatedPlaylist.trackCount) {
-            updatedPlaylistDownloads = Map.from(state.activePlaylistDownloads)..remove(playlistId);
+            updatedPlaylistDownloads = Map.from(state.activePlaylistDownloads)
+              ..remove(playlistId);
           } else {
             updatedPlaylistDownloads = {
               ...state.activePlaylistDownloads,
@@ -269,6 +276,7 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
         isLoaded: true,
       );
       await _persistCompletedDownloads(completedDownloads);
+      await _showCompletionMessageIfDone();
     } on DownloadFailure catch (error) {
       // Cancel notification if it failed or was manually cancelled
       NotificationService.instance.cancelDownloadNotification();
@@ -277,9 +285,10 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
         return; // The cancelling action already updated the state, just terminate
       }
 
-      final activeDownloads = Map<String, DownloadRecord>.from(state.activeDownloads)
-        ..remove(videoId);
-      
+      final activeDownloads =
+          Map<String, DownloadRecord>.from(state.activeDownloads)
+            ..remove(videoId);
+
       Map<String, PlaylistDownloadRecord>? updatedPlaylistDownloads;
       if (playlistId != null) {
         final playlistRecord = state.activePlaylistDownloads[playlistId];
@@ -572,8 +581,17 @@ class DownloadNotifier extends StateNotifier<DownloadState> {
   ) async {
     final preferences = await SharedPreferences.getInstance();
     final encoded = jsonEncode(
-      completedDownloads.map((record) => record.toJson()).toList(growable: false),
+      completedDownloads
+          .map((record) => record.toJson())
+          .toList(growable: false),
     );
     await preferences.setString(_completedDownloadsKey, encoded);
+  }
+
+  Future<void> _showCompletionMessageIfDone() async {
+    if (state.activeDownloads.isNotEmpty) return;
+    if (state.activePlaylistDownloads.isNotEmpty) return;
+
+    await NotificationService.instance.showAllDownloadsCompletedAlert();
   }
 }

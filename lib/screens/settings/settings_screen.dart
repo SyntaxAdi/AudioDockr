@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../download_manager/download_provider.dart';
 import '../../settings/app_preferences.dart';
+import '../../services/notification_service.dart';
 import '../../theme.dart';
 import 'pages/library_data_page.dart';
 import 'pages/notifications_page.dart';
@@ -26,13 +27,13 @@ class SettingsScreen extends ConsumerStatefulWidget {
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   static const String _resumeOnStartKey = 'resume_on_start';
   static const String _backgroundPlaybackKey = 'background_playback';
-  static const String _downloadNotificationsKey = 'download_notifications';
   static const String _releaseNotificationsKey = 'release_notifications';
 
   String _downloadPath = AppPreferences.defaultDownloadPath;
   bool _resumeOnStart = true;
   bool _backgroundPlayback = true;
-  bool _downloadNotifications = true;
+  bool _downloadOngoingNotifications = true;
+  bool _downloadCompletedNotifications = true;
   bool _releaseNotifications = false;
 
   @override
@@ -51,8 +52,10 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _downloadPath = AppPreferences.readDownloadPath(preferences);
       _resumeOnStart = preferences.getBool(_resumeOnStartKey) ?? true;
       _backgroundPlayback = preferences.getBool(_backgroundPlaybackKey) ?? true;
-      _downloadNotifications =
-          preferences.getBool(_downloadNotificationsKey) ?? true;
+      _downloadOngoingNotifications =
+          AppPreferences.readDownloadOngoingNotifications(preferences);
+      _downloadCompletedNotifications =
+          AppPreferences.readDownloadCompletedNotifications(preferences);
       _releaseNotifications =
           preferences.getBool(_releaseNotificationsKey) ?? false;
     });
@@ -143,11 +146,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                   subtitle: 'Downloads, releases and account alerts',
                   onTap: () => _openSettingsPage(
                     NotificationsPage(
-                      downloadNotifications: _downloadNotifications,
+                      downloadOngoingNotifications:
+                          _downloadOngoingNotifications,
+                      downloadCompletedNotifications:
+                          _downloadCompletedNotifications,
                       releaseNotifications: _releaseNotifications,
-                      onDownloadTriggerChanged: (value) {
-                        setState(() => _downloadNotifications = value);
-                        _updateBoolPreference(_downloadNotificationsKey, value);
+                      onDownloadOngoingNotificationsChanged: (value) {
+                        setState(() => _downloadOngoingNotifications = value);
+                        _updateBoolPreference(
+                          AppPreferences.downloadOngoingNotificationsKey,
+                          value,
+                        );
+                        if (!value) {
+                          NotificationService.instance
+                              .cancelDownloadNotification();
+                        }
+                      },
+                      onDownloadCompletedNotificationsChanged: (value) {
+                        setState(() => _downloadCompletedNotifications = value);
+                        _updateBoolPreference(
+                          AppPreferences.downloadCompletedNotificationsKey,
+                          value,
+                        );
                       },
                       onReleaseNotificationsChanged: (value) {
                         setState(() => _releaseNotifications = value);
