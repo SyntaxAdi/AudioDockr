@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:just_audio/just_audio.dart';
 
 class NativePlayerService {
   static const MethodChannel _commandChannel =
@@ -8,7 +10,52 @@ class NativePlayerService {
   static const EventChannel _eventChannel =
       EventChannel('com.akeno.audiodockr/player_events');
 
+  AudioPlayer? _audioPlayer;
+  final StreamController<Map<String, dynamic>> _fallbackEventController =
+      StreamController<Map<String, dynamic>>.broadcast();
+
+  AudioPlayer get _player {
+    if (_audioPlayer != null) return _audioPlayer!;
+    
+    final player = AudioPlayer();
+    _audioPlayer = player;
+    
+    player.positionStream.listen((pos) {
+      _fallbackEventController.add({
+        'type': 'status',
+        'position': pos.inMilliseconds,
+        'isPlaying': player.playing,
+      });
+    });
+    player.durationStream.listen((dur) {
+      if (dur != null) {
+        _fallbackEventController.add({
+          'type': 'status',
+          'duration': dur.inMilliseconds,
+        });
+      }
+    });
+    player.playerStateStream.listen((state) {
+      if (state.processingState == ProcessingState.completed) {
+        _fallbackEventController.add({
+          'type': 'event',
+          'name': 'track_ended',
+        });
+      }
+      _fallbackEventController.add({
+        'type': 'status',
+        'isPlaying': state.playing,
+      });
+    });
+    
+    return player;
+  }
+
+  NativePlayerService();
+
   Stream<Map<String, dynamic>> get playerStateStream {
+    if (!Platform.isAndroid) return _fallbackEventController.stream;
+
     return _eventChannel.receiveBroadcastStream().map((event) {
       if (event is Map) {
         return Map<String, dynamic>.from(event);
@@ -24,6 +71,12 @@ class NativePlayerService {
     required String artist,
     required String thumbnailUrl,
   }) async {
+    if (!Platform.isAndroid) {
+      await _player.setUrl(url, headers: headers);
+      await _player.play();
+      return;
+    }
+
     try {
       await _commandChannel.invokeMethod<void>(
         'play',
@@ -47,6 +100,12 @@ class NativePlayerService {
     required String artist,
     required String thumbnailUrl,
   }) async {
+    if (!Platform.isAndroid) {
+      await _player.setFilePath(filePath);
+      await _player.play();
+      return;
+    }
+
     try {
       await _commandChannel.invokeMethod<void>(
         'play',
@@ -65,14 +124,26 @@ class NativePlayerService {
   }
 
   Future<void> pause() async {
+    if (!Platform.isAndroid) {
+      await _player.pause();
+      return;
+    }
     await _commandChannel.invokeMethod<void>('pause');
   }
 
   Future<void> resume() async {
+    if (!Platform.isAndroid) {
+      await _player.play();
+      return;
+    }
     await _commandChannel.invokeMethod<void>('resume');
   }
 
   Future<void> seekTo(int milliseconds) async {
+    if (!Platform.isAndroid) {
+      await _player.seek(Duration(milliseconds: milliseconds));
+      return;
+    }
     await _commandChannel.invokeMethod<void>(
       'seekTo',
       {'position': milliseconds},
@@ -80,6 +151,12 @@ class NativePlayerService {
   }
 
   Future<void> setRepeatMode(String mode) async {
+    if (!Platform.isAndroid) {
+      await _player.setLoopMode(
+        mode == 'one' ? LoopMode.one : LoopMode.off,
+      );
+      return;
+    }
     await _commandChannel.invokeMethod<void>(
       'setRepeatMode',
       {'mode': mode},

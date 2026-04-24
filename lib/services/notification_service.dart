@@ -27,7 +27,11 @@ class NotificationService {
 
   Future<void> init() async {
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings);
+    const linuxSettings = LinuxInitializationSettings(defaultActionName: 'Open notification');
+    const initSettings = InitializationSettings(
+      android: androidSettings,
+      linux: linuxSettings,
+    );
 
     await _notificationsPlugin.initialize(initSettings);
 

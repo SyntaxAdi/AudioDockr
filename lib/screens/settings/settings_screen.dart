@@ -5,12 +5,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../download_manager/download_provider.dart';
 import '../../providers/search_provider.dart';
+import '../../recommendations/recommendation_provider.dart';
 import '../../settings/app_preferences.dart';
 import '../../services/notification_service.dart';
 import '../../theme.dart';
-import 'pages/library_data_page.dart';
 import 'pages/notifications_page.dart';
-import 'pages/playback_page.dart';
+import 'pages/recommendation_page.dart';
 import 'pages/profile_pages.dart';
 import 'pages/search_page.dart';
 import 'pages/storage_page.dart';
@@ -27,19 +27,15 @@ class SettingsScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsScreenState extends ConsumerState<SettingsScreen> {
-  static const String _resumeOnStartKey = 'resume_on_start';
-  static const String _backgroundPlaybackKey = 'background_playback';
-  static const String _releaseNotificationsKey = 'release_notifications';
-
   String _downloadPath = AppPreferences.defaultDownloadPath;
-  bool _resumeOnStart = true;
-  bool _backgroundPlayback = true;
   bool _downloadOngoingNotifications = true;
   bool _downloadCompletedNotifications = true;
-  bool _releaseNotifications = false;
   int _searchResultLimit = AppPreferences.defaultSearchResultLimit;
   SearchThumbnailQuality _searchThumbnailQuality =
       AppPreferences.defaultSearchThumbnailQuality;
+  String _lastFmApiKey = '';
+  RecommendationSeedStrategy _recommendationSeedStrategy =
+      AppPreferences.defaultRecommendationSeedStrategy;
 
   @override
   void initState() {
@@ -55,17 +51,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     setState(() {
       _downloadPath = AppPreferences.readDownloadPath(preferences);
-      _resumeOnStart = preferences.getBool(_resumeOnStartKey) ?? true;
-      _backgroundPlayback = preferences.getBool(_backgroundPlaybackKey) ?? true;
       _downloadOngoingNotifications =
           AppPreferences.readDownloadOngoingNotifications(preferences);
       _downloadCompletedNotifications =
           AppPreferences.readDownloadCompletedNotifications(preferences);
-      _releaseNotifications =
-          preferences.getBool(_releaseNotificationsKey) ?? false;
       _searchResultLimit = AppPreferences.readSearchResultLimit(preferences);
       _searchThumbnailQuality =
           AppPreferences.readSearchThumbnailQuality(preferences);
+      _lastFmApiKey = AppPreferences.readLastFmApiKey(preferences);
+      _recommendationSeedStrategy =
+          AppPreferences.readRecommendationSeedStrategy(preferences);
     });
   }
 
@@ -159,7 +154,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           _downloadOngoingNotifications,
                       downloadCompletedNotifications:
                           _downloadCompletedNotifications,
-                      releaseNotifications: _releaseNotifications,
                       onDownloadOngoingNotificationsChanged: (value) {
                         setState(() => _downloadOngoingNotifications = value);
                         _updateBoolPreference(
@@ -178,10 +172,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           value,
                         );
                       },
-                      onReleaseNotificationsChanged: (value) {
-                        setState(() => _releaseNotifications = value);
-                        _updateBoolPreference(_releaseNotificationsKey, value);
-                      },
                     ),
                   ),
                 ),
@@ -192,22 +182,28 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             SettingsGroup(
               children: [
                 SettingsActionTile(
-                  icon: Icons.graphic_eq_rounded,
-                  title: 'Playback',
-                  subtitle: 'Queue, resume and background behavior',
+                  icon: Icons.auto_awesome_outlined,
+                  title: 'Recommendations',
+                  subtitle: 'Autoplay and discovery preferences',
                   onTap: () => _openSettingsPage(
-                    PlaybackPage(
-                      resumeOnStart: _resumeOnStart,
-                      backgroundPlayback: _backgroundPlayback,
-                      onResumeOnStartChanged: (value) {
-                        setState(() => _resumeOnStart = value);
-                        _updateBoolPreference(_resumeOnStartKey, value);
+                    RecommendationPage(
+                      lastFmApiKey: _lastFmApiKey,
+                      recommendationSeedStrategy: _recommendationSeedStrategy,
+                      onLastFmApiKeyChanged: (value) {
+                        setState(() => _lastFmApiKey = value);
+                        ref
+                            .read(recommendationPreferencesProvider.notifier)
+                            .setApiKey(value);
                       },
-                      onBackgroundPlaybackChanged: (value) {
-                        setState(() => _backgroundPlayback = value);
-                        _updateBoolPreference(_backgroundPlaybackKey, value);
+                      onRecommendationSeedStrategyChanged: (value) {
+                        setState(() => _recommendationSeedStrategy = value);
+                        ref
+                            .read(recommendationPreferencesProvider.notifier)
+                            .setSeedStrategy(value);
                       },
-                      onShowComingSoon: _showComingSoonMessage,
+                      onValidateApiKey: (key) => ref
+                          .read(lastFmServiceProvider)
+                          .validateApiKey(key),
                     ),
                   ),
                 ),
@@ -243,16 +239,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       downloadPath: _downloadPath,
                       pathLabel: _pathLabel(_downloadPath),
                       onPickDownloadPath: _pickDownloadPath,
-                      onShowComingSoon: _showComingSoonMessage,
-                    ),
-                  ),
-                ),
-                SettingsActionTile(
-                  icon: Icons.storage_rounded,
-                  title: 'Library & data',
-                  subtitle: 'Import, export and manage local metadata',
-                  onTap: () => _openSettingsPage(
-                    LibraryDataPage(
                       onShowComingSoon: _showComingSoonMessage,
                     ),
                   ),

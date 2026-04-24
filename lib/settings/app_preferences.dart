@@ -17,6 +17,39 @@ enum SearchThumbnailQuality {
   }
 }
 
+enum RecommendationSeedStrategy {
+  mostRecent,
+  randomLiked,
+  mixLikedRecent,
+  currentlyPlaying;
+
+  String get label {
+    switch (this) {
+      case RecommendationSeedStrategy.mostRecent:
+        return 'Most recent played';
+      case RecommendationSeedStrategy.randomLiked:
+        return 'Random liked song';
+      case RecommendationSeedStrategy.mixLikedRecent:
+        return 'Mix: liked + recent';
+      case RecommendationSeedStrategy.currentlyPlaying:
+        return 'Currently playing only';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case RecommendationSeedStrategy.mostRecent:
+        return 'Seed from the song you played last';
+      case RecommendationSeedStrategy.randomLiked:
+        return 'Seed from a random song you liked';
+      case RecommendationSeedStrategy.mixLikedRecent:
+        return 'Rotate through liked songs and recent plays';
+      case RecommendationSeedStrategy.currentlyPlaying:
+        return 'Only use the song you\'re listening to right now';
+    }
+  }
+}
+
 class AppPreferences {
   AppPreferences._();
 
@@ -24,6 +57,9 @@ class AppPreferences {
   static const int defaultSearchResultLimit = 10;
   static const SearchThumbnailQuality defaultSearchThumbnailQuality =
       SearchThumbnailQuality.high;
+  static const RecommendationSeedStrategy defaultRecommendationSeedStrategy =
+      RecommendationSeedStrategy.mostRecent;
+
   static const String downloadPathKey = 'download_path';
   static const String downloadOngoingNotificationsKey =
       'download_ongoing_notifications';
@@ -31,6 +67,9 @@ class AppPreferences {
       'download_completed_notifications';
   static const String searchResultLimitKey = 'search_result_limit';
   static const String searchThumbnailQualityKey = 'search_thumbnail_quality';
+  static const String lastFmApiKeyKey = 'lastfm_api_key';
+  static const String recommendationSeedStrategyKey =
+      'recommendation_seed_strategy';
 
   static String readStringPreference(
     SharedPreferences preferences,
@@ -102,5 +141,30 @@ class AppPreferences {
   static Future<SearchThumbnailQuality> loadSearchThumbnailQuality() async {
     final preferences = await SharedPreferences.getInstance();
     return readSearchThumbnailQuality(preferences);
+  }
+
+  static String readLastFmApiKey(SharedPreferences preferences) {
+    return preferences.getString(lastFmApiKeyKey)?.trim() ?? '';
+  }
+
+  static RecommendationSeedStrategy readRecommendationSeedStrategy(
+    SharedPreferences preferences,
+  ) {
+    final value = preferences.getString(recommendationSeedStrategyKey);
+    return RecommendationSeedStrategy.values.firstWhere(
+      (strategy) => strategy.name == value,
+      orElse: () => defaultRecommendationSeedStrategy,
+    );
+  }
+
+  static Future<String> loadLastFmApiKey() async {
+    final preferences = await SharedPreferences.getInstance();
+    return readLastFmApiKey(preferences);
+  }
+
+  static Future<RecommendationSeedStrategy>
+      loadRecommendationSeedStrategy() async {
+    final preferences = await SharedPreferences.getInstance();
+    return readRecommendationSeedStrategy(preferences);
   }
 }

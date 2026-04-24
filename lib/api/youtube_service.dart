@@ -102,6 +102,33 @@ class YoutubeService {
     }
   }
 
+  Future<List<YoutubeSearchItem>> getRelatedVideos(String videoId) async {
+    try {
+      final video = await _client.videos.get(videoId);
+      final related = await _client.videos.getRelatedVideos(video);
+
+      if (related == null) return const [];
+
+      return related
+          .map(
+            (video) => YoutubeSearchItem(
+              id: video.id.value,
+              url: video.url,
+              title: video.title,
+              uploader: video.author,
+              duration: video.duration ?? Duration.zero,
+              lowThumbnailUrl: video.thumbnails.lowResUrl,
+              mediumThumbnailUrl: video.thumbnails.mediumResUrl,
+              highThumbnailUrl: video.thumbnails.highResUrl,
+            ),
+          )
+          .where((item) => item.id.isNotEmpty && item.url.isNotEmpty)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
   Future<String> extractAudioUrl({
     required String videoId,
     required String videoUrl,

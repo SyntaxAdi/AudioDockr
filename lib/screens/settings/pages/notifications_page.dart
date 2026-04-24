@@ -9,18 +9,14 @@ class NotificationsPage extends StatefulWidget {
     super.key,
     required this.downloadOngoingNotifications,
     required this.downloadCompletedNotifications,
-    required this.releaseNotifications,
     required this.onDownloadOngoingNotificationsChanged,
     required this.onDownloadCompletedNotificationsChanged,
-    required this.onReleaseNotificationsChanged,
   });
 
   final bool downloadOngoingNotifications;
   final bool downloadCompletedNotifications;
-  final bool releaseNotifications;
   final ValueChanged<bool> onDownloadOngoingNotificationsChanged;
   final ValueChanged<bool> onDownloadCompletedNotificationsChanged;
-  final ValueChanged<bool> onReleaseNotificationsChanged;
 
   @override
   State<NotificationsPage> createState() => _NotificationsPageState();
@@ -29,14 +25,12 @@ class NotificationsPage extends StatefulWidget {
 class _NotificationsPageState extends State<NotificationsPage> {
   late bool _downloadOngoingNotifications;
   late bool _downloadCompletedNotifications;
-  late bool _releaseNotifications;
 
   @override
   void initState() {
     super.initState();
     _downloadOngoingNotifications = widget.downloadOngoingNotifications;
     _downloadCompletedNotifications = widget.downloadCompletedNotifications;
-    _releaseNotifications = widget.releaseNotifications;
   }
 
   @override
@@ -64,16 +58,6 @@ class _NotificationsPageState extends State<NotificationsPage> {
               onChanged: (value) {
                 setState(() => _downloadCompletedNotifications = value);
                 widget.onDownloadCompletedNotificationsChanged(value);
-              },
-            ),
-            SettingsSwitchTile(
-              icon: Icons.new_releases_outlined,
-              title: 'New releases',
-              subtitle: 'Highlights from artists you follow',
-              value: _releaseNotifications,
-              onChanged: (value) {
-                setState(() => _releaseNotifications = value);
-                widget.onReleaseNotificationsChanged(value);
               },
             ),
           ],

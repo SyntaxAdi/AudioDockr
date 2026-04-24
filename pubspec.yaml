@@ -23,6 +23,10 @@ dependencies:
   path_provider: ^2.1.2
   flutter_displaymode: ^0.6.0
   flutter_local_notifications: ^17.1.2
+  sqflite_common_ffi: ^2.4.0+3
+  sqlite3_flutter_libs: ^0.6.0+eol
+  just_audio: ^0.10.5
+  url_launcher: ^6.3.2
 
 dev_dependencies:
   flutter_test:

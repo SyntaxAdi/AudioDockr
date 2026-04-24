@@ -47,6 +47,7 @@ abstract class PlaybackNotifierBase extends StateNotifier<PlaybackState> {
   });
   void setShuffleEnabled(bool enabled);
   void clearQueue();
+  void updateQueuedTrackThumbnail(String videoId, String thumbnailUrl);
   Future<void> nextTrack();
   Future<void> previousTrack();
   Future<void> toggleShuffleQueue();

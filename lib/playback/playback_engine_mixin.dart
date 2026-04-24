@@ -92,12 +92,17 @@ mixin PlaybackEngineMixin on PlaybackNotifierBase {
       artist: artist,
     );
 
+    // Use the YouTube thumbnail as a fallback when the track has no artwork.
+    final effectiveThumbnail = thumbnailUrl.isNotEmpty
+        ? thumbnailUrl
+        : (resolvedMedia.thumbnailUrl ?? '');
+
     try {
       state = state.copyWith(
         currentTrackId: videoId,
         currentTitle: title,
         currentArtist: artist,
-        currentThumbnailUrl: thumbnailUrl,
+        currentThumbnailUrl: effectiveThumbnail,
         currentVideoUrl: resolvedMedia.videoUrl,
         position: Duration.zero,
         duration: Duration.zero,
@@ -121,7 +126,7 @@ mixin PlaybackEngineMixin on PlaybackNotifierBase {
         headers: PlaybackUrlResolver.buildPlaybackHeaders(),
         title: title,
         artist: artist,
-        thumbnailUrl: thumbnailUrl,
+        thumbnailUrl: effectiveThumbnail,
       );
       lastTrackStart = DateTime.now();
 
@@ -132,7 +137,7 @@ mixin PlaybackEngineMixin on PlaybackNotifierBase {
               videoUrl: resolvedMedia.videoUrl,
               title: title,
               artist: artist,
-              thumbnailUrl: thumbnailUrl,
+              thumbnailUrl: effectiveThumbnail,
             )
             .catchError((_) {}),
       );
@@ -141,7 +146,7 @@ mixin PlaybackEngineMixin on PlaybackNotifierBase {
         currentTrackId: videoId,
         currentTitle: title,
         currentArtist: artist,
-        currentThumbnailUrl: thumbnailUrl,
+        currentThumbnailUrl: effectiveThumbnail,
         currentVideoUrl: resolvedMedia.videoUrl,
         position: Duration.zero,
         duration: Duration.zero,
@@ -152,7 +157,7 @@ mixin PlaybackEngineMixin on PlaybackNotifierBase {
           videoUrl: resolvedMedia.videoUrl,
           title: title,
           artist: artist,
-          thumbnailUrl: thumbnailUrl,
+          thumbnailUrl: effectiveThumbnail,
         ),
         lastError: null,
       );

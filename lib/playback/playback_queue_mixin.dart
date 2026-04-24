@@ -30,6 +30,29 @@ mixin PlaybackQueueMixin on PlaybackNotifierBase {
   }
 
   @override
+  void updateQueuedTrackThumbnail(String videoId, String thumbnailUrl) {
+    var changed = false;
+    final updated = state.queue.map((t) {
+      if (t.videoId == videoId && t.thumbnailUrl != thumbnailUrl) {
+        changed = true;
+        return t.copyWith(thumbnailUrl: thumbnailUrl);
+      }
+      return t;
+    }).toList(growable: false);
+
+    // Also update the currently-playing thumbnail if it matches.
+    final currentMatch = state.currentTrackId == videoId &&
+        (state.currentThumbnailUrl ?? '') != thumbnailUrl;
+
+    if (!changed && !currentMatch) return;
+
+    state = state.copyWith(
+      queue: changed ? updated : null,
+      currentThumbnailUrl: currentMatch ? thumbnailUrl : null,
+    );
+  }
+
+  @override
   void setShuffleEnabled(bool enabled) {
     if (state.shuffleEnabled == enabled) return;
     state = state.copyWith(shuffleEnabled: enabled);

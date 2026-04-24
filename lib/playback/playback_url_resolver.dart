@@ -11,10 +11,15 @@ class ResolvedMedia {
   const ResolvedMedia({
     required this.realYoutubeId,
     required this.videoUrl,
+    this.thumbnailUrl,
   });
 
   final String realYoutubeId;
   final String videoUrl;
+
+  /// YouTube thumbnail discovered during search. Used as a fallback when
+  /// iTunes artwork enrichment doesn't produce a result.
+  final String? thumbnailUrl;
 }
 
 class PlaybackUrlResolver {
@@ -104,6 +109,7 @@ class PlaybackUrlResolver {
       return ResolvedMedia(
         realYoutubeId: match.id,
         videoUrl: match.url,
+        thumbnailUrl: match.thumbnailUrl,
       );
     } on YoutubeServiceException catch (error) {
       throw PlaybackErrorMapper.fromSearchError(error);
@@ -127,11 +133,20 @@ class PlaybackUrlResolver {
       artist: track.artist,
     );
 
-    if (resolvedMedia.videoUrl == track.videoUrl) {
+    // Use the YouTube thumbnail as a fallback when the track has no artwork
+    // (e.g. iTunes enrichment didn't find a match for a recommendation).
+    final needsThumbnail = track.thumbnailUrl.isEmpty &&
+        resolvedMedia.thumbnailUrl != null &&
+        resolvedMedia.thumbnailUrl!.isNotEmpty;
+
+    if (resolvedMedia.videoUrl == track.videoUrl && !needsThumbnail) {
       return track;
     }
 
-    return track.copyWith(videoUrl: resolvedMedia.videoUrl);
+    return track.copyWith(
+      videoUrl: resolvedMedia.videoUrl,
+      thumbnailUrl: needsThumbnail ? resolvedMedia.thumbnailUrl : null,
+    );
   }
 
   static String _extractRealYoutubeId(String originalId, String videoUrl) {
@@ -144,6 +159,11 @@ class PlaybackUrlResolver {
     final segments = uri?.pathSegments ?? const <String>[];
     if (segments.isNotEmpty && uri?.host.contains('youtu.be') == true) {
       return segments.first;
+    }
+
+    // Handle youtube recommendation where the videoUrl is the actual video ID
+    if (originalId.startsWith('yt_rec_') && !videoUrl.contains('http')) {
+      return videoUrl;
     }
 
     return originalId;

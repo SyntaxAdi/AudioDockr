@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../playback/playback_provider.dart';
+import '../../recommendations/recommendation_provider.dart';
+import '../../settings/app_preferences.dart';
 import '../../theme.dart';
 
 class NowPlayingControls extends ConsumerWidget {
@@ -32,7 +34,8 @@ class NowPlayingControls extends ConsumerWidget {
         PlayerControlButton(
           icon: Icons.shuffle_rounded,
           active: shuffleEnabled,
-          onTap: () => unawaited(notifier.toggleShuffleQueue()),
+          onTap: () =>
+              unawaited(_handleShuffleTap(context, ref, shuffleEnabled)),
         ),
         PlayerControlButton(
           icon: Icons.skip_previous_rounded,
@@ -77,6 +80,68 @@ class NowPlayingControls extends ConsumerWidget {
         ),
       ],
     );
+  }
+}
+
+Future<void> _handleShuffleTap(
+  BuildContext context,
+  WidgetRef ref,
+  bool currentlyEnabled,
+) async {
+  // Capture before the first await so we don't touch the BuildContext
+  // across async gaps.
+  final messenger = ScaffoldMessenger.of(context);
+  final playbackNotifier = ref.read(playbackNotifierProvider.notifier);
+  final willTurnOn = !currentlyEnabled;
+
+  // When the user picks the "currently playing only" strategy, we must
+  // bypass toggleShuffleQueue() — it would otherwise eagerly fill the
+  // queue from liked tracks, leaving no room for the rec session to fire.
+  if (willTurnOn) {
+    // Ensure saved preferences have been read from disk before deciding
+    // on the code path. On a cold start the notifier still holds its
+    // constructor defaults until the async load completes.
+    await ref
+        .read(recommendationPreferencesProvider.notifier)
+        .ensureLoaded();
+    final strategy =
+        ref.read(recommendationPreferencesProvider).seedStrategy;
+    if (strategy == RecommendationSeedStrategy.currentlyPlaying) {
+      playbackNotifier.clearQueue();
+      playbackNotifier.setShuffleEnabled(true);
+      await _startRecSessionAndSurfaceErrors(messenger, ref);
+      return;
+    }
+  }
+
+  await playbackNotifier.toggleShuffleQueue();
+
+  if (!willTurnOn) return;
+
+  // If shuffle just came on but we have nothing queued to shuffle through,
+  // kick off the rec-shuffle session (30 similar tracks via Last.fm,
+  // auto-refilling as they're consumed).
+  final after = ref.read(playbackNotifierProvider);
+  if (!after.shuffleEnabled || after.queue.isNotEmpty) return;
+
+  await _startRecSessionAndSurfaceErrors(messenger, ref);
+}
+
+Future<void> _startRecSessionAndSurfaceErrors(
+  ScaffoldMessengerState messenger,
+  WidgetRef ref,
+) async {
+  final recNotifier = ref.read(recommendationNotifierProvider.notifier);
+  await recNotifier.startShuffle();
+
+  // Surface any reason the session didn't start (missing API key, no seeds,
+  // all fetches failed) so the user knows what to fix.
+  final recState = ref.read(recommendationNotifierProvider);
+  final message = recState.errorMessage;
+  if (!recState.active && message != null && message.isNotEmpty) {
+    messenger
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 }
 

@@ -559,6 +559,14 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                                       fit: BoxFit.cover,
                                       memCacheWidth: 132,
                                       memCacheHeight: 132,
+                                      placeholder: (_, __) => const Icon(
+                                        Icons.music_note,
+                                        color: textSecondary,
+                                      ),
+                                      errorWidget: (_, __, ___) => const Icon(
+                                        Icons.music_note,
+                                        color: textSecondary,
+                                      ),
                                     ),
                             ),
                             title: Text(track.title,

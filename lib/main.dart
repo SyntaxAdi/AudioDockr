@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'theme.dart';
 import 'screens/shell.dart';
@@ -11,11 +13,18 @@ import 'services/notification_service.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
+  if (Platform.isWindows || Platform.isLinux || Platform.isMacOS) {
+    sqfliteFfiInit();
+    databaseFactory = databaseFactoryFfi;
+  }
+
   // Initialize services in the background without blocking the initial frame
   unawaited(NotificationService.instance.init());
 
   try {
-    unawaited(FlutterDisplayMode.setHighRefreshRate());
+    if (Platform.isAndroid) {
+      unawaited(FlutterDisplayMode.setHighRefreshRate());
+    }
   } catch (_) {
     // Fallback if display mode setting is not supported
   }

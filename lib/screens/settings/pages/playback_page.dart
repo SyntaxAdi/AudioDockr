@@ -48,12 +48,6 @@ class PlaybackPage extends StatelessWidget {
           title: 'Advanced',
           children: [
             SettingsActionTile(
-              icon: Icons.shuffle_rounded,
-              title: 'Autoplay recommendations',
-              subtitle: 'Play similar songs when the queue ends',
-              onTap: () => onShowComingSoon('Autoplay recommendations'),
-            ),
-            SettingsActionTile(
               icon: Icons.tune_rounded,
               title: 'Crossfade',
               subtitle: 'Smooth transitions between tracks',
