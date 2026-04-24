@@ -19,6 +19,7 @@ class TrackOptionTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final foreground = destructive ? accentRed : textPrimary;
+    final accent = destructive ? accentRed : accentPrimary;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
@@ -28,18 +29,11 @@ class TrackOptionTile extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.centerLeft,
-              end: Alignment.centerRight,
-              colors: destructive
-                  ? [accentRed.withValues(alpha: 0.08), bgCard]
-                  : [accentPrimary.withValues(alpha: 0.05), bgCard],
-            ),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: destructive
-                  ? accentRed.withValues(alpha: 0.22)
-                  : accentPrimary.withValues(alpha: 0.14),
+                  ? accentRed.withValues(alpha: 0.2)
+                  : bgDivider.withValues(alpha: 0.72),
             ),
           ),
           child: Row(
@@ -48,12 +42,10 @@ class TrackOptionTile extends StatelessWidget {
                 width: 34,
                 height: 34,
                 decoration: BoxDecoration(
-                  color: destructive
-                      ? accentRed.withValues(alpha: 0.08)
-                      : accentPrimary.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: accent.withValues(alpha: 0.18)),
                 ),
-                child: Icon(icon, color: foreground, size: 18),
+                child: Icon(icon, color: accent, size: 18),
               ),
               const SizedBox(width: 14),
               Expanded(

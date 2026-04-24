@@ -9,6 +9,18 @@ enum NativePlaybackState { idle, buffering, ready, ended }
 mixin PlaybackEventMixin on PlaybackNotifierBase {
   @override
   void handleNativePlayerEvent(Map<String, dynamic> event) {
+    // Handle skip events from the notification media controls.
+    final eventType = event['type'] as String?;
+    final eventName = event['name'] as String?;
+    if (eventType == 'event') {
+      if (eventName == 'skip_next') {
+        unawaited(nextTrack());
+      } else if (eventName == 'skip_previous') {
+        unawaited(previousTrack());
+      }
+      return;
+    }
+
     if (state.isPreparing) return;
 
     final isPlaying = event['isPlaying'] as bool? ?? state.isPlaying;

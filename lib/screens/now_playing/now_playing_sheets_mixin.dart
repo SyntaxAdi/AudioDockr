@@ -99,8 +99,7 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                       else
                         Expanded(
                           child: ListView.separated(
-                            padding:
-                                const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                             itemCount: userPlaylists.length,
                             separatorBuilder: (_, __) =>
                                 const SizedBox(height: 10),
@@ -126,12 +125,12 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                                               videoUrl: playbackState
                                                       .currentVideoUrl ??
                                                   '',
-                                              title: playbackState
-                                                      .currentTitle ??
-                                                  'Unknown track',
-                                              artist: playbackState
-                                                      .currentArtist ??
-                                                  'Unknown artist',
+                                              title:
+                                                  playbackState.currentTitle ??
+                                                      'Unknown track',
+                                              artist:
+                                                  playbackState.currentArtist ??
+                                                      'Unknown artist',
                                               thumbnailUrl: playbackState
                                                       .currentThumbnailUrl ??
                                                   '',
@@ -156,8 +155,7 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                                       },
                                 borderRadius: BorderRadius.circular(16),
                                 child: AnimatedContainer(
-                                  duration:
-                                      const Duration(milliseconds: 220),
+                                  duration: const Duration(milliseconds: 220),
                                   curve: Curves.easeOut,
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
@@ -199,8 +197,7 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                                                   .textTheme
                                                   .bodyLarge
                                                   ?.copyWith(
-                                                    fontWeight:
-                                                        FontWeight.w700,
+                                                    fontWeight: FontWeight.w700,
                                                   ),
                                             ),
                                             const SizedBox(height: 4),
@@ -209,17 +206,15 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                                               style: Theme.of(context)
                                                   .textTheme
                                                   .labelSmall
-                                                  ?.copyWith(
-                                                      letterSpacing: 0),
+                                                  ?.copyWith(letterSpacing: 0),
                                             ),
                                           ],
                                         ),
                                       ),
                                       AnimatedSwitcher(
-                                        duration: const Duration(
-                                            milliseconds: 220),
-                                        switchInCurve:
-                                            Curves.easeOutBack,
+                                        duration:
+                                            const Duration(milliseconds: 220),
+                                        switchInCurve: Curves.easeOutBack,
                                         switchOutCurve: Curves.easeIn,
                                         transitionBuilder: (child, anim) =>
                                             ScaleTransition(
@@ -262,7 +257,9 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
     if (videoId.isEmpty) return;
 
     final selectedPlaylistIds = <String>{
-      ...await ref.read(libraryProvider.notifier).fetchSavedPlaylistIds(videoId),
+      ...await ref
+          .read(libraryProvider.notifier)
+          .fetchSavedPlaylistIds(videoId),
     };
     final searchController = TextEditingController();
     var query = '';
@@ -294,20 +291,16 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                     children: [
                       _sheetHandle(),
                       Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 20),
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
                         child: Row(
                           children: [
                             Text('Saved in',
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .titleLarge),
+                                style: Theme.of(context).textTheme.titleLarge),
                             const Spacer(),
                             TextButton(
                               style: TextButton.styleFrom(
                                 minimumSize: Size.zero,
-                                tapTargetSize:
-                                    MaterialTapTargetSize.shrinkWrap,
+                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 6),
                                 side: BorderSide.none,
@@ -320,9 +313,8 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                                 if (!mounted || !parentContext.mounted) {
                                   return;
                                 }
-                                final created =
-                                    await showCreatePlaylistSheet(
-                                        parentContext, ref);
+                                final created = await showCreatePlaylistSheet(
+                                    parentContext, ref);
                                 if (created &&
                                     mounted &&
                                     parentContext.mounted) {
@@ -345,26 +337,21 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                       ),
                       const SizedBox(height: 14),
                       Padding(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: TextField(
                           controller: searchController,
-                          onChanged: (v) =>
-                              setModalState(() => query = v),
+                          onChanged: (v) => setModalState(() => query = v),
                           decoration: InputDecoration(
-                            prefixIcon: const Icon(
-                                Icons.search_rounded,
+                            prefixIcon: const Icon(Icons.search_rounded,
                                 color: textSecondary),
                             hintText: 'Find playlist',
                             filled: true,
                             fillColor: bgCard,
-                            contentPadding:
-                                const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 12),
+                            contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 12),
                             enabledBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
-                              borderSide:
-                                  const BorderSide(color: bgDivider),
+                              borderSide: const BorderSide(color: bgDivider),
                             ),
                             focusedBorder: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(12),
@@ -377,8 +364,7 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                       const SizedBox(height: 14),
                       Expanded(
                         child: ListView.separated(
-                          padding:
-                              const EdgeInsets.fromLTRB(16, 0, 16, 20),
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
                           itemCount: filtered.length,
                           separatorBuilder: (_, __) =>
                               const SizedBox(height: 10),
@@ -397,17 +383,15 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                                       playlistId: playlist.id,
                                       shouldSave: shouldSave,
                                       videoId: videoId,
-                                      videoUrl: playbackState
-                                              .currentVideoUrl ??
-                                          '',
+                                      videoUrl:
+                                          playbackState.currentVideoUrl ?? '',
                                       title: playbackState.currentTitle ??
                                           'Unknown track',
-                                      artist:
-                                          playbackState.currentArtist ??
-                                              'Unknown artist',
-                                      thumbnailUrl: playbackState
-                                              .currentThumbnailUrl ??
-                                          '',
+                                      artist: playbackState.currentArtist ??
+                                          'Unknown artist',
+                                      thumbnailUrl:
+                                          playbackState.currentThumbnailUrl ??
+                                              '',
                                       durationSeconds:
                                           playbackState.duration.inSeconds,
                                     );
@@ -545,8 +529,8 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                         itemBuilder: (context, index) {
                           final track = queue[index];
                           return ListTile(
-                            contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 4),
+                            contentPadding:
+                                const EdgeInsets.symmetric(horizontal: 4),
                             leading: Container(
                               width: 44,
                               height: 44,
@@ -570,11 +554,9 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                                     ),
                             ),
                             title: Text(track.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis),
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
                             subtitle: Text(track.artist,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis),
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
                           );
                         },
                       ),
@@ -609,9 +591,14 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (sheetContext) {
-        return FractionallySizedBox(
-          heightFactor: 0.62,
-          child: Container(
+        final initialSize = savedPlaylists.isNotEmpty ? 0.52 : 0.46;
+
+        return DraggableScrollableSheet(
+          expand: false,
+          minChildSize: 0.36,
+          initialChildSize: initialSize,
+          maxChildSize: 0.96,
+          builder: (context, scrollController) => Container(
             decoration: BoxDecoration(
               color: bgSurface,
               borderRadius:
@@ -619,191 +606,93 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
               border: Border.all(color: accentPrimary.withValues(alpha: 0.16)),
               boxShadow: const [
                 BoxShadow(
-                    color: Color(0x33000000),
-                    blurRadius: 28,
-                    offset: Offset(0, -10)),
+                  color: Color(0x33000000),
+                  blurRadius: 28,
+                  offset: Offset(0, -10),
+                ),
               ],
             ),
             child: Stack(
               children: [
                 Positioned(
-                  top: 0, left: 0, right: 0,
-                  child: Container(height: 1,
-                      color: accentPrimary.withValues(alpha: 0.22)),
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                      height: 1, color: accentPrimary.withValues(alpha: 0.22)),
                 ),
                 Positioned(
-                  top: 0, left: 20, width: 96,
-                  child: Container(height: 2,
-                      color: accentCyan.withValues(alpha: 0.28)),
+                  top: 0,
+                  left: 20,
+                  width: 96,
+                  child: Container(
+                      height: 2, color: accentCyan.withValues(alpha: 0.28)),
                 ),
                 SafeArea(
                   top: false,
-                  child: Column(
-                    children: [
-                      _sheetHandle(),
-                      Padding(
-                        padding:
-                            const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: bgCard,
-                            borderRadius: BorderRadius.circular(18),
-                            border: Border.all(
-                                color: accentPrimary.withValues(alpha: 0.14)),
-                          ),
-                          child: Row(
-                            children: [
-                              Container(
-                                width: 56,
-                                height: 56,
-                                decoration: BoxDecoration(
-                                  color: bgSurface,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                      color: accentPrimary
-                                          .withValues(alpha: 0.12)),
-                                ),
-                                child: (playbackState.currentThumbnailUrl ??
-                                            '')
-                                        .isEmpty
-                                    ? const Icon(
-                                        Icons.music_note_rounded,
-                                        color: textSecondary)
-                                    : ClipRRect(
-                                        borderRadius:
-                                            BorderRadius.circular(14),
-                                        child: CachedNetworkImage(
-                                          imageUrl: playbackState
-                                              .currentThumbnailUrl!,
-                                          fit: BoxFit.cover,
-                                          memCacheWidth: 168,
-                                          memCacheHeight: 168,
-                                        ),
-                                      ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      playbackState.currentTitle ??
-                                          'Unknown track',
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.copyWith(
-                                              fontWeight: FontWeight.w700),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      playbackState.currentArtist ??
-                                          'Unknown artist',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .labelSmall
-                                          ?.copyWith(
-                                            color: textSecondary,
-                                            letterSpacing: 0.4,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
+                  child: CustomScrollView(
+                    controller: scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverPersistentHeader(
+                        pinned: true,
+                        delegate: _TrackOptionsHeaderDelegate(
+                          playbackState: playbackState,
                         ),
                       ),
-                      Expanded(
-                        child: ListView(
-                          padding:
-                              const EdgeInsets.fromLTRB(12, 0, 12, 16),
-                          children: [
-                            TrackOptionTile(
-                              icon: Icons.playlist_add_rounded,
-                              label: 'Add to playlist',
-                              onTap: () async {
-                                Navigator.of(sheetContext).pop();
-                                await Future<void>.delayed(
-                                    const Duration(milliseconds: 160));
-                                if (!mounted || !context.mounted) return;
-                                await showAddToPlaylistSheet(
-                                  context,
-                                  ref.read(libraryProvider),
-                                  ref.read(playbackNotifierProvider),
-                                );
-                              },
-                            ),
-                            if (savedPlaylists.isNotEmpty)
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                        sliver: SliverList(
+                          delegate: SliverChildListDelegate(
+                            [
                               TrackOptionTile(
-                                icon: Icons.remove_circle_outline_rounded,
-                                label: 'Remove from playlist',
-                                destructive: true,
+                                icon: Icons.playlist_add_rounded,
+                                label: 'Add to playlist',
                                 onTap: () async {
                                   Navigator.of(sheetContext).pop();
                                   await Future<void>.delayed(
                                       const Duration(milliseconds: 160));
                                   if (!mounted || !context.mounted) return;
-                                  await showRemoveFromPlaylistSheet(
+                                  await showAddToPlaylistSheet(
                                     context,
-                                    playbackState,
-                                    savedPlaylists,
+                                    ref.read(libraryProvider),
+                                    ref.read(playbackNotifierProvider),
                                   );
                                 },
                               ),
-                            TrackOptionTile(
-                              icon: Icons.queue_music_rounded,
-                              label: 'Add to queue',
-                              onTap: () {
-                                final added = ref
-                                    .read(playbackNotifierProvider.notifier)
-                                    .addToQueue(
-                                      videoId: videoId,
-                                      videoUrl:
-                                          playbackState.currentVideoUrl ??
-                                              '',
-                                      title: playbackState.currentTitle ??
-                                          'Unknown track',
-                                      artist:
-                                          playbackState.currentArtist ??
-                                              'Unknown artist',
-                                      thumbnailUrl:
-                                          playbackState.currentThumbnailUrl ??
-                                              '',
+                              if (savedPlaylists.isNotEmpty)
+                                TrackOptionTile(
+                                  icon: Icons.remove_circle_outline_rounded,
+                                  label: 'Remove from playlist',
+                                  destructive: true,
+                                  onTap: () async {
+                                    Navigator.of(sheetContext).pop();
+                                    await Future<void>.delayed(
+                                        const Duration(milliseconds: 160));
+                                    if (!mounted || !context.mounted) return;
+                                    await showRemoveFromPlaylistSheet(
+                                      context,
+                                      playbackState,
+                                      savedPlaylists,
                                     );
-                                Navigator.of(sheetContext).pop();
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(added
-                                        ? 'Added to queue'
-                                        : 'Already in queue'),
-                                    duration:
-                                        const Duration(milliseconds: 1200),
-                                  ),
-                                );
-                              },
-                            ),
-                            TrackOptionTile(
-                              icon: Icons.format_list_bulleted_rounded,
-                              label: 'Go to queue',
-                              onTap: () async {
-                                Navigator.of(sheetContext).pop();
-                                await Future<void>.delayed(
-                                    const Duration(milliseconds: 160));
-                                if (!mounted || !context.mounted) return;
-                                await showQueueSheet(
-                                  context,
-                                  ref.read(playbackNotifierProvider),
-                                );
-                              },
-                            ),
-                          ],
+                                  },
+                                ),
+                              TrackOptionTile(
+                                icon: Icons.format_list_bulleted_rounded,
+                                label: 'Go to queue',
+                                onTap: () async {
+                                  Navigator.of(sheetContext).pop();
+                                  await Future<void>.delayed(
+                                      const Duration(milliseconds: 160));
+                                  if (!mounted || !context.mounted) return;
+                                  await showQueueSheet(
+                                    context,
+                                    ref.read(playbackNotifierProvider),
+                                  );
+                                },
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
@@ -842,16 +731,18 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
             child: Stack(
               children: [
                 Positioned(
-                  top: 0, left: 0, right: 0,
+                  top: 0,
+                  left: 0,
+                  right: 0,
                   child: Container(
-                      height: 1,
-                      color: accentRed.withValues(alpha: 0.24)),
+                      height: 1, color: accentRed.withValues(alpha: 0.24)),
                 ),
                 Positioned(
-                  top: 0, left: 20, width: 88,
+                  top: 0,
+                  left: 20,
+                  width: 88,
                   child: Container(
-                      height: 2,
-                      color: accentPrimary.withValues(alpha: 0.22)),
+                      height: 2, color: accentPrimary.withValues(alpha: 0.22)),
                 ),
                 SafeArea(
                   top: false,
@@ -881,15 +772,13 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                                 .textTheme
                                 .labelSmall
                                 ?.copyWith(
-                                    color: textSecondary,
-                                    letterSpacing: 0.3),
+                                    color: textSecondary, letterSpacing: 0.3),
                           ),
                         ),
                       ),
                       Expanded(
                         child: ListView.builder(
-                          padding:
-                              const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                          padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
                           itemCount: savedPlaylists.length,
                           itemBuilder: (context, index) {
                             final playlist = savedPlaylists[index];
@@ -907,13 +796,11 @@ mixin NowPlayingSheetsMixin on ConsumerState<NowPlayingScreen> {
                                       shouldSave: false,
                                       videoId: videoId,
                                       videoUrl:
-                                          playbackState.currentVideoUrl ??
-                                              '',
+                                          playbackState.currentVideoUrl ?? '',
                                       title: playbackState.currentTitle ??
                                           'Unknown track',
-                                      artist:
-                                          playbackState.currentArtist ??
-                                              'Unknown artist',
+                                      artist: playbackState.currentArtist ??
+                                          'Unknown artist',
                                       thumbnailUrl:
                                           playbackState.currentThumbnailUrl ??
                                               '',
@@ -953,4 +840,148 @@ Widget _sheetHandle() {
       ),
     ),
   );
+}
+
+class _TrackOptionsHeaderDelegate extends SliverPersistentHeaderDelegate {
+  const _TrackOptionsHeaderDelegate({
+    required this.playbackState,
+  });
+
+  static const double _height = 204;
+
+  final PlaybackState playbackState;
+
+  @override
+  double get minExtent => _height;
+
+  @override
+  double get maxExtent => _height;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(
+      color: bgSurface,
+      child: Column(
+        children: [
+          _sheetHandle(),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 3,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: accentPrimary.withValues(alpha: 0.9),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Track options',
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Quick actions for the current track',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: textSecondary,
+                              letterSpacing: 0.3,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: bgCard,
+                borderRadius: BorderRadius.circular(18),
+                border:
+                    Border.all(color: accentPrimary.withValues(alpha: 0.14)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 56,
+                    height: 56,
+                    decoration: BoxDecoration(
+                      color: bgSurface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: accentPrimary.withValues(alpha: 0.12)),
+                    ),
+                    child: (playbackState.currentThumbnailUrl ?? '').isEmpty
+                        ? const Icon(Icons.music_note_rounded,
+                            color: textSecondary)
+                        : ClipRRect(
+                            borderRadius: BorderRadius.circular(14),
+                            child: CachedNetworkImage(
+                              imageUrl: playbackState.currentThumbnailUrl!,
+                              fit: BoxFit.cover,
+                              memCacheWidth: 168,
+                              memCacheHeight: 168,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          playbackState.currentTitle ?? 'Unknown track',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          playbackState.currentArtist ?? 'Unknown artist',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: textSecondary,
+                                    letterSpacing: 0.4,
+                                  ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _TrackOptionsHeaderDelegate oldDelegate) =>
+      playbackState.currentTrackId !=
+          oldDelegate.playbackState.currentTrackId ||
+      playbackState.currentTitle != oldDelegate.playbackState.currentTitle ||
+      playbackState.currentArtist != oldDelegate.playbackState.currentArtist ||
+      playbackState.currentThumbnailUrl !=
+          oldDelegate.playbackState.currentThumbnailUrl;
 }

@@ -60,7 +60,11 @@ mixin PlaybackQueueMixin on PlaybackNotifierBase {
 
   @override
   Future<void> nextTrack() async {
-    if (state.queue.isEmpty) return;
+    if (state.queue.isEmpty) {
+      await nativePlayerService.pause();
+      state = state.copyWith(isPlaying: false);
+      return;
+    }
     final current = currentTrackSnapshot();
     if (current != null) history.add(current);
     await advanceQueue();

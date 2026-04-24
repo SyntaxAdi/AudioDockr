@@ -153,13 +153,50 @@ class PlaybackService : MediaSessionService() {
                 )
             }
 
-        mediaSession = MediaSession.Builder(this, player).build().also { session ->
+        val forwardingPlayer = object : androidx.media3.common.ForwardingPlayer(player) {
+            override fun getAvailableCommands(): Player.Commands {
+                return super.getAvailableCommands().buildUpon()
+                    .add(Player.COMMAND_SEEK_TO_NEXT)
+                    .add(Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM)
+                    .add(Player.COMMAND_SEEK_TO_PREVIOUS)
+                    .add(Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM)
+                    .build()
+            }
+
+            override fun isCommandAvailable(command: Int): Boolean {
+                return when (command) {
+                    Player.COMMAND_SEEK_TO_NEXT,
+                    Player.COMMAND_SEEK_TO_NEXT_MEDIA_ITEM,
+                    Player.COMMAND_SEEK_TO_PREVIOUS,
+                    Player.COMMAND_SEEK_TO_PREVIOUS_MEDIA_ITEM -> true
+                    else -> super.isCommandAvailable(command)
+                }
+            }
+
+            override fun seekToNext() {
+                publishSkipEvent("skip_next")
+            }
+
+            override fun seekToNextMediaItem() {
+                publishSkipEvent("skip_next")
+            }
+
+            override fun seekToPrevious() {
+                publishSkipEvent("skip_previous")
+            }
+
+            override fun seekToPreviousMediaItem() {
+                publishSkipEvent("skip_previous")
+            }
+        }
+
+        mediaSession = MediaSession.Builder(this, forwardingPlayer).build().also { session ->
             createSessionActivity()?.let(session::setSessionActivity)
         }
         ensureNotificationChannel()
         notificationManager = buildNotificationManager().also {
             mediaSession?.platformToken?.let(it::setMediaSessionToken)
-            it.setPlayer(player)
+            it.setPlayer(forwardingPlayer)
         }
     }
 
@@ -293,6 +330,16 @@ class PlaybackService : MediaSessionService() {
         lastState = state
         listeners.forEach { listener ->
             listener(state)
+        }
+    }
+
+    private fun publishSkipEvent(action: String) {
+        val event = mapOf<String, Any?>(
+            "type" to "event",
+            "name" to action,
+        )
+        listeners.forEach { listener ->
+            listener(event)
         }
     }
 
@@ -579,8 +626,8 @@ class PlaybackService : MediaSessionService() {
             .build()
             .apply {
                 setColorized(true)
-                setUseNextAction(false)
-                setUsePreviousAction(false)
+                setUseNextAction(true)
+                setUsePreviousAction(true)
                 setUsePlayPauseActions(true)
                 setPriority(NotificationCompat.PRIORITY_LOW)
             }
