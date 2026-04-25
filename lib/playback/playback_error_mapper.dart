@@ -9,6 +9,11 @@ abstract final class PlaybackErrorMapper {
           'no_results',
           'No YouTube result was found for this imported Spotify track.',
         );
+      case 'no_playable_match':
+        return const PlaybackFailure(
+          'no_playable_match',
+          'No safe YouTube result was found for this track.',
+        );
       case 'temporary_unavailable':
         return const PlaybackFailure(
           'temporary_unavailable',

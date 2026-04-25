@@ -282,34 +282,97 @@ class RecommendationNotifier extends StateNotifier<RecommendationState> {
     required List<RecommendedTrack> exclude,
   }) async {
     try {
-      final results = await _youtubeService.search('${seed.title} ${seed.artist}');
+      final results = await _fetchYoutubeFallbackCandidates(seed);
       if (results.isEmpty) return const [];
+      final autoplayCandidates = YoutubeService.rankAutoplayCandidates(
+        results,
+        maxDuration: YoutubeService.maxRecommendationDuration,
+      );
+      if (autoplayCandidates.isEmpty) return const [];
 
       final blocked = {
         ...exclude.map((track) => track.dedupKey),
-        '${seed.artist.trim().toLowerCase()}|${seed.title.trim().toLowerCase()}',
+        RecommendedTrack.dedupKeyFor(
+          artist: seed.artist,
+          title: seed.title,
+        ),
       };
 
       final out = <RecommendedTrack>[];
-      for (final result in results) {
-        final title = result.title.trim();
-        final artist = result.uploader.trim();
-        if (title.isEmpty || artist.isEmpty) continue;
-
-        final rec = RecommendedTrack(
-          title: title,
-          artist: artist,
-          imageUrl: _sanitizeAllowedThumbnail(result.thumbnailUrl),
+      for (final result in autoplayCandidates) {
+        final rec = RecommendedTrack.fromYoutubeSearchItem(
+          result,
+          fallbackArtist: seed.artist,
         );
+        final title = rec.title.trim();
+        final artist = rec.artist.trim();
+        if (title.isEmpty || artist.isEmpty) continue;
+        if (_looksLikeSeedVariant(rec, seed)) continue;
+
         if (!blocked.add(rec.dedupKey)) continue;
 
-        out.add(rec);
+        out.add(rec.copyWith(
+          imageUrl: _sanitizeAllowedThumbnail(result.thumbnailUrl),
+        ));
         if (out.length >= limit) break;
       }
       return out;
     } catch (_) {
       return const [];
     }
+  }
+
+  Future<List<YoutubeSearchItem>> _fetchYoutubeFallbackCandidates(
+    LibraryTrack seed,
+  ) async {
+    final queries = <String>[
+      '${seed.artist} songs',
+      '${seed.artist} topic',
+      seed.artist,
+    ];
+
+    final merged = <YoutubeSearchItem>[];
+    final seenIds = <String>{};
+    for (final query in queries) {
+      try {
+        final results = await _youtubeService.search(query);
+        for (final result in results) {
+          if (seenIds.add(result.id)) merged.add(result);
+        }
+      } catch (_) {
+        continue;
+      }
+    }
+    return merged;
+  }
+
+  bool _looksLikeSeedVariant(RecommendedTrack candidate, LibraryTrack seed) {
+    final seedKey = RecommendedTrack.dedupKeyFor(
+      artist: seed.artist,
+      title: seed.title,
+    );
+    if (candidate.dedupKey == seedKey) return true;
+
+    final seedTitle = RecommendedTrack.normalizedTitleFor(seed.title);
+    final candidateTitle = RecommendedTrack.normalizedTitleFor(candidate.title);
+    if (seedTitle.isEmpty || candidateTitle.isEmpty) return false;
+
+    if (candidateTitle.contains(seedTitle) ||
+        seedTitle.contains(candidateTitle)) {
+      return true;
+    }
+
+    final seedTokens =
+        seedTitle.split(' ').where((part) => part.isNotEmpty).toSet();
+    final candidateTokens =
+        candidateTitle.split(' ').where((part) => part.isNotEmpty).toSet();
+    if (seedTokens.isEmpty || candidateTokens.isEmpty) return false;
+
+    final overlap = seedTokens.intersection(candidateTokens).length;
+    final minSize = seedTokens.length < candidateTokens.length
+        ? seedTokens.length
+        : candidateTokens.length;
+    return minSize > 0 && overlap >= minSize;
   }
 
   LibraryTrack _nextSeed() {
@@ -321,6 +384,32 @@ class RecommendationNotifier extends StateNotifier<RecommendationState> {
   /// Enqueues a recommended track and returns the generated ID, or null if
   /// the track was already in the queue.
   String? _enqueue(RecommendedTrack rec) {
+    final recKey = rec.dedupKey;
+    final playback = _playbackNotifier.state;
+    final currentTitle = playback.currentTitle?.trim() ?? '';
+    final currentArtist = playback.currentArtist?.trim() ?? '';
+
+    if (currentTitle.isNotEmpty &&
+        currentArtist.isNotEmpty &&
+        RecommendedTrack.dedupKeyFor(
+              artist: currentArtist,
+              title: currentTitle,
+            ) ==
+            recKey) {
+      return null;
+    }
+
+    if (playback.queue.any(
+      (track) =>
+          RecommendedTrack.dedupKeyFor(
+            artist: track.artist,
+            title: track.title,
+          ) ==
+          recKey,
+    )) {
+      return null;
+    }
+
     final id = '$lastFmRecIdPrefix${_sessionSeed}_${_enqueueCounter++}';
     final added = _playbackNotifier.addToQueue(
       videoId: id,
@@ -374,9 +463,16 @@ class RecommendationNotifier extends StateNotifier<RecommendationState> {
     if (sanitizedArtwork.isNotEmpty) return sanitizedArtwork;
 
     try {
-      final results = await _youtubeService.search('${rec.title} ${rec.artist}');
-      if (results.isEmpty) return '';
-      return _sanitizeAllowedThumbnail(results.first.thumbnailUrl);
+      final results =
+          await _youtubeService.search('${rec.title} ${rec.artist}');
+      final match = YoutubeService.selectAutoplayCandidate(
+        results,
+        title: rec.title,
+        artist: rec.artist,
+        maxDuration: YoutubeService.maxRecommendationDuration,
+      );
+      if (match == null) return '';
+      return _sanitizeAllowedThumbnail(match.thumbnailUrl);
     } catch (_) {
       return '';
     }
@@ -505,7 +601,10 @@ class RecommendationNotifier extends StateNotifier<RecommendationState> {
   Set<String> _initialSeenKeys() {
     final keys = <String>{};
     void addKey(String artist, String title) {
-      final key = '${artist.trim().toLowerCase()}|${title.trim().toLowerCase()}';
+      final key = RecommendedTrack.dedupKeyFor(
+        artist: artist,
+        title: title,
+      );
       if (key != '|') keys.add(key);
     }
 
@@ -513,6 +612,14 @@ class RecommendationNotifier extends StateNotifier<RecommendationState> {
       addKey(t.artist, t.title);
     }
     for (final t in _libraryNotifier.state.likedTracks) {
+      addKey(t.artist, t.title);
+    }
+    final playback = _playbackNotifier.state;
+    if ((playback.currentArtist ?? '').trim().isNotEmpty &&
+        (playback.currentTitle ?? '').trim().isNotEmpty) {
+      addKey(playback.currentArtist!, playback.currentTitle!);
+    }
+    for (final t in playback.queue) {
       addKey(t.artist, t.title);
     }
     return keys;

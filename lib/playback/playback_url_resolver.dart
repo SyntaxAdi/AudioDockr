@@ -25,6 +25,7 @@ class ResolvedMedia {
 class PlaybackUrlResolver {
   static const MethodChannel _extractChannel =
       MethodChannel('audiodockr/extract');
+  static const String _lastFmRecommendationPrefix = 'lastfm_rec_';
 
   const PlaybackUrlResolver({
     required YoutubeService youtubeService,
@@ -101,7 +102,21 @@ class PlaybackUrlResolver {
     try {
       final query = '$title $artist'.trim();
       final results = await _youtubeService.search(query);
-      final match = results.first;
+      final maxDuration = videoId.startsWith(_lastFmRecommendationPrefix)
+          ? YoutubeService.maxRecommendationDuration
+          : null;
+      final match = YoutubeService.selectAutoplayCandidate(
+        results,
+        title: title,
+        artist: artist,
+        maxDuration: maxDuration,
+      );
+      if (match == null) {
+        throw const YoutubeServiceException(
+          'no_playable_match',
+          'No safe YouTube result was found for this track.',
+        );
+      }
       await _libraryNotifier.updateTrackVideoUrl(
         videoId: videoId,
         videoUrl: match.url,
