@@ -402,15 +402,6 @@ class _AccountProfilePageState extends ConsumerState<AccountProfilePage>
                           ),
                           child: const _ScanDivider(),
                         ),
-                        Padding(
-                          padding: EdgeInsets.fromLTRB(
-                            horizontalPadding,
-                            14,
-                            horizontalPadding,
-                            0,
-                          ),
-                          child: const _CyberpunkFooter(),
-                        ),
                       ],
                     ),
                   ),
@@ -978,57 +969,6 @@ class _ScanDivider extends StatelessWidget {
           color: accentPrimary.withValues(alpha: 0.25),
         ),
       ),
-    );
-  }
-}
-
-class _CyberpunkFooter extends StatelessWidget {
-  const _CyberpunkFooter();
-
-  @override
-  Widget build(BuildContext context) {
-    final footerStyle = _techStyle(
-      size: 10,
-      color: const Color(0xFF252535),
-      spacing: 1.6,
-    );
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        if (constraints.maxWidth < 360) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'NIGHT CITY BUILD SYSTEM',
-                style: footerStyle,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'SYS::PROFILE_MOD v53',
-                style: footerStyle,
-              ),
-            ],
-          );
-        }
-
-        return Row(
-          children: [
-            Expanded(
-              child: Text(
-                'NIGHT CITY BUILD SYSTEM',
-                style: footerStyle,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Text(
-              'SYS::PROFILE_MOD v53',
-              style: footerStyle,
-            ),
-          ],
-        );
-      },
     );
   }
 }

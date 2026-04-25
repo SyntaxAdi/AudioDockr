@@ -1,11 +1,31 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../providers/profile_provider.dart';
 import '../../../services/app_info_service.dart';
 import '../../../services/app_update_service.dart';
 import '../../../theme.dart';
+
+const Color _cpTopbarLine = Color(0xFF1A1A26);
+const Color _cpWarmText = Color(0xFFE0D5B0);
+
+TextStyle _techStyle({
+  double size = 12,
+  FontWeight weight = FontWeight.w400,
+  Color color = _cpWarmText,
+  double spacing = 0.0,
+  double? height,
+}) {
+  return GoogleFonts.shareTechMono(
+    fontSize: size,
+    fontWeight: weight,
+    color: color,
+    letterSpacing: spacing,
+    height: height,
+  );
+}
 
 class AppUpdatesPage extends ConsumerStatefulWidget {
   const AppUpdatesPage({super.key});
@@ -58,160 +78,235 @@ class _AppUpdatesPageState extends ConsumerState<AppUpdatesPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: bgBase,
-      appBar: AppBar(
-        backgroundColor: bgBase,
-        elevation: 0,
-        title: Text(
-          'App updates',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: textPrimary,
-              ),
-        ),
-      ),
-      body: FutureBuilder<(_PageStateData, RemoteReleaseInfo?)>(
-        future: _pageFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState != ConnectionState.done) {
-            return const Center(
-              child: CircularProgressIndicator(color: accentPrimary),
-            );
-          }
+      body: SafeArea(
+        child: Column(
+          children: [
+            const _CyberpunkTopBar(),
+            Expanded(
+              child: FutureBuilder<(_PageStateData, RemoteReleaseInfo?)>(
+                future: _pageFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(
+                      child: CircularProgressIndicator(color: accentPrimary),
+                    );
+                  }
 
-          if (snapshot.hasError || !snapshot.hasData) {
-            return ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              children: const [
-                _UpdateStateCard(
-                  title: 'Update module unavailable',
-                  details: [
-                    'The App Updates screen could not load right now.',
-                    'Try reopening the page or restarting the app once.',
-                  ],
-                ),
-              ],
-            );
-          }
+                  if (snapshot.hasError || !snapshot.hasData) {
+                    return ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      children: const [
+                        _UpdateStateCard(
+                          title: 'Update module unavailable',
+                          details: [
+                            'The App Updates screen could not load right now.',
+                            'Try reopening the page or restarting the app once.',
+                          ],
+                        ),
+                      ],
+                    );
+                  }
 
-          final (pageState, release) = snapshot.data!;
-          final installed = pageState.installed;
-          final displayName = ref.watch(displayNameProvider);
-          final isSamePublishedVersion =
-              release != null && release.version == installed.normalizedVersion;
-          final hasPatch = release != null &&
-              release.version.isNotEmpty &&
-              release.version != installed.normalizedVersion;
+                  final (pageState, release) = snapshot.data!;
+                  final installed = pageState.installed;
+                  final displayName = ref.watch(displayNameProvider);
+                  final isSamePublishedVersion = release != null &&
+                      release.version == installed.normalizedVersion;
+                  final hasPatch = release != null &&
+                      release.version.isNotEmpty &&
+                      release.version != installed.normalizedVersion;
 
-          return RefreshIndicator(
-            color: accentPrimary,
-            onRefresh: () async {
-              final future = _loadData();
-              setState(() {
-                _pageFuture = future;
-              });
-              await future;
-            },
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-              children: [
-                _FrameHeader(versionCode: installed.displayBuildNumber),
-                const SizedBox(height: 14),
-                const _SectionLabel('System identity'),
-                _IdentityCard(
-                  installed: installed,
-                  displayName: displayName,
-                ),
-                const SizedBox(height: 18),
-                _SectionLabel(hasPatch ? 'Patch available' : 'Update status'),
-                if (release == null)
-                  const _UpdateStateCard(
-                    title: 'Release service unavailable',
-                    details: [
-                      'Could not fetch the latest GitHub release right now.'
-                    ],
-                  )
-                else if (hasPatch)
-                  _PatchAvailableCard(
-                    installedVersion: installed.normalizedVersion,
-                    release: release,
-                    onPrimaryAction: release.preferredAsset == null
-                        ? null
-                        : () => _openUrl(release.preferredAsset!.downloadUrl),
-                    onSecondaryAction: release.workflowRunUrl == null
-                        ? null
-                        : () => _openUrl(release.workflowRunUrl!),
-                  )
-                else if (installed.isDirty)
-                  _UpdateStateCard(
-                    title: 'Local modified build detected',
-                    dangerTitle: true,
-                    details: [
-                      if (isSamePublishedVersion)
-                        'Installed build ${installed.versionName} matches the latest published version, but it contains local unpushed changes.'
-                      else
-                        'Installed build ${installed.versionName} contains local modifications and may differ from the latest published release.',
-                      'Installing the published APK will replace this dirty local build with a clean release build.',
-                    ],
-                  )
-                else
-                  _UpdateStateCard(
-                    title: 'System up to date',
-                    details: [
-                      'Installed build ${installed.versionName} already matches the latest published release.',
-                      if (release.assets.isNotEmpty)
-                        'Latest asset: ${release.assets.first.name}',
-                    ],
-                  ),
-                const SizedBox(height: 18),
-                const Divider(color: bgDivider, height: 1),
-                const SizedBox(height: 14),
-                Wrap(
-                  alignment: WrapAlignment.spaceBetween,
-                  runSpacing: 8,
-                  children: [
-                    InkWell(
-                      onTap: _openSyntaxAdiProfile,
-                      child: RichText(
-                        text: TextSpan(
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelSmall
-                              ?.copyWith(
-                                color: textSecondary.withValues(alpha: 0.56),
-                                letterSpacing: 1.2,
+                  return RefreshIndicator(
+                    color: accentPrimary,
+                    onRefresh: () async {
+                      final future = _loadData();
+                      setState(() {
+                        _pageFuture = future;
+                      });
+                      await future;
+                    },
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                      children: [
+                        _FrameHeader(versionCode: installed.displayBuildNumber),
+                        const SizedBox(height: 14),
+                        const _SectionLabel('System identity'),
+                        _IdentityCard(
+                          installed: installed,
+                          displayName: displayName,
+                        ),
+                        const SizedBox(height: 18),
+                        _SectionLabel(
+                            hasPatch ? 'Patch available' : 'Update status'),
+                        if (release == null)
+                          const _UpdateStateCard(
+                            title: 'Release service unavailable',
+                            details: [
+                              'Could not fetch the latest GitHub release right now.'
+                            ],
+                          )
+                        else if (hasPatch)
+                          _PatchAvailableCard(
+                            installedVersion: installed.normalizedVersion,
+                            release: release,
+                            onPrimaryAction: release.preferredAsset == null
+                                ? null
+                                : () => _openUrl(
+                                    release.preferredAsset!.downloadUrl),
+                            onSecondaryAction: release.workflowRunUrl == null
+                                ? null
+                                : () => _openUrl(release.workflowRunUrl!),
+                          )
+                        else if (installed.isDirty)
+                          _UpdateStateCard(
+                            title: 'Local modified build detected',
+                            dangerTitle: true,
+                            details: [
+                              if (isSamePublishedVersion)
+                                'Installed build ${installed.versionName} matches the latest published version, but it contains local unpushed changes.'
+                              else
+                                'Installed build ${installed.versionName} contains local modifications and may differ from the latest published release.',
+                              'Installing the published APK will replace this dirty local build with a clean release build.',
+                            ],
+                          )
+                        else
+                          _UpdateStateCard(
+                            title: 'System up to date',
+                            details: [
+                              'Installed build ${installed.versionName} already matches the latest published release.',
+                              if (release.assets.isNotEmpty)
+                                'Latest asset: ${release.assets.first.name}',
+                            ],
+                          ),
+                        const SizedBox(height: 18),
+                        const Divider(color: bgDivider, height: 1),
+                        const SizedBox(height: 14),
+                        Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          runSpacing: 8,
+                          children: [
+                            InkWell(
+                              onTap: _openSyntaxAdiProfile,
+                              child: RichText(
+                                text: TextSpan(
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(
+                                        color: textSecondary
+                                            .withValues(alpha: 0.56),
+                                        letterSpacing: 1.2,
+                                      ),
+                                  children: const [
+                                    TextSpan(text: 'Made With '),
+                                    TextSpan(text: '💛'),
+                                    TextSpan(text: ' by '),
+                                    TextSpan(
+                                      text: 'SyntaxAdi',
+                                      style: TextStyle(
+                                        color: accentPrimary,
+                                        decoration: TextDecoration.underline,
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                          children: const [
-                            TextSpan(text: 'Made With '),
-                            TextSpan(text: '💛'),
-                            TextSpan(text: ' by '),
-                            TextSpan(
-                              text: 'SyntaxAdi',
-                              style: TextStyle(
-                                color: accentPrimary,
-                                decoration: TextDecoration.underline,
-                              ),
+                            ),
+                            Text(
+                              release == null
+                                  ? 'OFFLINE'
+                                  : _formatDateTime(release.publishedAt),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .labelSmall
+                                  ?.copyWith(
+                                    color: textSecondary.withValues(alpha: 0.42),
+                                    letterSpacing: 1.6,
+                                  ),
                             ),
                           ],
                         ),
-                      ),
+                      ],
                     ),
-                    Text(
-                      release == null
-                          ? 'OFFLINE'
-                          : _formatDateTime(release.publishedAt),
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: textSecondary.withValues(alpha: 0.42),
-                            letterSpacing: 1.6,
-                          ),
-                    ),
-                  ],
-                ),
-              ],
+                  );
+                },
+              ),
             ),
-          );
-        },
+          ],
+        ),
       ),
     );
   }
+}
+
+class _CyberpunkTopBar extends StatelessWidget {
+  const _CyberpunkTopBar();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: _cpTopbarLine),
+        ),
+      ),
+      child: Row(
+        children: [
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => Navigator.of(context).maybePop(),
+              child: ClipPath(
+                clipper: _ParallelogramButtonClipper(),
+                child: Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    border: Border.all(color: accentPrimary),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Icon(
+                    Icons.chevron_left_rounded,
+                    color: accentPrimary,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Text(
+            'UPDATES',
+            style: _techStyle(
+              size: 20,
+              weight: FontWeight.w700,
+              color: accentPrimary,
+              spacing: 3.0,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ParallelogramButtonClipper extends CustomClipper<Path> {
+  @override
+  Path getClip(Size size) {
+    const cut = 6.0;
+    final path = Path()
+      ..moveTo(cut, 0)
+      ..lineTo(size.width, 0)
+      ..lineTo(size.width - cut, size.height)
+      ..lineTo(0, size.height)
+      ..lineTo(0, cut)
+      ..close();
+    return path;
+  }
+
+  @override
+  bool shouldReclip(covariant CustomClipper<Path> oldClipper) => false;
 }
 
 class _PageStateData {
