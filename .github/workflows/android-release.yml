@@ -59,8 +59,8 @@ jobs:
           SHORT_SHA="$(git rev-parse --short HEAD)"
           FULL_SHA="$(git rev-parse HEAD)"
           VERSION_CODE="${{ github.run_number }}"
-          RELEASE_TAG="android-sideload-${SHORT_SHA}"
-          RELEASE_NAME="AudioDockr — Android Sideload Build (${SHORT_SHA})"
+          RELEASE_TAG="audiodockr-stable-${SHORT_SHA}"
+          RELEASE_NAME="AudioDockr Stable Release"
           ASSET_DIR="build/release-assets"
           BUILD_TIME_UTC="$(date -u +"%Y-%m-%d %H:%M UTC")"
 
@@ -148,7 +148,7 @@ jobs:
           tag: ${{ steps.metadata.outputs.release_tag }}
           name: ${{ steps.metadata.outputs.release_name }}
           commit: ${{ github.sha }}
-          prerelease: true
+          prerelease: false
           artifactErrorsFailBuild: true
           artifacts: ${{ steps.metadata.outputs.asset_dir }}/*.apk
           body: |
