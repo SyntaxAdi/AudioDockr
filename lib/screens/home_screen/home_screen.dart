@@ -37,8 +37,6 @@ class HomeScreen extends ConsumerWidget {
     final displayName = ref.watch(displayNameProvider);
     final profileImage = ref.watch(profileImageProvider);
     final recentlyPlayed = libraryState.recentTracks.take(10).toList();
-    final latestPlayedTrack =
-        libraryState.recentTracks.isNotEmpty ? libraryState.recentTracks.first : null;
     final playlists = libraryState.userPlaylists;
     final likedTracks = libraryState.likedTracks;
     final screenSize = MediaQuery.sizeOf(context);
@@ -48,7 +46,6 @@ class HomeScreen extends ConsumerWidget {
       context: context,
       ref: ref,
       libraryState: libraryState,
-      latestPlayedTrack: latestPlayedTrack,
       likedTracks: likedTracks,
       playlists: playlists,
     );
@@ -155,12 +152,12 @@ class HomeScreen extends ConsumerWidget {
     required BuildContext context,
     required WidgetRef ref,
     required LibraryState libraryState,
-    required LibraryTrack? latestPlayedTrack,
     required List<LibraryTrack> likedTracks,
     required List<LibraryPlaylist> playlists,
   }) {
     final items = <HomeShortcutData>[
       HomeShortcutData(
+        id: 'liked',
         title: 'Liked Songs',
         subtitle: '',
         icon: Icons.favorite_rounded,
@@ -168,7 +165,8 @@ class HomeScreen extends ConsumerWidget {
         onTap: () {
           Navigator.of(context).push(
             CupertinoPageRoute(
-              builder: (_) => PlaylistDetailsScreen(                title: 'Liked Songs',
+              builder: (_) => PlaylistDetailsScreen(
+                title: 'Liked Songs',
                 tracks: likedTracks,
               ),
             ),
@@ -176,6 +174,7 @@ class HomeScreen extends ConsumerWidget {
         },
       ),
       HomeShortcutData(
+        id: 'recents',
         title: 'Recents',
         subtitle: '${libraryState.recentTracks.length} tracks',
         isCyberpunkRecents: true,
@@ -183,67 +182,26 @@ class HomeScreen extends ConsumerWidget {
         onTap: () {
           Navigator.of(context).push(
             CupertinoPageRoute(
-              builder: (_) => PlaylistDetailsScreen(                title: 'Recents',
+              builder: (_) => PlaylistDetailsScreen(
+                title: 'Recents',
                 tracks: libraryState.recentTracks,
               ),
             ),
           );
         },
-      ),
-      HomeShortcutData(
-        title: latestPlayedTrack?.title ?? 'Recently played',
-        subtitle: latestPlayedTrack?.artist ?? 'Your latest song will appear here',
-        artworkUrl: latestPlayedTrack?.thumbnailUrl,
-        icon: Icons.history_rounded,
-        usesAppLogoFallback: true,
-        onTap: () {
-          Navigator.of(context).push(
-            CupertinoPageRoute(
-              builder: (_) => PlaylistDetailsScreen(                title: 'Recents',
-                tracks: libraryState.recentTracks,
-              ),
-            ),
-          );
-        },
-        onLongPress: latestPlayedTrack == null
-            ? null
-            : () => showTrackActionsSheet(context, ref, latestPlayedTrack),
       ),
     ];
 
     final remainingSlots = 8 - items.length;
-    final playlistCount =
-        playlists.length >= remainingSlots ? remainingSlots : playlists.length;
+    final recentShortcutCount =
+        libraryState.recentTracks.length >= remainingSlots
+            ? remainingSlots
+            : libraryState.recentTracks.length;
 
     items.addAll([
-      for (final playlist in playlists.take(playlistCount))
+      for (final track in libraryState.recentTracks.take(recentShortcutCount))
         HomeShortcutData(
-          title: playlist.name,
-          subtitle: '${playlist.trackCount} tracks',
-          localArtworkPath: playlist.coverImagePath,
-          icon: Icons.queue_music_rounded,
-          usesAppLogoFallback: true,
-          onTap: () {
-            Navigator.of(context).push(
-              CupertinoPageRoute(
-                builder: (_) => PlaylistDetailsScreen(
-                  title: playlist.name,
-                  playlistId: playlist.id,
-                ),
-              ),
-            );
-          },
-        ),
-    ]);
-
-    final remainingSongSlots = 8 - items.length;
-    final gridRecentTracks = latestPlayedTrack == null
-        ? libraryState.recentTracks
-        : libraryState.recentTracks.skip(1).toList();
-
-    items.addAll([
-      for (final track in gridRecentTracks.take(remainingSongSlots))
-        HomeShortcutData(
+          id: 'track:${track.videoId}',
           title: track.title,
           subtitle: track.artist,
           artworkUrl: track.thumbnailUrl,
@@ -266,6 +224,33 @@ class HomeScreen extends ConsumerWidget {
             }
           },
           onLongPress: () => showTrackActionsSheet(context, ref, track),
+        ),
+    ]);
+
+    final remainingPlaylistSlots = 8 - items.length;
+    final playlistCount = playlists.length >= remainingPlaylistSlots
+        ? remainingPlaylistSlots
+        : playlists.length;
+
+    items.addAll([
+      for (final playlist in playlists.take(playlistCount))
+        HomeShortcutData(
+          id: 'playlist:${playlist.id}',
+          title: playlist.name,
+          subtitle: '${playlist.trackCount} tracks',
+          localArtworkPath: playlist.coverImagePath,
+          icon: Icons.queue_music_rounded,
+          usesAppLogoFallback: true,
+          onTap: () {
+            Navigator.of(context).push(
+              CupertinoPageRoute(
+                builder: (_) => PlaylistDetailsScreen(
+                  title: playlist.name,
+                  playlistId: playlist.id,
+                ),
+              ),
+            );
+          },
         ),
     ]);
 

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
@@ -6,33 +7,131 @@ import 'package:flutter/material.dart';
 import '../../theme.dart';
 import 'home_shortcut_data.dart';
 
-class HomeCollectionGrid extends StatelessWidget {
+class HomeCollectionGrid extends StatefulWidget {
   const HomeCollectionGrid({super.key, required this.items});
 
   final List<HomeShortcutData> items;
 
   @override
+  State<HomeCollectionGrid> createState() => _HomeCollectionGridState();
+}
+
+class _HomeCollectionGridState extends State<HomeCollectionGrid> {
+  final Set<String> _animatedInIds = <String>{};
+  Map<String, int> _previousIndexes = <String, int>{};
+
+  List<HomeShortcutData> get _visibleItems => widget.items.take(8).toList();
+
+  @override
+  void initState() {
+    super.initState();
+    _previousIndexes = {
+      for (var i = 0; i < _visibleItems.length; i++) _visibleItems[i].id: i,
+    };
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _animatedInIds.addAll(_visibleItems.map((item) => item.id));
+      });
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeCollectionGrid oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final previousIds = oldWidget.items.take(8).map((item) => item.id).toSet();
+    final currentIds = _visibleItems.map((item) => item.id).toSet();
+    _previousIndexes = {
+      for (var i = 0; i < oldWidget.items.take(8).length; i++)
+        oldWidget.items[i].id: i,
+    };
+
+    _animatedInIds.removeWhere((id) => !currentIds.contains(id));
+
+    final addedIds = currentIds.difference(previousIds);
+    if (addedIds.isEmpty) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      setState(() {
+        _animatedInIds.addAll(addedIds);
+      });
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final visibleItems = items.take(8).toList();
+    final visibleItems = _visibleItems;
     final width = MediaQuery.of(context).size.width - 32;
     final isCompact = width < 380;
-    // Current aspect ratio results in 4 rows taking space of 4 rows.
-    // To make 4 rows take space of 3 rows, we increase aspect ratio by 4/3.
     final bannerAspectRatio = isCompact ? (2.8 * 4 / 3) : (3.2 * 4 / 3);
+    const crossAxisSpacing = 8.0;
+    const mainAxisSpacing = 6.0;
+    const columnCount = 2;
+    final tileWidth = (width - crossAxisSpacing) / columnCount;
+    final tileHeight = tileWidth / bannerAspectRatio;
+    final rowCount = math.max(1, (visibleItems.length / columnCount).ceil());
+    final gridHeight =
+        rowCount * tileHeight + math.max(0, rowCount - 1) * mainAxisSpacing;
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: visibleItems.length,
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 8,
-        mainAxisSpacing: 6, // Slightly reduced spacing
-        childAspectRatio: bannerAspectRatio,
+    return SizedBox(
+      height: gridHeight,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          for (var index = 0; index < visibleItems.length; index++)
+            () {
+              final item = visibleItems[index];
+              final previousIndex = _previousIndexes[item.id];
+              final isNew = !_animatedInIds.contains(item.id);
+              final movedUp = previousIndex != null && previousIndex > index;
+              final movedDown = previousIndex != null && previousIndex < index;
+              final baseTop =
+                  (index ~/ columnCount) * (tileHeight + mainAxisSpacing);
+
+              return AnimatedPositioned(
+                key: ValueKey(item.id),
+                duration: const Duration(milliseconds: 560),
+                curve: Curves.easeInOutCubicEmphasized,
+                left: (index % columnCount) * (tileWidth + crossAxisSpacing),
+                top: baseTop,
+                width: tileWidth,
+                height: tileHeight,
+                child: TweenAnimationBuilder<double>(
+                  tween: Tween<double>(begin: 0, end: 1),
+                  duration: const Duration(milliseconds: 640),
+                  curve: Curves.easeInOutCubicEmphasized,
+                  builder: (context, progress, child) {
+                    final lift = movedUp ? (1 - progress) * 14 : 0.0;
+                    final slideY = isNew
+                        ? (1 - progress) * 10
+                        : movedDown
+                            ? (1 - progress) * 6
+                            : 0.0;
+                    final scale = isNew
+                        ? 0.92 + (0.08 * progress)
+                        : movedUp
+                            ? 1.0 + ((1 - progress) * 0.045)
+                            : 1.0;
+                    final opacity = isNew ? progress : 1.0;
+
+                    return Transform.translate(
+                      offset: Offset(0, -lift + slideY),
+                      child: Opacity(
+                        opacity: opacity.clamp(0, 1),
+                        child: Transform.scale(
+                          scale: scale,
+                          child: child,
+                        ),
+                      ),
+                    );
+                  },
+                  child: _HomeCollectionTile(item: item),
+                ),
+              );
+            }(),
+        ],
       ),
-      itemBuilder: (context, index) {
-        return _HomeCollectionTile(item: visibleItems[index]);
-      },
     );
   }
 }
@@ -196,7 +295,8 @@ class _HomeCollectionArtwork extends StatelessWidget {
               ),
             ),
             const Center(
-              child: Icon(Icons.favorite_rounded, color: Colors.white, size: 24),
+              child:
+                  Icon(Icons.favorite_rounded, color: Colors.white, size: 24),
             ),
           ],
         ),
