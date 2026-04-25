@@ -45,26 +45,39 @@ class AppUpdateService {
   final http.Client _client;
 
   Future<RemoteReleaseInfo?> fetchLatestRelease() async {
+    final releases = await fetchAllReleases();
+    return releases.isEmpty ? null : releases.first;
+  }
+
+  Future<List<RemoteReleaseInfo>> fetchAllReleases() async {
     final response = await _client.get(
       Uri.parse(
-          'https://api.github.com/repos/SyntaxAdi/AudioDockr/releases/latest'),
+          'https://api.github.com/repos/SyntaxAdi/AudioDockr/releases?per_page=10'),
       headers: const {
         'Accept': 'application/vnd.github+json',
         'User-Agent': 'AudioDockr-App',
       },
-    ).timeout(const Duration(seconds: 8));
+    ).timeout(const Duration(seconds: 10));
 
     if (response.statusCode != 200) {
-      throw Exception('Failed to load latest release.');
+      throw Exception('Failed to load releases.');
     }
 
     final decoded = jsonDecode(response.body);
-    if (decoded is! Map<String, dynamic>) return null;
+    if (decoded is! List) return const [];
 
-    final body = (decoded['body'] as String?) ?? '';
-    final tagName = (decoded['tag_name'] as String?)?.trim() ?? '';
+    return decoded
+        .whereType<Map<String, dynamic>>()
+        .map(_parseRelease)
+        .whereType<RemoteReleaseInfo>()
+        .toList(growable: false);
+  }
+
+  RemoteReleaseInfo? _parseRelease(Map<String, dynamic> json) {
+    final body = (json['body'] as String?) ?? '';
+    final tagName = (json['tag_name'] as String?)?.trim() ?? '';
     final version = _extractVersion(body, tagName);
-    final assetsJson = decoded['assets'];
+    final assetsJson = json['assets'];
     final assets = assetsJson is List
         ? assetsJson
             .whereType<Map>()
@@ -80,11 +93,10 @@ class AppUpdateService {
 
     return RemoteReleaseInfo(
       version: version,
-      title: (decoded['name'] as String?)?.trim().isNotEmpty == true
-          ? (decoded['name'] as String).trim()
+      title: (json['name'] as String?)?.trim().isNotEmpty == true
+          ? (json['name'] as String).trim()
           : 'AudioDockr Stable Release',
-      publishedAt:
-          DateTime.tryParse((decoded['published_at'] as String?) ?? ''),
+      publishedAt: DateTime.tryParse((json['published_at'] as String?) ?? ''),
       changelog: _extractChangelog(body),
       assets: assets,
       workflowRunUrl: _extractWorkflowRunUrl(body),

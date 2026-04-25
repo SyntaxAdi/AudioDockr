@@ -38,7 +38,7 @@ class _AppUpdatesPageState extends ConsumerState<AppUpdatesPage> {
   final AppInfoService _appInfoService = AppInfoService();
   final AppUpdateService _appUpdateService = AppUpdateService();
 
-  late Future<(_PageStateData, RemoteReleaseInfo?)> _pageFuture;
+  late Future<(_PageStateData, List<RemoteReleaseInfo>)> _pageFuture;
 
   @override
   void initState() {
@@ -46,18 +46,23 @@ class _AppUpdatesPageState extends ConsumerState<AppUpdatesPage> {
     _pageFuture = _loadData();
   }
 
-  Future<(_PageStateData, RemoteReleaseInfo?)> _loadData() async {
+  Future<(_PageStateData, List<RemoteReleaseInfo>)> _loadData() async {
     final installed = await _appInfoService.loadInstalledBuildInfo();
     final displayName = ref.read(displayNameProvider);
-    RemoteReleaseInfo? release;
+    List<RemoteReleaseInfo> releases = [];
     try {
-      release = await _appUpdateService.fetchLatestRelease();
+      final allReleases = await _appUpdateService.fetchAllReleases();
+      for (final r in allReleases) {
+        if (r.version == installed.normalizedVersion) break;
+        releases.add(r);
+        if (releases.length >= 7) break;
+      }
     } catch (_) {
-      release = null;
+      releases = [];
     }
     return (
       _PageStateData(installed: installed, displayName: displayName),
-      release,
+      releases,
     );
   }
 
@@ -83,7 +88,7 @@ class _AppUpdatesPageState extends ConsumerState<AppUpdatesPage> {
           children: [
             const _CyberpunkTopBar(),
             Expanded(
-              child: FutureBuilder<(_PageStateData, RemoteReleaseInfo?)>(
+              child: FutureBuilder<(_PageStateData, List<RemoteReleaseInfo>)>(
                 future: _pageFuture,
                 builder: (context, snapshot) {
                   if (snapshot.connectionState != ConnectionState.done) {
@@ -107,14 +112,11 @@ class _AppUpdatesPageState extends ConsumerState<AppUpdatesPage> {
                     );
                   }
 
-                  final (pageState, release) = snapshot.data!;
+                  final (pageState, releases) = snapshot.data!;
                   final installed = pageState.installed;
                   final displayName = ref.watch(displayNameProvider);
-                  final isSamePublishedVersion = release != null &&
-                      release.version == installed.normalizedVersion;
-                  final hasPatch = release != null &&
-                      release.version.isNotEmpty &&
-                      release.version != installed.normalizedVersion;
+                  final hasPatch = releases.isNotEmpty;
+                  final latestRelease = hasPatch ? releases.first : null;
 
                   return RefreshIndicator(
                     color: accentPrimary,
@@ -138,46 +140,46 @@ class _AppUpdatesPageState extends ConsumerState<AppUpdatesPage> {
                         const SizedBox(height: 18),
                         _SectionLabel(
                             hasPatch ? 'Patch available' : 'Update status'),
-                        if (release == null)
-                          const _UpdateStateCard(
-                            title: 'Release service unavailable',
+                        if (!hasPatch)
+                          _UpdateStateCard(
+                            title: installed.isDirty
+                                ? 'Local modified build detected'
+                                : 'System up to date',
+                            dangerTitle: installed.isDirty,
                             details: [
-                              'Could not fetch the latest GitHub release right now.'
+                              if (installed.isDirty) ...[
+                                'Installed build ${installed.versionName} contains local modifications and may differ from the latest published release.',
+                                'Installing the latest clean release will replace this dirty local build.',
+                              ] else ...[
+                                'Installed build ${installed.versionName} already matches the latest published release.',
+                              ],
                             ],
                           )
-                        else if (hasPatch)
+                        else ...[
                           _PatchAvailableCard(
                             installedVersion: installed.normalizedVersion,
-                            release: release,
-                            onPrimaryAction: release.preferredAsset == null
+                            release: latestRelease!,
+                            onPrimaryAction: latestRelease.preferredAsset ==
+                                    null
                                 ? null
                                 : () => _openUrl(
-                                    release.preferredAsset!.downloadUrl),
-                            onSecondaryAction: release.workflowRunUrl == null
-                                ? null
-                                : () => _openUrl(release.workflowRunUrl!),
-                          )
-                        else if (installed.isDirty)
-                          _UpdateStateCard(
-                            title: 'Local modified build detected',
-                            dangerTitle: true,
-                            details: [
-                              if (isSamePublishedVersion)
-                                'Installed build ${installed.versionName} matches the latest published version, but it contains local unpushed changes.'
-                              else
-                                'Installed build ${installed.versionName} contains local modifications and may differ from the latest published release.',
-                              'Installing the published APK will replace this dirty local build with a clean release build.',
-                            ],
-                          )
-                        else
-                          _UpdateStateCard(
-                            title: 'System up to date',
-                            details: [
-                              'Installed build ${installed.versionName} already matches the latest published release.',
-                              if (release.assets.isNotEmpty)
-                                'Latest asset: ${release.assets.first.name}',
-                            ],
+                                    latestRelease.preferredAsset!.downloadUrl),
+                            onSecondaryAction:
+                                latestRelease.workflowRunUrl == null
+                                    ? null
+                                    : () =>
+                                        _openUrl(latestRelease.workflowRunUrl!),
                           ),
+                          if (releases.length > 1) ...[
+                            const SizedBox(height: 24),
+                            const _SectionLabel('Cumulative patches'),
+                            const SizedBox(height: 4),
+                            ...releases.skip(1).map((r) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _CompactReleaseCard(release: r),
+                                )),
+                          ],
+                        ],
                         const SizedBox(height: 18),
                         const Divider(color: bgDivider, height: 1),
                         const SizedBox(height: 14),
@@ -213,9 +215,9 @@ class _AppUpdatesPageState extends ConsumerState<AppUpdatesPage> {
                               ),
                             ),
                             Text(
-                              release == null
-                                  ? 'OFFLINE'
-                                  : _formatDateTime(release.publishedAt),
+                              !hasPatch
+                                  ? 'UP TO DATE'
+                                  : _formatDateTime(latestRelease?.publishedAt),
                               style: Theme.of(context)
                                   .textTheme
                                   .labelSmall
@@ -234,6 +236,89 @@ class _AppUpdatesPageState extends ConsumerState<AppUpdatesPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _CompactReleaseCard extends StatelessWidget {
+  const _CompactReleaseCard({required this.release});
+
+  final RemoteReleaseInfo release;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: bgSurface,
+        border: Border.all(color: bgDivider),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  border: Border.all(color: accentCyan.withValues(alpha: 0.5)),
+                  color: accentCyan.withValues(alpha: 0.05),
+                ),
+                child: Text(
+                  release.version,
+                  style: _techStyle(
+                    size: 11,
+                    weight: FontWeight.w700,
+                    color: accentCyan,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  release.title.toUpperCase(),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _techStyle(
+                    size: 11,
+                    weight: FontWeight.w700,
+                    color: textPrimary,
+                    spacing: 0.8,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          for (final line in release.changelog.take(3))
+            Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '·',
+                    style: TextStyle(
+                      color: accentPrimary.withValues(alpha: 0.7),
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      line,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: textSecondary,
+                            height: 1.3,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+        ],
       ),
     );
   }
