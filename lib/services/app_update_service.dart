@@ -104,16 +104,18 @@ class AppUpdateService {
   }
 
   static String _extractVersion(String body, String tagName) {
+    const prefix = 'audiodockr-stable-';
+    if (tagName.startsWith(prefix)) {
+      return tagName.substring(prefix.length).trim();
+    }
+    if (tagName.isNotEmpty) return tagName;
+
     final tableMatch = RegExp(r'\| Version \| `([^`]+)` \|').firstMatch(body);
     if (tableMatch != null) {
       return tableMatch.group(1)!.trim();
     }
 
-    const prefix = 'audiodockr-stable-';
-    if (tagName.startsWith(prefix)) {
-      return tagName.substring(prefix.length).trim();
-    }
-    return tagName.trim().isNotEmpty ? tagName.trim() : 'unknown';
+    return 'unknown';
   }
 
   static List<String> _extractChangelog(String body) {
