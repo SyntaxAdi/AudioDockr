@@ -22,6 +22,7 @@ class MainActivity : FlutterFragmentActivity() {
     private val playerCommandsChannel = "com.akeno.audiodockr/player_commands"
     private val playerEventsChannel = "com.akeno.audiodockr/player_events"
     private val localMetadataChannel = "audiodockr/local_metadata"
+    private val appInfoChannel = "audiodockr/app_info"
     private var playbackListener: ((Map<String, Any?>) -> Unit)? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -181,6 +182,27 @@ class MainActivity : FlutterFragmentActivity() {
                         result.success(metadata)
                     }
                 }
+            }
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, appInfoChannel)
+            .setMethodCallHandler { call, result ->
+                if (call.method != "getAppInfo") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+
+                result.success(
+                    mapOf(
+                        "appName" to packageManager.getApplicationLabel(applicationInfo).toString(),
+                        "versionName" to BuildConfig.VERSION_NAME,
+                        "versionCode" to BuildConfig.VERSION_CODE.toString(),
+                        "commitCount" to BuildConfig.GIT_COMMIT_COUNT.toString(),
+                        "gitSha" to BuildConfig.GIT_SHA,
+                        "isDirty" to BuildConfig.GIT_DIRTY,
+                        "abi" to (Build.SUPPORTED_ABIS.firstOrNull() ?: "unknown"),
+                        "packageType" to "Sideload",
+                    ),
+                )
             }
     }
 

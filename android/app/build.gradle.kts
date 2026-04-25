@@ -22,6 +22,7 @@ fun gitOutput(vararg args: String): String? {
 
 val autoVersionCode = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyDDDHHmm")).toInt()
 val gitSha = gitOutput("rev-parse", "--short", "HEAD") ?: "nogit"
+val gitCommitCount = (gitOutput("rev-list", "--count", "HEAD") ?: "0").trim()
 val gitDirty = gitOutput("status", "--porcelain").isNullOrBlank().not()
 val computedVersionName = buildString {
     append(gitSha)
@@ -58,6 +59,9 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = autoVersionCode
         versionName = computedVersionName
+        buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
+        buildConfigField("int", "GIT_COMMIT_COUNT", gitCommitCount)
+        buildConfigField("boolean", "GIT_DIRTY", gitDirty.toString())
     }
 
     buildTypes {

@@ -9,6 +9,7 @@ import '../../recommendations/recommendation_provider.dart';
 import '../../settings/app_preferences.dart';
 import '../../services/notification_service.dart';
 import '../../theme.dart';
+import 'pages/app_updates_page.dart';
 import 'pages/notifications_page.dart';
 import 'pages/recommendation_page.dart';
 import 'pages/profile_pages.dart';
@@ -201,9 +202,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                             .read(recommendationPreferencesProvider.notifier)
                             .setSeedStrategy(value);
                       },
-                      onValidateApiKey: (key) => ref
-                          .read(lastFmServiceProvider)
-                          .validateApiKey(key),
+                      onValidateApiKey: (key) =>
+                          ref.read(lastFmServiceProvider).validateApiKey(key),
                     ),
                   ),
                 ),
@@ -242,6 +242,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       onShowComingSoon: _showComingSoonMessage,
                     ),
                   ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            const SectionLabel('Updates'),
+            SettingsGroup(
+              children: [
+                SettingsActionTile(
+                  icon: Icons.system_update_alt_rounded,
+                  title: 'App updates',
+                  subtitle:
+                      'Installed build, release notes and APK patch downloads',
+                  onTap: () => _openSettingsPage(const AppUpdatesPage()),
                 ),
               ],
             ),
