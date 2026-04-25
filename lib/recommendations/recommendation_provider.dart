@@ -17,7 +17,8 @@ export 'recommendation_preferences.dart'
     show recommendationPreferencesProvider, RecommendationPreferences;
 export 'recommendation_state.dart';
 
-final recommendationNotifierProvider =
+final StateNotifierProvider<RecommendationNotifier, RecommendationState>
+    recommendationNotifierProvider =
     StateNotifierProvider<RecommendationNotifier, RecommendationState>((ref) {
   final notifier = RecommendationNotifier(
     lastFmService: ref.read(lastFmServiceProvider),

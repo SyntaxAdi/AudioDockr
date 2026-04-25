@@ -4,6 +4,7 @@ import 'dart:math';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../library/library_provider.dart';
+import '../recommendations/recommendation_preferences.dart';
 import '../services/native_player_service.dart';
 import '../api/youtube_service.dart';
 import 'playback_engine_mixin.dart';
@@ -64,17 +65,28 @@ class PlaybackNotifier extends PlaybackNotifierBase
   @override
   final PlaybackUrlResolver resolver;
 
+  final RecommendationPreferences Function() _preferencesResolver;
+  final Future<void> Function() _ensurePreferencesLoaded;
+  final Future<void> Function() _startRecommendationSession;
+
   // ── Mutable mixin-shared state ────────────────────────────────────────────
 
   StreamSubscription<Map<String, dynamic>>? _playerEventsSubscription;
+  bool _inPlayTracks = false;
 
   // ── Constructor ───────────────────────────────────────────────────────────
 
   PlaybackNotifier(
     this.nativePlayerService,
     YoutubeService youtubeService,
-    this.libraryNotifier,
-  )   : resolver = PlaybackUrlResolver(
+    this.libraryNotifier, {
+    required RecommendationPreferences Function() preferencesResolver,
+    required Future<void> Function() ensurePreferencesLoaded,
+    required Future<void> Function() startRecommendationSession,
+  })  : _preferencesResolver = preferencesResolver,
+        _ensurePreferencesLoaded = ensurePreferencesLoaded,
+        _startRecommendationSession = startRecommendationSession,
+        resolver = PlaybackUrlResolver(
           youtubeService: youtubeService,
           libraryNotifier: libraryNotifier,
         ),
@@ -93,6 +105,18 @@ class PlaybackNotifier extends PlaybackNotifierBase
     String thumbnailUrl, {
     String? localFilePath,
   }) async {
+    // Auto-enable shuffle and start the recommendation session when the
+    // user has a Last.fm API key configured and plays a single song
+    // (not when called internally from playTracks).
+    var shouldAutoShuffle = false;
+    if (!_inPlayTracks && !state.shuffleEnabled) {
+      await _ensurePreferencesLoaded();
+      if (_preferencesResolver().apiKey.isNotEmpty) {
+        shouldAutoShuffle = true;
+        setShuffleEnabled(true);
+      }
+    }
+
     final current = currentTrackSnapshot();
     if (current != null && current.videoId != videoId) {
       history.add(current);
@@ -105,6 +129,10 @@ class PlaybackNotifier extends PlaybackNotifierBase
       thumbnailUrl: thumbnailUrl,
       localFilePath: localFilePath,
     );
+
+    if (shouldAutoShuffle && state.shuffleEnabled) {
+      unawaited(_startRecommendationSession());
+    }
   }
 
   Future<void> playTracks(List<LibraryTrack> tracks, {bool? shuffle}) async {
@@ -131,14 +159,19 @@ class PlaybackNotifier extends PlaybackNotifierBase
           .toList(growable: false),
     );
 
-    await playTrack(
-      firstTrack.videoId,
-      firstTrack.videoUrl,
-      firstTrack.title,
-      firstTrack.artist,
-      firstTrack.thumbnailUrl,
-      localFilePath: firstTrack.localFilePath,
-    );
+    _inPlayTracks = true;
+    try {
+      await playTrack(
+        firstTrack.videoId,
+        firstTrack.videoUrl,
+        firstTrack.title,
+        firstTrack.artist,
+        firstTrack.thumbnailUrl,
+        localFilePath: firstTrack.localFilePath,
+      );
+    } finally {
+      _inPlayTracks = false;
+    }
   }
 
   Future<void> togglePlayPause() async {
