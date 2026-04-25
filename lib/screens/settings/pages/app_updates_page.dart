@@ -118,6 +118,12 @@ class _AppUpdatesPageState extends ConsumerState<AppUpdatesPage> {
                   final hasPatch = releases.isNotEmpty;
                   final latestRelease = hasPatch ? releases.first : null;
 
+                  // Merge all changelogs from all new releases into one list
+                  final allChangelogItems = releases
+                      .expand((r) => r.changelog)
+                      .toSet() // Dedupe if same commit appears
+                      .toList();
+
                   return RefreshIndicator(
                     color: accentPrimary,
                     onRefresh: () async {
@@ -159,6 +165,7 @@ class _AppUpdatesPageState extends ConsumerState<AppUpdatesPage> {
                           _PatchAvailableCard(
                             installedVersion: installed.normalizedVersion,
                             release: latestRelease!,
+                            mergedChangelog: allChangelogItems,
                             onPrimaryAction: latestRelease.preferredAsset ==
                                     null
                                 ? null
@@ -170,15 +177,6 @@ class _AppUpdatesPageState extends ConsumerState<AppUpdatesPage> {
                                     : () =>
                                         _openUrl(latestRelease.workflowRunUrl!),
                           ),
-                          if (releases.length > 1) ...[
-                            const SizedBox(height: 24),
-                            const _SectionLabel('Cumulative patches'),
-                            const SizedBox(height: 4),
-                            ...releases.skip(1).map((r) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _CompactReleaseCard(release: r),
-                                )),
-                          ],
                         ],
                         const SizedBox(height: 18),
                         const Divider(color: bgDivider, height: 1),
@@ -644,19 +642,21 @@ class _PatchAvailableCard extends StatelessWidget {
   const _PatchAvailableCard({
     required this.installedVersion,
     required this.release,
+    required this.mergedChangelog,
     this.onPrimaryAction,
     this.onSecondaryAction,
   });
 
   final String installedVersion;
   final RemoteReleaseInfo release;
+  final List<String> mergedChangelog;
   final VoidCallback? onPrimaryAction;
   final VoidCallback? onSecondaryAction;
 
   @override
   Widget build(BuildContext context) {
     final preferredAsset = release.preferredAsset;
-    final changelog = release.changelog.take(4).toList();
+    final displayChangelog = mergedChangelog.take(15).toList();
 
     return Container(
       decoration: BoxDecoration(
@@ -751,7 +751,7 @@ class _PatchAvailableCard extends StatelessWidget {
                       ),
                 ),
                 const SizedBox(height: 12),
-                for (final line in changelog)
+                for (final line in displayChangelog)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: Row(
@@ -781,6 +781,17 @@ class _PatchAvailableCard extends StatelessWidget {
                       ],
                     ),
                   ),
+                if (mergedChangelog.length > 15)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4, bottom: 8),
+                    child: Text(
+                      '... and ${mergedChangelog.length - 15} more updates',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: textSecondary.withValues(alpha: 0.4),
+                            fontStyle: FontStyle.italic,
+                          ),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -790,7 +801,7 @@ class _PatchAvailableCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    'Released ${_formatDate(release.publishedAt)}',
+                    'Latest Build: ${_formatDate(release.publishedAt)}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.labelSmall?.copyWith(

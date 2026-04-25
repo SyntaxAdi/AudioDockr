@@ -113,7 +113,8 @@ jobs:
             CHANGE_RANGE="${{ github.event.before }}..${{ github.sha }}"
             CHANGELOG="$(git log "$CHANGE_RANGE" --pretty=format:'- **%s** ([`%h`]('"$REPO_URL"'/commit/%H))')"
           else
-            CHANGELOG="$(git log -10 --pretty=format:'- **%s** ([`%h`]('"$REPO_URL"'/commit/%H))')"
+            # Default to last 15 commits to ensure everything is visible
+            CHANGELOG="$(git log -15 --pretty=format:'- **%s** ([`%h`]('"$REPO_URL"'/commit/%H))')"
           fi
 
           if [ -z "$CHANGELOG" ]; then
@@ -149,9 +150,11 @@ jobs:
           name: ${{ steps.metadata.outputs.release_name }}
           commit: ${{ github.sha }}
           prerelease: false
+          allowUpdates: true
+          makeLatest: true
+          removeExistingArtifacts: true
           artifactErrorsFailBuild: true
           artifacts: ${{ steps.metadata.outputs.asset_dir }}/*.apk
-          makeLatest: true
           body: |
             ## AudioDockr — Android Sideload Build
 
