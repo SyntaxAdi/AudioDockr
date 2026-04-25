@@ -51,35 +51,69 @@ jobs:
         run: flutter pub get
 
       - name: Build release APK
-        run: flutter build apk --release
+        run: flutter build apk --release --split-per-abi
 
       - name: Collect release metadata
         id: metadata
         run: |
           SHORT_SHA="$(git rev-parse --short HEAD)"
+          FULL_SHA="$(git rev-parse HEAD)"
           VERSION_CODE="${{ github.run_number }}"
-          APK_PATH="build/app/outputs/flutter-apk/app-release.apk"
-          APK_SIZE="$(du -h "$APK_PATH" | cut -f1)"
+          RELEASE_TAG="android-sideload-${SHORT_SHA}"
+          RELEASE_NAME="AudioDockr — Android Sideload Build (${SHORT_SHA})"
+          ASSET_DIR="build/release-assets"
           BUILD_TIME_UTC="$(date -u +"%Y-%m-%d %H:%M UTC")"
+
+          rm -rf "$ASSET_DIR"
+          mkdir -p "$ASSET_DIR"
+
+          declare -a RENAMED_ASSETS=()
+          for APK_PATH in build/app/outputs/flutter-apk/app-*-release.apk; do
+            [ -f "$APK_PATH" ] || continue
+            APK_FILE="$(basename "$APK_PATH")"
+            ABI="${APK_FILE#app-}"
+            ABI="${ABI%-release.apk}"
+            if [ "$ABI" = "arm64-v8a" ]; then
+              DEST_PATH="$ASSET_DIR/AudioDockr.apk"
+            else
+              DEST_PATH="$ASSET_DIR/AudioDockr-${ABI}.apk"
+            fi
+            cp "$APK_PATH" "$DEST_PATH"
+            RENAMED_ASSETS+=("$DEST_PATH")
+          done
+
+          if [ "${#RENAMED_ASSETS[@]}" -eq 0 ]; then
+            echo "No split APK assets were produced." >&2
+            exit 1
+          fi
+
+          APK_SIZE="$(du -ch "${RENAMED_ASSETS[@]}" | tail -1 | cut -f1)"
+
           {
             echo "short_sha=$SHORT_SHA"
+            echo "full_sha=$FULL_SHA"
             echo "version_code=$VERSION_CODE"
             echo "apk_size=$APK_SIZE"
             echo "build_time_utc=$BUILD_TIME_UTC"
+            echo "release_tag=$RELEASE_TAG"
+            echo "release_name=$RELEASE_NAME"
+            echo "asset_dir=$ASSET_DIR"
           } >> "$GITHUB_OUTPUT"
 
       - name: Generate changelog
         id: changelog
         shell: bash
         run: |
+          REPO_URL="${{ github.server_url }}/${{ github.repository }}"
+
           if [ "${{ github.event_name }}" = "push" ] \
             && [ -n "${{ github.event.before }}" ] \
             && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ] \
             && git cat-file -e "${{ github.event.before }}"^{commit} 2>/dev/null; then
             CHANGE_RANGE="${{ github.event.before }}..${{ github.sha }}"
-            CHANGELOG="$(git log "$CHANGE_RANGE" --pretty=format:'- %s (%h)')"
+            CHANGELOG="$(git log "$CHANGE_RANGE" --pretty=format:'- **%s** ([`%h`]('"$REPO_URL"'/commit/%H))')"
           else
-            CHANGELOG="$(git log -10 --pretty=format:'- %s (%h)')"
+            CHANGELOG="$(git log -10 --pretty=format:'- **%s** ([`%h`]('"$REPO_URL"'/commit/%H))')"
           fi
 
           if [ -z "$CHANGELOG" ]; then
@@ -92,35 +126,57 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Publish continuous release
+      - name: Generate assets list
+        id: assets
+        shell: bash
+        run: |
+          ASSET_DIR="${{ steps.metadata.outputs.asset_dir }}"
+          {
+            echo "content<<EOF"
+            for APK_PATH in "$ASSET_DIR"/*.apk; do
+              [ -f "$APK_PATH" ] || continue
+              APK_NAME="$(basename "$APK_PATH")"
+              APK_SIZE="$(du -h "$APK_PATH" | cut -f1)"
+              echo "- 📦 \`$APK_NAME\` — $APK_SIZE"
+            done
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub release
         uses: ncipollo/release-action@v1
         with:
-          tag: continuous
-          name: Continuous Sideload Build
+          tag: ${{ steps.metadata.outputs.release_tag }}
+          name: ${{ steps.metadata.outputs.release_name }}
           commit: ${{ github.sha }}
           prerelease: true
-          allowUpdates: true
-          removeArtifacts: true
           artifactErrorsFailBuild: true
-          artifacts: build/app/outputs/flutter-apk/app-release.apk
+          artifacts: ${{ steps.metadata.outputs.asset_dir }}/*.apk
           body: |
-            Automated Android sideload build for AudioDockr.
+            ## AudioDockr — Android Sideload Build
 
-            Note:
-            - This workflow currently builds the repo's existing release APK configuration.
-            - Until a real release keystore is configured in GitHub secrets, treat this as a sideload build rather than a store-ready production release.
+            > ⚠️ **Sideload only** — no release keystore configured. Not for Play Store distribution.
 
-            - Version: `${{ steps.metadata.outputs.short_sha }}`
-            - Version code: `${{ steps.metadata.outputs.version_code }}`
-            - Commit: `${{ github.sha }}`
-            - Short SHA: `${{ steps.metadata.outputs.short_sha }}`
-            - Branch: `${{ github.ref_name }}`
-            - APK size: `${{ steps.metadata.outputs.apk_size }}`
-            - Built at: `${{ steps.metadata.outputs.build_time_utc }}`
-            - Workflow run: `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`
+            ---
 
-            What's new:
+            ### What's new
+
             ${{ steps.changelog.outputs.content }}
 
-            Files:
-            - `app-release.apk`
+            ---
+
+            ### Build info
+
+            | Field | Value |
+            |---|---|
+            | Version | `${{ steps.metadata.outputs.short_sha }}` |
+            | Version code | `${{ steps.metadata.outputs.version_code }}` |
+            | Branch | `${{ github.ref_name }}` |
+            | APK size | `${{ steps.metadata.outputs.apk_size }}` |
+            | Built at | `${{ steps.metadata.outputs.build_time_utc }}` |
+            | Workflow run | [#${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}) |
+
+            ---
+
+            ### Assets
+
+            ${{ steps.assets.outputs.content }}
