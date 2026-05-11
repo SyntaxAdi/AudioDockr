@@ -97,6 +97,7 @@ class AppPreferences {
   static const AudioSource defaultAudioSource = AudioSource.youtube;
   static const String resumeOnStartKey = 'resume_on_start';
   static const String backgroundPlaybackKey = 'background_playback';
+  static const String _backgroundPlaybackMigratedKey = 'bg_playback_default_migrated';
   static const String sessionVideoIdKey = 'session_video_id';
   static const String sessionTitleKey = 'session_title';
   static const String sessionArtistKey = 'session_artist';
@@ -233,5 +234,13 @@ class AppPreferences {
   static Future<bool> loadBackgroundPlayback() async {
     final preferences = await SharedPreferences.getInstance();
     return readBackgroundPlayback(preferences);
+  }
+
+  static Future<void> runMigrations() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (!prefs.containsKey(_backgroundPlaybackMigratedKey)) {
+      await prefs.remove(backgroundPlaybackKey);
+      await prefs.setBool(_backgroundPlaybackMigratedKey, true);
+    }
   }
 }

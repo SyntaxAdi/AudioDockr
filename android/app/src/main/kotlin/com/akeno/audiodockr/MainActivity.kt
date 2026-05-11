@@ -127,6 +127,12 @@ class MainActivity : FlutterFragmentActivity() {
                         startService(PlaybackService.buildRepeatModeIntent(this, mode))
                         result.success(null)
                     }
+                    "dismissNotification" -> {
+                        if (PlaybackService.isRunning()) {
+                            startService(PlaybackService.buildDismissNotificationIntent(this))
+                        }
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }

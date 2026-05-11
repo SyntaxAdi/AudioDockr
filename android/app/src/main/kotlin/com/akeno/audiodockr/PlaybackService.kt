@@ -56,12 +56,14 @@ class PlaybackService : MediaSessionService() {
         .build()
 
     private lateinit var player: ExoPlayer
+    private lateinit var forwardingPlayer: androidx.media3.common.ForwardingPlayer
     private var mediaSession: MediaSession? = null
     private lateinit var notificationManager: PlayerNotificationManager
     private var currentRepeatMode: String = "off"
     private var repeatOnePendingReplay = false
     private var isForegroundActive = false
     private var isSwitchingTrack = false
+    private var isSuppressingNotification = false
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val artworkHttpClient = OkHttpClient()
     private val artworkCache = object : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 16L).toInt()) {
@@ -153,7 +155,7 @@ class PlaybackService : MediaSessionService() {
                 )
             }
 
-        val forwardingPlayer = object : androidx.media3.common.ForwardingPlayer(player) {
+        forwardingPlayer = object : androidx.media3.common.ForwardingPlayer(player) {
             override fun getAvailableCommands(): Player.Commands {
                 return super.getAvailableCommands().buildUpon()
                     .add(Player.COMMAND_SEEK_TO_NEXT)
@@ -190,7 +192,7 @@ class PlaybackService : MediaSessionService() {
             }
         }
 
-        mediaSession = MediaSession.Builder(this, forwardingPlayer).build().also { session ->
+        mediaSession = MediaSession.Builder(this, forwardingPlayer as Player).build().also { session ->
             createSessionActivity()?.let(session::setSessionActivity)
         }
         ensureNotificationChannel()
@@ -221,6 +223,7 @@ class PlaybackService : MediaSessionService() {
                 publishState()
             }
             ACTION_RESUME -> {
+                restoreNotificationIfNeeded()
                 if (player.playbackState == Player.STATE_ENDED) {
                     player.seekToDefaultPosition()
                     if (player.mediaItemCount > 0) {
@@ -230,6 +233,17 @@ class PlaybackService : MediaSessionService() {
                 player.play()
                 startProgressUpdates()
                 publishState()
+            }
+            ACTION_DISMISS_NOTIFICATION -> {
+                player.pause()
+                stopProgressUpdates()
+                publishState()
+                isSuppressingNotification = true
+                notificationManager.setPlayer(null)
+                if (isForegroundActive) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                    isForegroundActive = false
+                }
             }
             ACTION_SEEK -> {
                 player.seekTo(intent.getLongExtra(EXTRA_POSITION, 0L))
@@ -260,6 +274,13 @@ class PlaybackService : MediaSessionService() {
         return START_STICKY
     }
 
+    private fun restoreNotificationIfNeeded() {
+        if (isSuppressingNotification) {
+            isSuppressingNotification = false
+            notificationManager.setPlayer(forwardingPlayer)
+        }
+    }
+
     private fun play(
         url: String,
         headers: Map<String, String>,
@@ -268,6 +289,7 @@ class PlaybackService : MediaSessionService() {
         artworkUrl: String,
         isLocalFile: Boolean,
     ) {
+        restoreNotificationIfNeeded()
         if (BuildConfig.DEBUG) {
             Log.d(TAG, "Starting playback for $url")
         }
@@ -395,6 +417,7 @@ class PlaybackService : MediaSessionService() {
         private const val ACTION_RESUME = "com.akeno.audiodockr.action.RESUME"
         private const val ACTION_SEEK = "com.akeno.audiodockr.action.SEEK"
         private const val ACTION_SET_REPEAT_MODE = "com.akeno.audiodockr.action.SET_REPEAT_MODE"
+        private const val ACTION_DISMISS_NOTIFICATION = "com.akeno.audiodockr.action.DISMISS_NOTIFICATION"
         private const val EXTRA_URL = "url"
         private const val EXTRA_HEADERS = "headers"
         private const val EXTRA_POSITION = "position"
@@ -493,6 +516,12 @@ class PlaybackService : MediaSessionService() {
             return Intent(context, PlaybackService::class.java).apply {
                 action = ACTION_SET_REPEAT_MODE
                 putExtra(EXTRA_REPEAT_MODE, mode)
+            }
+        }
+
+        fun buildDismissNotificationIntent(context: Context): Intent {
+            return Intent(context, PlaybackService::class.java).apply {
+                action = ACTION_DISMISS_NOTIFICATION
             }
         }
 

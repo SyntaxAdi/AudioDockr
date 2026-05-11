@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../playback/playback_provider.dart';
+import '../settings/app_preferences.dart';
 import '../theme.dart';
 import 'app_updates/app_updates_screen.dart';
 import 'home_screen/home_screen.dart';
@@ -43,7 +44,8 @@ class _AppShellState extends ConsumerState<AppShell>
       widget.initialIndex: _buildPage(widget.initialIndex),
     };
     WidgetsBinding.instance.addObserver(this);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await AppPreferences.runMigrations();
       ref.read(playbackNotifierProvider.notifier).restoreSession();
     });
   }
@@ -61,6 +63,17 @@ class _AppShellState extends ConsumerState<AppShell>
         lifecycleState == AppLifecycleState.detached) {
       ref.read(playbackNotifierProvider.notifier).saveSession();
     }
+    if (lifecycleState == AppLifecycleState.paused) {
+      _checkBackgroundPlayback();
+    }
+  }
+
+  void _checkBackgroundPlayback() {
+    AppPreferences.loadBackgroundPlayback().then((enabled) {
+      if (!enabled && mounted) {
+        ref.read(playbackNotifierProvider.notifier).pauseAndDismissNotification();
+      }
+    });
   }
 
   void _onTabTapped(int index) {

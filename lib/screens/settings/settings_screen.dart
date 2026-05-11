@@ -40,7 +40,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   RecommendationSeedStrategy _recommendationSeedStrategy =
       AppPreferences.defaultRecommendationSeedStrategy;
   bool _sessionRestore = true;
-  bool _backgroundPlayback = false;
+  bool _backgroundPlayback = true;
   AudioSource _audioSource = AppPreferences.defaultAudioSource;
 
   @override

@@ -131,6 +131,14 @@ class NativePlayerService {
     await _commandChannel.invokeMethod<void>('pause');
   }
 
+  Future<void> dismissNotification() async {
+    if (!Platform.isAndroid) {
+      await _player.pause();
+      return;
+    }
+    await _commandChannel.invokeMethod<void>('dismissNotification');
+  }
+
   Future<void> resume() async {
     if (!Platform.isAndroid) {
       await _player.play();

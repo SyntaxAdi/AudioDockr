@@ -219,6 +219,13 @@ class PlaybackNotifier extends PlaybackNotifierBase
     }
   }
 
+  Future<void> pauseAndDismissNotification() async {
+    await nativePlayerService.dismissNotification();
+    if (state.isPlaying) {
+      state = state.copyWith(isPlaying: false);
+    }
+  }
+
   Future<void> saveSession() async {
     if (state.currentTrackId == null || state.isRestoredSession) return;
     final prefs = await SharedPreferences.getInstance();
