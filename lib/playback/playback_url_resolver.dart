@@ -2,8 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../api/jiosaavn_service.dart';
 import '../api/youtube_service.dart';
 import '../library/library_provider.dart';
+import '../settings/app_preferences.dart';
 import 'playback_error_mapper.dart';
 import 'playback_models.dart';
 
@@ -22,12 +24,29 @@ class ResolvedMedia {
   final String? thumbnailUrl;
 }
 
-class PlaybackUrlResolver {
-  static const MethodChannel _extractChannel =
-      MethodChannel('audiodockr/extract');
-  static const String _lastFmRecommendationPrefix = 'lastfm_rec_';
+// ── Audio-source adapter interface ─────────────────────────────────────────
+//
+// Each audio engine implements this interface. To add a new engine:
+//   1. Add an enum value to AudioSource in app_preferences.dart.
+//   2. Create a class that extends _AudioSourceAdapter here.
+//   3. Register it in PlaybackUrlResolver._adapters below.
+//   Nothing else needs to change.
 
-  const PlaybackUrlResolver({
+abstract class _AudioSourceAdapter {
+  /// Search for [title] + [artist] and return a resolved media object,
+  /// or null if no suitable match was found.
+  ///
+  /// [trackId] is the original synthetic ID (e.g. `lastfm_rec_0`) and is
+  /// forwarded to adapters that need extra context (e.g. max-duration hints).
+  Future<ResolvedMedia?> findTrack({
+    required String title,
+    required String artist,
+    required String trackId,
+  });
+}
+
+class _YouTubeAdapter extends _AudioSourceAdapter {
+  _YouTubeAdapter({
     required YoutubeService youtubeService,
     required LibraryNotifier libraryNotifier,
   })  : _youtubeService = youtubeService,
@@ -35,6 +54,102 @@ class PlaybackUrlResolver {
 
   final YoutubeService _youtubeService;
   final LibraryNotifier _libraryNotifier;
+
+  static const String _lastFmPrefix = 'lastfm_rec_';
+
+  @override
+  Future<ResolvedMedia?> findTrack({
+    required String title,
+    required String artist,
+    required String trackId,
+  }) async {
+    final query = '$title $artist'.trim();
+    try {
+      final results = await _youtubeService.search(query);
+      final maxDuration = trackId.startsWith(_lastFmPrefix)
+          ? YoutubeService.maxRecommendationDuration
+          : null;
+      final match = YoutubeService.selectAutoplayCandidate(
+        results,
+        title: title,
+        artist: artist,
+        maxDuration: maxDuration,
+      );
+      if (match == null) return null;
+      await _libraryNotifier.updateTrackVideoUrl(
+        videoId: trackId,
+        videoUrl: match.url,
+      );
+      return ResolvedMedia(
+        realYoutubeId: match.id,
+        videoUrl: match.url,
+        thumbnailUrl: match.thumbnailUrl,
+      );
+    } on YoutubeServiceException catch (error) {
+      throw PlaybackErrorMapper.fromSearchError(error);
+    }
+  }
+}
+
+class _JioSaavnAdapter extends _AudioSourceAdapter {
+  _JioSaavnAdapter(this._jiosaavnService);
+
+  final JioSaavnService _jiosaavnService;
+
+  @override
+  Future<ResolvedMedia?> findTrack({
+    required String title,
+    required String artist,
+    required String trackId,
+  }) async {
+    try {
+      final query = '$title $artist'.trim();
+      final results = await _jiosaavnService.search(query, limit: 5);
+      if (results.isEmpty) return null;
+      final best = results.first;
+      return ResolvedMedia(
+        realYoutubeId: 'jio_${best.id}',
+        videoUrl: '',
+        thumbnailUrl: best.highThumbnailUrl,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+// ── Resolver ─────────────────────────────────────────────────────────────────
+
+class PlaybackUrlResolver {
+  static const MethodChannel _extractChannel =
+      MethodChannel('audiodockr/extract');
+  static const String _jioSaavnIdPrefix = 'jio_';
+
+  PlaybackUrlResolver({
+    required YoutubeService youtubeService,
+    required JioSaavnService jiosaavnService,
+    required LibraryNotifier libraryNotifier,
+  })  : _youtubeService = youtubeService,
+        _jiosaavnService = jiosaavnService,
+        _libraryNotifier = libraryNotifier,
+        _adapters = {
+          AudioSource.youtube: _YouTubeAdapter(
+            youtubeService: youtubeService,
+            libraryNotifier: libraryNotifier,
+          ),
+          AudioSource.jioSaavn: _JioSaavnAdapter(jiosaavnService),
+        };
+
+  final YoutubeService _youtubeService;
+  final JioSaavnService _jiosaavnService;
+  final LibraryNotifier _libraryNotifier;
+  final Map<AudioSource, _AudioSourceAdapter> _adapters;
+
+  static bool isJioSaavnId(String videoId) =>
+      videoId.startsWith(_jioSaavnIdPrefix);
+
+  static String saavnIdFromVideoId(String videoId) =>
+      videoId.replaceFirst(_jioSaavnIdPrefix, '');
 
   static Map<String, String> buildPlaybackHeaders() {
     return const {
@@ -64,6 +179,17 @@ class PlaybackUrlResolver {
   }
 
   Future<String?> extractTrackUrl(String videoId, String videoUrl) async {
+    if (isJioSaavnId(videoId)) {
+      final url = await _jiosaavnService.getStreamUrl(saavnIdFromVideoId(videoId));
+      if (url == null || url.isEmpty) {
+        throw const PlaybackFailure(
+          'extract_empty',
+          'Could not load JioSaavn stream. Please try again.',
+        );
+      }
+      return url;
+    }
+
     try {
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
         return await _extractChannel.invokeMethod<String>(
@@ -92,6 +218,10 @@ class PlaybackUrlResolver {
     required String title,
     required String artist,
   }) async {
+    if (isJioSaavnId(videoId)) {
+      return ResolvedMedia(realYoutubeId: videoId, videoUrl: videoUrl);
+    }
+
     if (videoUrl.isNotEmpty) {
       return ResolvedMedia(
         realYoutubeId: _extractRealYoutubeId(videoId, videoUrl),
@@ -99,36 +229,30 @@ class PlaybackUrlResolver {
       );
     }
 
-    try {
-      final query = '$title $artist'.trim();
-      final results = await _youtubeService.search(query);
-      final maxDuration = videoId.startsWith(_lastFmRecommendationPrefix)
-          ? YoutubeService.maxRecommendationDuration
-          : null;
-      final match = YoutubeService.selectAutoplayCandidate(
-        results,
+    final audioSource = await AppPreferences.loadAudioSource();
+    final adapter = _adapters[audioSource] ?? _adapters[AudioSource.youtube]!;
+
+    ResolvedMedia? result = await adapter.findTrack(
+      title: title,
+      artist: artist,
+      trackId: videoId,
+    );
+
+    // If the selected engine returned nothing, fall back to YouTube so the
+    // user never gets a dead silence. Skip if YouTube is already the engine.
+    if (result == null && audioSource != AudioSource.youtube) {
+      result = await _adapters[AudioSource.youtube]!.findTrack(
         title: title,
         artist: artist,
-        maxDuration: maxDuration,
+        trackId: videoId,
       );
-      if (match == null) {
-        throw const YoutubeServiceException(
-          'no_playable_match',
-          'No safe YouTube result was found for this track.',
-        );
-      }
-      await _libraryNotifier.updateTrackVideoUrl(
-        videoId: videoId,
-        videoUrl: match.url,
-      );
-      return ResolvedMedia(
-        realYoutubeId: match.id,
-        videoUrl: match.url,
-        thumbnailUrl: match.thumbnailUrl,
-      );
-    } on YoutubeServiceException catch (error) {
-      throw PlaybackErrorMapper.fromSearchError(error);
     }
+
+    if (result != null) return result;
+    throw const PlaybackFailure(
+      'no_playable_match',
+      'No playable match was found for this track.',
+    );
   }
 
   Future<QueuedTrack> resolveQueuedTrackIfNeeded(QueuedTrack track) async {

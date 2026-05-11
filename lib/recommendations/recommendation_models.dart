@@ -20,12 +20,18 @@ class RecommendedTrack {
         title: title,
       );
 
+  /// Title-only key used as a secondary dedup signal so the same song
+  /// cannot appear twice regardless of which artist credit LastFM attached.
+  String get titleKey => _normalizeTitle(title);
+
   static String dedupKeyFor({
     required String artist,
     required String title,
   }) {
     return '${_normalizeArtist(artist)}|${_normalizeTitle(title)}';
   }
+
+  static String titleKeyFor(String title) => _normalizeTitle(title);
 
   static String normalizedTitleFor(String title) {
     return _normalizeTitle(title);
@@ -175,13 +181,13 @@ String _normalizeTitle(String value) {
   );
   normalized = normalized.replaceAll(
     RegExp(
-      r'\((official|audio|video|lyrics|lyric video|lirik|visualizer|remaster(ed)?|live|sped up( version)?|speed up( version)?|slowed( reverb)?|nightcore|karaoke|translation|translated|terjemahan|[0-9]+\s*hour(\s*version)?)[^)]*\)',
+      r'\((official|audio|video|lyrics|lyric video|lirik|visualizer|remaster(ed)?|live|sped up( version)?|speed up( version)?|slowed( reverb)?|nightcore|karaoke|translation|translated|terjemahan|[0-9]+\s*hour(\s*version)?|from\b[^)]*|ost|original\s*(motion\s*picture|soundtrack|score|version|mix)?|acoustic(\s*version)?|radio\s*(edit|version)|reprise|remix(\s*(edit|version|mix))?|extended(\s*remix|\s*mix|\s*version)?|club\s*(remix|mix|version)|instrumental(\s*version)?|cover(\s*version)?|piano(\s*version)?|duet|[0-9]{4})[^)]*\)',
     ),
     '',
   );
   normalized = normalized.replaceAll(
     RegExp(
-      r'\[(official|audio|video|lyrics|lyric video|lirik|visualizer|remaster(ed)?|live|sped up( version)?|speed up( version)?|slowed( reverb)?|nightcore|karaoke|translation|translated|terjemahan|[0-9]+\s*hour(\s*version)?)[^\]]*\]',
+      r'\[(official|audio|video|lyrics|lyric video|lirik|visualizer|remaster(ed)?|live|sped up( version)?|speed up( version)?|slowed( reverb)?|nightcore|karaoke|translation|translated|terjemahan|[0-9]+\s*hour(\s*version)?|from\b[^\]]*|ost|original\s*(motion\s*picture|soundtrack|score|version|mix)?|acoustic(\s*version)?|radio\s*(edit|version)|reprise|remix(\s*(edit|version|mix))?|extended(\s*remix|\s*mix|\s*version)?|club\s*(remix|mix|version)|instrumental(\s*version)?|cover(\s*version)?|piano(\s*version)?|duet|[0-9]{4})[^\]]*\]',
     ),
     '',
   );
@@ -191,7 +197,7 @@ String _normalizeTitle(String value) {
   );
   normalized = normalized.replaceAll(
     RegExp(
-      r'\s*[-–|/]\s*(official|audio|video|lyrics|lyric video|lirik|visualizer|remaster(ed)?|live|sped up( version)?|speed up( version)?|slowed( reverb)?|nightcore|karaoke|translation|translated|terjemahan|[0-9]+\s*hour(\s*version)?).*$',
+      r'\s*[-–|/]\s*(official|audio|video|lyrics|lyric video|lirik|visualizer|remaster(ed)?|live|sped up( version)?|speed up( version)?|slowed( reverb)?|nightcore|karaoke|translation|translated|terjemahan|from\b|ost|acoustic(\s*version)?|radio\s*(edit|version)|reprise|remix|extended|club\s*(remix|mix)|instrumental|cover|piano|[0-9]+\s*hour(\s*version)?).*$',
     ),
     '',
   );

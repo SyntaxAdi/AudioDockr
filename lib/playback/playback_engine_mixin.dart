@@ -32,9 +32,12 @@ mixin PlaybackEngineMixin on PlaybackNotifierBase {
             currentArtist: artist,
             currentThumbnailUrl: thumbnailUrl,
             currentVideoUrl: videoUrl,
+            currentLocalFilePath: localFilePath,
             position: Duration.zero,
             duration: Duration.zero,
             isPreparing: true,
+            isRestoredSession: false,
+            restoredPosition: null,
             lastError: null,
           );
 
@@ -64,10 +67,13 @@ mixin PlaybackEngineMixin on PlaybackNotifierBase {
             currentArtist: artist,
             currentThumbnailUrl: thumbnailUrl,
             currentVideoUrl: videoUrl,
+            currentLocalFilePath: localFilePath,
             position: Duration.zero,
             duration: Duration.zero,
             isPreparing: false,
             isPlaying: true,
+            isRestoredSession: false,
+            restoredPosition: null,
             recentlyPlayed: updatedRecentlyPlayed(
               videoId: videoId,
               videoUrl: videoUrl,
@@ -104,9 +110,12 @@ mixin PlaybackEngineMixin on PlaybackNotifierBase {
         currentArtist: artist,
         currentThumbnailUrl: effectiveThumbnail,
         currentVideoUrl: resolvedMedia.videoUrl,
+        currentLocalFilePath: null,
         position: Duration.zero,
         duration: Duration.zero,
         isPreparing: true,
+        isRestoredSession: false,
+        restoredPosition: null,
         lastError: null,
       );
 
@@ -123,7 +132,9 @@ mixin PlaybackEngineMixin on PlaybackNotifierBase {
 
       await nativePlayerService.playYoutubeStream(
         url: audioUrl,
-        headers: PlaybackUrlResolver.buildPlaybackHeaders(),
+        headers: PlaybackUrlResolver.isJioSaavnId(videoId)
+            ? const <String, String>{}
+            : PlaybackUrlResolver.buildPlaybackHeaders(),
         title: title,
         artist: artist,
         thumbnailUrl: effectiveThumbnail,
@@ -148,10 +159,13 @@ mixin PlaybackEngineMixin on PlaybackNotifierBase {
         currentArtist: artist,
         currentThumbnailUrl: effectiveThumbnail,
         currentVideoUrl: resolvedMedia.videoUrl,
+        currentLocalFilePath: null,
         position: Duration.zero,
         duration: Duration.zero,
         isPreparing: false,
         isPlaying: true,
+        isRestoredSession: false,
+        restoredPosition: null,
         recentlyPlayed: updatedRecentlyPlayed(
           videoId: videoId,
           videoUrl: resolvedMedia.videoUrl,

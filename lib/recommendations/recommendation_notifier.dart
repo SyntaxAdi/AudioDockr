@@ -211,8 +211,10 @@ class RecommendationNotifier extends StateNotifier<RecommendationState> {
       for (final rec in hydratedRecs) {
         if (_playbackNotifier.state.queue.length >= queueTarget) break;
         final key = rec.dedupKey;
-        if (_seen.contains(key)) continue;
+        final tKey = rec.titleKey;
+        if (_seen.contains(key) || _seen.contains(tKey)) continue;
         _seen.add(key);
+        if (tKey.isNotEmpty) _seen.add(tKey);
         final id = _enqueue(rec);
         if (id != null) enqueuedPairs.add((id, rec));
       }
@@ -385,18 +387,18 @@ class RecommendationNotifier extends StateNotifier<RecommendationState> {
   /// the track was already in the queue.
   String? _enqueue(RecommendedTrack rec) {
     final recKey = rec.dedupKey;
+    final recTitleKey = rec.titleKey;
     final playback = _playbackNotifier.state;
     final currentTitle = playback.currentTitle?.trim() ?? '';
     final currentArtist = playback.currentArtist?.trim() ?? '';
 
-    if (currentTitle.isNotEmpty &&
-        currentArtist.isNotEmpty &&
-        RecommendedTrack.dedupKeyFor(
-              artist: currentArtist,
-              title: currentTitle,
-            ) ==
-            recKey) {
-      return null;
+    if (currentTitle.isNotEmpty && currentArtist.isNotEmpty) {
+      if (RecommendedTrack.dedupKeyFor(
+                artist: currentArtist, title: currentTitle) ==
+            recKey ||
+          RecommendedTrack.titleKeyFor(currentTitle) == recTitleKey) {
+        return null;
+      }
     }
 
     if (playback.queue.any(
@@ -405,7 +407,8 @@ class RecommendationNotifier extends StateNotifier<RecommendationState> {
             artist: track.artist,
             title: track.title,
           ) ==
-          recKey,
+              recKey ||
+          RecommendedTrack.titleKeyFor(track.title) == recTitleKey,
     )) {
       return null;
     }
@@ -608,19 +611,28 @@ class RecommendationNotifier extends StateNotifier<RecommendationState> {
       if (key != '|') keys.add(key);
     }
 
+    void addTitleKey(String title) {
+      final tKey = RecommendedTrack.titleKeyFor(title);
+      if (tKey.isNotEmpty) keys.add(tKey);
+    }
+
     for (final t in _libraryNotifier.state.recentTracks) {
       addKey(t.artist, t.title);
+      addTitleKey(t.title);
     }
     for (final t in _libraryNotifier.state.likedTracks) {
       addKey(t.artist, t.title);
+      addTitleKey(t.title);
     }
     final playback = _playbackNotifier.state;
     if ((playback.currentArtist ?? '').trim().isNotEmpty &&
         (playback.currentTitle ?? '').trim().isNotEmpty) {
       addKey(playback.currentArtist!, playback.currentTitle!);
+      addTitleKey(playback.currentTitle!);
     }
     for (final t in playback.queue) {
       addKey(t.artist, t.title);
+      addTitleKey(t.title);
     }
     return keys;
   }

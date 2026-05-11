@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../playback/playback_provider.dart';
 import '../theme.dart';
 import 'app_updates/app_updates_screen.dart';
 import 'home_screen/home_screen.dart';
@@ -23,7 +24,8 @@ class AppShell extends ConsumerStatefulWidget {
   ConsumerState<AppShell> createState() => _AppShellState();
 }
 
-class _AppShellState extends ConsumerState<AppShell> {
+class _AppShellState extends ConsumerState<AppShell>
+    with WidgetsBindingObserver {
   static const double _menuWidthFraction = 0.8;
   late int _currentIndex;
   int _libraryResetToken = 0;
@@ -40,12 +42,25 @@ class _AppShellState extends ConsumerState<AppShell> {
     _pageCache = {
       widget.initialIndex: _buildPage(widget.initialIndex),
     };
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(playbackNotifierProvider.notifier).restoreSession();
+    });
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState lifecycleState) {
+    if (lifecycleState == AppLifecycleState.paused ||
+        lifecycleState == AppLifecycleState.detached) {
+      ref.read(playbackNotifierProvider.notifier).saveSession();
+    }
   }
 
   void _onTabTapped(int index) {

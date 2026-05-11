@@ -53,6 +53,12 @@ class MiniPlayer extends ConsumerWidget {
         return false;
       }),
     );
+    final isRestoredSession = ref.watch(
+      playbackNotifierProvider.select((s) => s.isRestoredSession),
+    );
+    final restoredPosition = ref.watch(
+      playbackNotifierProvider.select((s) => s.restoredPosition),
+    );
 
     if (currentTrackId == null && !isPreparing) {
       return const SizedBox.shrink();
@@ -150,10 +156,14 @@ class MiniPlayer extends ConsumerWidget {
                         Text(
                           isPreparing
                               ? 'Starting playback'
-                              : (currentArtist ?? 'Unknown artist'),
+                              : isRestoredSession && restoredPosition != null
+                                  ? 'Resume from ${_formatDuration(restoredPosition)}'
+                                  : (currentArtist ?? 'Unknown artist'),
                           style: Theme.of(context).textTheme.labelSmall?.copyWith(
                                 fontSize: 10,
-                                color: textSecondary,
+                                color: isRestoredSession
+                                    ? accentPrimary
+                                    : textSecondary,
                               ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -228,6 +238,12 @@ class MiniPlayer extends ConsumerWidget {
       ),
     );
   }
+}
+
+String _formatDuration(Duration d) {
+  final m = d.inMinutes;
+  final s = (d.inSeconds % 60).toString().padLeft(2, '0');
+  return '$m:$s';
 }
 
 class _MiniPlayerProgressBar extends ConsumerWidget {

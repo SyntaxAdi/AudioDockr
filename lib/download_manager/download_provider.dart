@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path/path.dart' as path;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../api/jiosaavn_service.dart';
 import '../api/youtube_service.dart';
 import '../library/library_provider.dart';
 import '../playback/playback_url_resolver.dart';
@@ -24,6 +25,7 @@ final downloadServiceProvider = Provider<DownloadService>((ref) {
   return DownloadService(
     resolver: PlaybackUrlResolver(
       youtubeService: ref.read(youtubeServiceProvider),
+      jiosaavnService: ref.read(jioSaavnServiceProvider),
       libraryNotifier: ref.read(libraryProvider.notifier),
     ),
   );

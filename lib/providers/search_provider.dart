@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../api/jiosaavn_service.dart';
 import '../database_helper.dart';
 import '../api/youtube_service.dart';
 import '../settings/app_preferences.dart';
@@ -9,8 +10,9 @@ final searchProvider =
     StateNotifierProvider<SearchNotifier, AsyncValue<List<SearchResult>>>(
         (ref) {
   final youtubeService = ref.read(youtubeServiceProvider);
+  final jiosaavnService = ref.read(jioSaavnServiceProvider);
   final databaseHelper = DatabaseHelper.instance;
-  return SearchNotifier(youtubeService, databaseHelper);
+  return SearchNotifier(youtubeService, jiosaavnService, databaseHelper);
 });
 
 final searchHistoryProvider =
@@ -169,10 +171,14 @@ class SearchPreferencesNotifier extends StateNotifier<SearchPreferences> {
 }
 
 class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
-  SearchNotifier(this._youtubeService, this._databaseHelper)
-      : super(const AsyncValue.data([]));
+  SearchNotifier(
+    this._youtubeService,
+    this._jiosaavnService,
+    this._databaseHelper,
+  ) : super(const AsyncValue.data([]));
 
   final YoutubeService _youtubeService;
+  final JioSaavnService _jiosaavnService;
   final DatabaseHelper _databaseHelper;
 
   String _latestQuery = '';
@@ -188,38 +194,20 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
 
     state = const AsyncValue.loading();
 
+    final audioSource = await AppPreferences.loadAudioSource();
+
     try {
-      final futures = <Future<Object?>>[
-        _youtubeService.search(trimmedQuery),
-        if (saveToHistory) _databaseHelper.saveSearchQuery(trimmedQuery),
-      ];
-      final results = await Future.wait(futures);
-      final items = results.first as List<YoutubeSearchItem>;
-
-      if (_latestQuery != trimmedQuery) {
-        return;
+      if (saveToHistory) {
+        _databaseHelper.saveSearchQuery(trimmedQuery);
       }
 
-      state = AsyncValue.data(
-        items
-            .map(
-              (item) => SearchResult(
-                videoId: item.id,
-                videoUrl: item.url,
-                title: item.title,
-                artist: item.uploader,
-                duration: item.duration,
-                lowThumbnailUrl: item.lowThumbnailUrl,
-                mediumThumbnailUrl: item.mediumThumbnailUrl,
-                highThumbnailUrl: item.highThumbnailUrl,
-              ),
-            )
-            .toList(),
-      );
+      if (audioSource == AudioSource.jioSaavn) {
+        await _searchJioSaavn(trimmedQuery);
+      } else {
+        await _searchYouTube(trimmedQuery);
+      }
     } catch (error, stackTrace) {
-      if (_latestQuery != trimmedQuery) {
-        return;
-      }
+      if (_latestQuery != trimmedQuery) return;
       final mappedError = _mapSearchError(error);
       if (mappedError.code == 'no_results') {
         state = const AsyncValue.data([]);
@@ -227,6 +215,51 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
       }
       state = AsyncValue.error(mappedError, stackTrace);
     }
+  }
+
+  Future<void> _searchYouTube(String query) async {
+    final items = await _youtubeService.search(query);
+    if (_latestQuery != query) return;
+    state = AsyncValue.data(
+      items
+          .map(
+            (item) => SearchResult(
+              videoId: item.id,
+              videoUrl: item.url,
+              title: item.title,
+              artist: item.uploader,
+              duration: item.duration,
+              lowThumbnailUrl: item.lowThumbnailUrl,
+              mediumThumbnailUrl: item.mediumThumbnailUrl,
+              highThumbnailUrl: item.highThumbnailUrl,
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  Future<void> _searchJioSaavn(String query) async {
+    final items = await _jiosaavnService.search(query);
+    if (_latestQuery != query) return;
+    if (items.isEmpty) {
+      throw const JioSaavnServiceException('no_results', 'No results found on JioSaavn.');
+    }
+    state = AsyncValue.data(
+      items
+          .map(
+            (item) => SearchResult(
+              videoId: 'jio_${item.id}',
+              videoUrl: '',
+              title: item.name,
+              artist: item.artist,
+              duration: item.duration,
+              lowThumbnailUrl: item.lowThumbnailUrl,
+              mediumThumbnailUrl: item.mediumThumbnailUrl,
+              highThumbnailUrl: item.highThumbnailUrl,
+            ),
+          )
+          .toList(),
+    );
   }
 
   void clear() {
@@ -267,6 +300,13 @@ class SearchNotifier extends StateNotifier<AsyncValue<List<SearchResult>>> {
             error.message,
           );
       }
+    }
+
+    if (error is JioSaavnServiceException) {
+      if (error.code == 'no_results') {
+        return const SearchFailure('no_results', 'No results found on JioSaavn.');
+      }
+      return SearchFailure(error.code, error.message);
     }
 
     return const SearchFailure(

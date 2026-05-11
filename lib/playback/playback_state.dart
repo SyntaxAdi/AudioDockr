@@ -8,10 +8,13 @@ class PlaybackState {
   final String? currentArtist;
   final String? currentThumbnailUrl;
   final String? currentVideoUrl;
+  final String? currentLocalFilePath;
   final bool isPreparing;
   final bool isPlaying;
+  final bool isRestoredSession;
   final Duration position;
   final Duration duration;
+  final Duration? restoredPosition;
   final PlaybackRepeatMode? _repeatMode;
   final bool? _shuffleEnabled;
   final String? lastError;
@@ -29,10 +32,13 @@ class PlaybackState {
     this.currentArtist,
     this.currentThumbnailUrl,
     this.currentVideoUrl,
+    this.currentLocalFilePath,
     this.isPreparing = false,
     this.isPlaying = false,
+    this.isRestoredSession = false,
     this.position = Duration.zero,
     this.duration = Duration.zero,
+    this.restoredPosition,
     PlaybackRepeatMode? repeatMode,
     bool? shuffleEnabled,
     this.lastError,
@@ -49,10 +55,13 @@ class PlaybackState {
     String? currentArtist,
     String? currentThumbnailUrl,
     String? currentVideoUrl,
+    Object? currentLocalFilePath = _playbackStateNoChange,
     bool? isPreparing,
     bool? isPlaying,
+    bool? isRestoredSession,
     Duration? position,
     Duration? duration,
+    Object? restoredPosition = _playbackStateNoChange,
     PlaybackRepeatMode? repeatMode,
     bool? shuffleEnabled,
     List<RecentlyPlayedTrack>? recentlyPlayed,
@@ -65,10 +74,17 @@ class PlaybackState {
       currentArtist: currentArtist ?? this.currentArtist,
       currentThumbnailUrl: currentThumbnailUrl ?? this.currentThumbnailUrl,
       currentVideoUrl: currentVideoUrl ?? this.currentVideoUrl,
+      currentLocalFilePath: identical(currentLocalFilePath, _playbackStateNoChange)
+          ? this.currentLocalFilePath
+          : currentLocalFilePath as String?,
       isPreparing: isPreparing ?? this.isPreparing,
       isPlaying: isPlaying ?? this.isPlaying,
+      isRestoredSession: isRestoredSession ?? this.isRestoredSession,
       position: position ?? this.position,
       duration: duration ?? this.duration,
+      restoredPosition: identical(restoredPosition, _playbackStateNoChange)
+          ? this.restoredPosition
+          : restoredPosition as Duration?,
       repeatMode: repeatMode ?? this.repeatMode,
       shuffleEnabled: shuffleEnabled ?? this.shuffleEnabled,
       recentlyPlayed: recentlyPlayed ?? this.recentlyPlayed,

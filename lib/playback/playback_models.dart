@@ -60,6 +60,24 @@ class QueuedTrack {
           : localFilePath as String?,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'videoId': videoId,
+        'videoUrl': videoUrl,
+        'title': title,
+        'artist': artist,
+        'thumbnailUrl': thumbnailUrl,
+        'localFilePath': localFilePath,
+      };
+
+  factory QueuedTrack.fromJson(Map<String, dynamic> json) => QueuedTrack(
+        videoId: json['videoId'] as String,
+        videoUrl: json['videoUrl'] as String,
+        title: json['title'] as String,
+        artist: json['artist'] as String,
+        thumbnailUrl: json['thumbnailUrl'] as String,
+        localFilePath: json['localFilePath'] as String?,
+      );
 }
 
 const Object _playbackUnsetField = Object();

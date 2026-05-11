@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../download_manager/download_provider.dart';
+import '../../playback/playback_provider.dart';
 import '../../providers/search_provider.dart';
 import '../../recommendations/recommendation_provider.dart';
 import '../../settings/app_preferences.dart';
@@ -11,6 +12,7 @@ import '../../services/notification_service.dart';
 import '../../theme.dart';
 import 'pages/app_updates_page.dart';
 import 'pages/notifications_page.dart';
+import 'pages/playback_page.dart';
 import 'pages/recommendation_page.dart';
 import 'pages/profile_pages.dart';
 import 'pages/search_page.dart';
@@ -37,6 +39,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   String _lastFmApiKey = '';
   RecommendationSeedStrategy _recommendationSeedStrategy =
       AppPreferences.defaultRecommendationSeedStrategy;
+  bool _sessionRestore = true;
+  bool _backgroundPlayback = false;
+  AudioSource _audioSource = AppPreferences.defaultAudioSource;
 
   @override
   void initState() {
@@ -62,6 +67,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       _lastFmApiKey = AppPreferences.readLastFmApiKey(preferences);
       _recommendationSeedStrategy =
           AppPreferences.readRecommendationSeedStrategy(preferences);
+      _sessionRestore = AppPreferences.readResumeOnStart(preferences);
+      _backgroundPlayback = AppPreferences.readBackgroundPlayback(preferences);
+      _audioSource = AppPreferences.readAudioSource(preferences);
     });
   }
 
@@ -174,6 +182,140 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         );
                       },
                     ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            const SectionLabel('Playback'),
+            SettingsGroup(
+              children: [
+                SettingsActionTile(
+                  icon: Icons.play_circle_outline_rounded,
+                  title: 'Playback',
+                  subtitle: 'Session restore, background audio',
+                  onTap: () => _openSettingsPage(
+                    PlaybackPage(
+                      sessionRestore: _sessionRestore,
+                      backgroundPlayback: _backgroundPlayback,
+                      onSessionRestoreChanged: (value) async {
+                        setState(() => _sessionRestore = value);
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool(
+                            AppPreferences.resumeOnStartKey, value);
+                        if (!value) {
+                          await ref
+                              .read(playbackNotifierProvider.notifier)
+                              .clearSavedSession();
+                        }
+                      },
+                      onBackgroundPlaybackChanged: (value) async {
+                        setState(() => _backgroundPlayback = value);
+                        final prefs = await SharedPreferences.getInstance();
+                        await prefs.setBool(
+                            AppPreferences.backgroundPlaybackKey, value);
+                      },
+                      onShowComingSoon: _showComingSoonMessage,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 24),
+            const SectionLabel('Audio Engine'),
+            SettingsGroup(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: bgSurface,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.headphones_rounded,
+                          color: accentPrimary,
+                          size: 22,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Audio source',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyLarge
+                                  ?.copyWith(
+                                    color: textPrimary,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              _audioSource == AudioSource.youtube
+                                  ? 'Streaming from YouTube'
+                                  : 'Streaming from JioSaavn',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodyMedium
+                                  ?.copyWith(color: textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      SegmentedButton<AudioSource>(
+                        segments: const [
+                          ButtonSegment(
+                            value: AudioSource.youtube,
+                            label: Text('YouTube'),
+                          ),
+                          ButtonSegment(
+                            value: AudioSource.jioSaavn,
+                            label: Text('JioSaavn'),
+                          ),
+                        ],
+                        selected: {_audioSource},
+                        showSelectedIcon: false,
+                        style: ButtonStyle(
+                          backgroundColor:
+                              WidgetStateProperty.resolveWith<Color>(
+                            (states) => states.contains(WidgetState.selected)
+                                ? accentPrimary
+                                : bgSurface,
+                          ),
+                          foregroundColor:
+                              WidgetStateProperty.resolveWith<Color>(
+                            (states) => states.contains(WidgetState.selected)
+                                ? Colors.white
+                                : textSecondary,
+                          ),
+                          side: WidgetStateProperty.all(
+                            const BorderSide(color: bgDivider),
+                          ),
+                          textStyle: WidgetStateProperty.all(
+                            const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        onSelectionChanged: (Set<AudioSource> selected) async {
+                          final value = selected.first;
+                          setState(() => _audioSource = value);
+                          final prefs = await SharedPreferences.getInstance();
+                          await prefs.setString(
+                              AppPreferences.audioSourceKey, value.name);
+                        },
+                      ),
+                    ],
                   ),
                 ),
               ],

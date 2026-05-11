@@ -17,6 +17,29 @@ enum SearchThumbnailQuality {
   }
 }
 
+enum AudioSource {
+  youtube,
+  jioSaavn;
+
+  String get label {
+    switch (this) {
+      case AudioSource.youtube:
+        return 'YouTube';
+      case AudioSource.jioSaavn:
+        return 'JioSaavn';
+    }
+  }
+
+  String get description {
+    switch (this) {
+      case AudioSource.youtube:
+        return 'Search and stream audio from YouTube';
+      case AudioSource.jioSaavn:
+        return 'Search via JioSaavn, saved YouTube tracks unaffected';
+    }
+  }
+}
+
 enum RecommendationSeedStrategy {
   mostRecent,
   randomLiked,
@@ -70,6 +93,19 @@ class AppPreferences {
   static const String lastFmApiKeyKey = 'lastfm_api_key';
   static const String recommendationSeedStrategyKey =
       'recommendation_seed_strategy';
+  static const String audioSourceKey = 'audio_source';
+  static const AudioSource defaultAudioSource = AudioSource.youtube;
+  static const String resumeOnStartKey = 'resume_on_start';
+  static const String backgroundPlaybackKey = 'background_playback';
+  static const String sessionVideoIdKey = 'session_video_id';
+  static const String sessionTitleKey = 'session_title';
+  static const String sessionArtistKey = 'session_artist';
+  static const String sessionThumbnailUrlKey = 'session_thumbnail_url';
+  static const String sessionVideoUrlKey = 'session_video_url';
+  static const String sessionLocalFilePathKey = 'session_local_file_path';
+  static const String sessionPositionMsKey = 'session_position_ms';
+  static const String sessionQueueJsonKey = 'session_queue_json';
+  static const String sessionShuffleEnabledKey = 'session_shuffle_enabled';
 
   static String readStringPreference(
     SharedPreferences preferences,
@@ -166,5 +202,36 @@ class AppPreferences {
       loadRecommendationSeedStrategy() async {
     final preferences = await SharedPreferences.getInstance();
     return readRecommendationSeedStrategy(preferences);
+  }
+
+  static AudioSource readAudioSource(SharedPreferences preferences) {
+    final value = preferences.getString(audioSourceKey);
+    return AudioSource.values.firstWhere(
+      (s) => s.name == value,
+      orElse: () => defaultAudioSource,
+    );
+  }
+
+  static Future<AudioSource> loadAudioSource() async {
+    final preferences = await SharedPreferences.getInstance();
+    return readAudioSource(preferences);
+  }
+
+  static bool readResumeOnStart(SharedPreferences preferences) {
+    return preferences.getBool(resumeOnStartKey) ?? true;
+  }
+
+  static Future<bool> loadResumeOnStart() async {
+    final preferences = await SharedPreferences.getInstance();
+    return readResumeOnStart(preferences);
+  }
+
+  static bool readBackgroundPlayback(SharedPreferences preferences) {
+    return preferences.getBool(backgroundPlaybackKey) ?? true;
+  }
+
+  static Future<bool> loadBackgroundPlayback() async {
+    final preferences = await SharedPreferences.getInstance();
+    return readBackgroundPlayback(preferences);
   }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../api/jiosaavn_service.dart';
 import '../api/youtube_service.dart';
 import '../recommendations/recommendation_provider.dart';
 import '../services/native_player_service.dart';
@@ -22,6 +23,7 @@ final StateNotifierProvider<PlaybackNotifier, PlaybackState>
   return PlaybackNotifier(
     ref.read(nativePlayerServiceProvider),
     ref.read(youtubeServiceProvider),
+    ref.read(jioSaavnServiceProvider),
     ref.read(libraryProvider.notifier),
     preferencesResolver: () => ref.read(recommendationPreferencesProvider),
     ensurePreferencesLoaded: () =>
