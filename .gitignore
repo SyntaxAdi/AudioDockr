@@ -15,7 +15,8 @@
 .swiftpm/
 .codex
 migrate_working_dir/
-
+.devin/
+.codex
 # ── Editors & IDEs ────────────────────────────
 # IntelliJ / Android Studio
 *.iml
@@ -134,3 +135,4 @@ GEMINI.md
 AGENTS.md
 .windsurfrules
 .cursorrules
+.codex

@@ -5,20 +5,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../settings/app_preferences.dart';
 import '../../../theme.dart';
 
-const Color _purple = Color(0xFFB060FF);
-
-enum _AccentType { yellow, cyan, purple }
+enum _AccentType { yellow, cyan }
 
 Color _accentColor(_AccentType t) => switch (t) {
       _AccentType.yellow => accentPrimary,
       _AccentType.cyan => accentCyan,
-      _AccentType.purple => _purple,
     };
 
 Color _iconBgColor(_AccentType t) => switch (t) {
       _AccentType.yellow => const Color(0xFF12120E),
       _AccentType.cyan => const Color(0xFF001820),
-      _AccentType.purple => const Color(0xFF0E0818),
     };
 
 class PlaybackPage extends StatefulWidget {
@@ -28,14 +24,12 @@ class PlaybackPage extends StatefulWidget {
     required this.backgroundPlayback,
     required this.onSessionRestoreChanged,
     required this.onBackgroundPlaybackChanged,
-    required this.onShowComingSoon,
   });
 
   final bool sessionRestore;
   final bool backgroundPlayback;
   final ValueChanged<bool> onSessionRestoreChanged;
   final ValueChanged<bool> onBackgroundPlaybackChanged;
-  final ValueChanged<String> onShowComingSoon;
 
   @override
   State<PlaybackPage> createState() => _PlaybackPageState();
@@ -78,9 +72,6 @@ class _PlaybackPageState extends State<PlaybackPage> {
                   children: [
                     _buildSectionLabel('Playback config'),
                     _buildMainCard(),
-                    _buildSectionLabel('Advanced'),
-                    _buildAdvancedCard(),
-                    _buildScanDivider(),
                   ],
                 ),
               ),
@@ -174,38 +165,6 @@ class _PlaybackPageState extends State<PlaybackPage> {
     );
   }
 
-  Widget _buildAdvancedCard() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: const BoxDecoration(
-        color: Color(0xFF0D0D16),
-        border: Border(
-          top: BorderSide(color: Color(0xFF1E1E30)),
-          right: BorderSide(color: Color(0xFF1E1E30)),
-          bottom: BorderSide(color: Color(0xFF1E1E30)),
-          left: BorderSide(color: accentCyan, width: 3),
-        ),
-      ),
-      child: _CpChevronRow(
-        icon: Icons.tune_rounded,
-        title: 'Crossfade',
-        subtitle: 'Smooth transitions between tracks',
-        onTap: () => widget.onShowComingSoon('Crossfade'),
-      ),
-    );
-  }
-
-  Widget _buildScanDivider() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
-      child: CustomPaint(
-        size: const Size(double.infinity, 1),
-        painter: _DashedLinePainter(
-          color: accentPrimary.withValues(alpha: 0.15),
-        ),
-      ),
-    );
-  }
 }
 
 // ── Toggle row ────────────────────────────────────────────────────────────────
@@ -274,72 +233,6 @@ class _CpToggleRow extends StatelessWidget {
   }
 }
 
-// ── Chevron row ───────────────────────────────────────────────────────────────
-
-class _CpChevronRow extends StatelessWidget {
-  const _CpChevronRow({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            _CpIconBox(icon: icon, accentType: _AccentType.purple),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title.toUpperCase(),
-                    style: GoogleFonts.shareTechMono(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                      color: _purple,
-                      letterSpacing: 1.0,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.shareTechMono(
-                      fontSize: 11,
-                      color: const Color(0xFF555570),
-                      letterSpacing: 0.4,
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: _purple.withValues(alpha: 0.45),
-              size: 20,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 // ── Icon box ──────────────────────────────────────────────────────────────────
 
 class _CpIconBox extends StatelessWidget {
@@ -386,9 +279,7 @@ class _CpToggle extends StatelessWidget {
     final trackBg = value
         ? (accentType == _AccentType.cyan
             ? const Color(0xFF001820)
-            : accentType == _AccentType.purple
-                ? const Color(0xFF0E0818)
-                : const Color(0xFF1A1200))
+            : const Color(0xFF1A1200))
         : const Color(0xFF1A1A26);
     final borderColor = value ? accent : const Color(0xFF2A2A40);
     final thumbColor = value ? accent : const Color(0xFF2A2A40);
